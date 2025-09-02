@@ -32,6 +32,12 @@ optional-dependencies.dev = [
 ]
 scripts.openhands-cli = "openhands_cli.simple_main:main"
 
+[dependency-groups]
+dev = [
+  "pre-commit>=4.3",
+  "pyinstaller>=6.15",
+]
+
 [tool.poetry]
 name = "openhands-cli"
 version = "0.1.0"
@@ -103,8 +109,3 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
-
-[dependency-groups]
-dev = [
-    "pyinstaller>=6.15.0",
-]
