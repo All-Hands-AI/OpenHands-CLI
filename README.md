@@ -54,3 +54,88 @@ Run `make help` to see all available commands:
 ```bash
 make help
 ```
+
+## Binary Packaging
+
+The OpenHands CLI can be packaged into a standalone executable binary using PyInstaller. This allows distribution of the CLI without requiring users to install Python or dependencies.
+
+### Building the Executable
+
+#### Quick Build
+
+Use the provided build script to create a standalone executable:
+
+```bash
+# Using shell script (recommended - handles installation automatically)
+./build.sh --install-pyinstaller
+
+# Using Python script directly (requires PyInstaller to be pre-installed)
+uv run python build.py
+```
+
+#### Manual Build
+
+You can also build manually using PyInstaller with uv:
+
+```bash
+# Install PyInstaller as dev dependency
+uv add --dev pyinstaller
+
+# Build using the spec file
+uv run pyinstaller openhands-cli.spec --clean
+```
+
+### Build Options
+
+The build script supports several options:
+
+```bash
+# Install PyInstaller and build (shell script handles installation)
+./build.sh --install-pyinstaller
+
+# Build without testing the executable
+./build.sh --install-pyinstaller --no-test
+
+# Build without cleaning previous artifacts
+./build.sh --install-pyinstaller --no-clean
+
+# Use a custom spec file
+./build.sh --install-pyinstaller --spec custom.spec
+
+# Show help
+./build.sh --help
+```
+
+**Note:** The shell script (`build.sh`) automatically handles PyInstaller installation when using the `--install-pyinstaller` flag. The Python script (`build.py`) can be used directly but requires PyInstaller to be pre-installed.
+
+### Output
+
+The build process creates:
+- `dist/openhands-cli` - The standalone executable
+- `build/` - Temporary build files (automatically cleaned)
+
+The executable is typically 10-15 MB and includes all necessary dependencies.
+
+### Testing the Executable
+
+The build script automatically tests the executable, but you can also test manually:
+
+```bash
+# Run the executable
+./dist/openhands-cli
+
+# Check that it displays the CLI interface
+```
+
+### Packaging Configuration
+
+The packaging is configured through:
+- `openhands-cli.spec` - PyInstaller specification file
+- `build.py` - Build automation script
+- `build.sh` - Shell wrapper script
+
+The spec file is optimized for:
+- Single-file executable
+- Minimal size through exclusions
+- All required dependencies included
+- Console application mode
