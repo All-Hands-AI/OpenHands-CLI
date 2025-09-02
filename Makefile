@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format clean run install-pre-commit-hooks lint-pre-commit
+.PHONY: help install install-dev test lint format clean run install-pre-commit-hooks
 
 # Default target
 help:
@@ -7,8 +7,7 @@ help:
 	@echo "  install-dev              - Install with development dependencies"
 	@echo "  install-pre-commit-hooks - Install pre-commit hooks"
 	@echo "  test                     - Run tests"
-	@echo "  lint                     - Run linting with ruff and mypy"
-	@echo "  lint-pre-commit          - Run pre-commit on all files"
+	@echo "  lint                     - Run pre-commit on all files"
 	@echo "  format                   - Format code with ruff"
 	@echo "  clean                    - Clean build artifacts"
 	@echo "  run                      - Run the CLI"
@@ -33,14 +32,11 @@ install-pre-commit-hooks: install-dev
 	@echo "Pre-commit hooks installed successfully."
 
 # Run pre-commit on all files
-lint-pre-commit: install-dev
+lint: install-dev
 	@echo "Running pre-commit on all files..."
 	uv run pre-commit run --all-files --show-diff-on-failure
 
-# Run linting
-lint:
-	uv run ruff check openhands_cli/
-	uv run mypy openhands_cli/
+
 
 # Format code
 format:
