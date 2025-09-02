@@ -25,10 +25,13 @@ dev = [
 ]
 
 [project.scripts]
-openhands-cli = "openhands.simple_main:main"
+openhands-cli = "openhands_cli.simple_main:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["openhands_cli"]
 
 # Keep Poetry configuration for compatibility
 [tool.poetry]
@@ -38,7 +41,7 @@ description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 authors = ["OpenHands Team <contact@all-hands.dev>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "openhands"}]
+packages = [{include = "openhands_cli"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -53,7 +56,7 @@ flake8 = "^6.0.0"
 mypy = "^1.0.0"
 
 [tool.poetry.scripts]
-openhands-cli = "openhands.simple_main:main"
+openhands-cli = "openhands_cli.simple_main:main"
 
 [tool.black]
 line-length = 88
