@@ -1,0 +1,34 @@
+# Workflow that runs lint on the python code
+name: Lint
+
+# Always run on "main"
+# Always run on PRs
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# If triggered by a PR, it will be in the same group. However, each commit on main will be in its own unique group
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # Run lint on the python code
+  lint-python:
+    name: Lint python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+          cache: "pip"
+      - name: Install pre-commit
+        run: pip install pre-commit==3.7.0
+      - name: Run pre-commit hooks
+        run: pre-commit run --all-files --show-diff-on-failure

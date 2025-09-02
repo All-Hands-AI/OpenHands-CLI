@@ -1,15 +1,17 @@
-.PHONY: help install install-dev test lint format clean run
+.PHONY: help install install-dev test lint format clean run install-pre-commit-hooks lint-pre-commit
 
 # Default target
 help:
 	@echo "OpenHands CLI - Available commands:"
-	@echo "  install      - Install the package"
-	@echo "  install-dev  - Install with development dependencies"
-	@echo "  test         - Run tests"
-	@echo "  lint         - Run linting"
-	@echo "  format       - Format code"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  run          - Run the CLI"
+	@echo "  install                  - Install the package"
+	@echo "  install-dev              - Install with development dependencies"
+	@echo "  install-pre-commit-hooks - Install pre-commit hooks"
+	@echo "  test                     - Run tests"
+	@echo "  lint                     - Run linting with ruff and mypy"
+	@echo "  lint-pre-commit          - Run pre-commit on all files"
+	@echo "  format                   - Format code with ruff"
+	@echo "  clean                    - Clean build artifacts"
+	@echo "  run                      - Run the CLI"
 
 # Install the package
 install:
@@ -23,15 +25,26 @@ install-dev:
 test:
 	uv run pytest
 
+# Install pre-commit hooks
+install-pre-commit-hooks: install-dev
+	@echo "Installing pre-commit hooks..."
+	@git config --unset-all core.hooksPath || true
+	uv run pre-commit install
+	@echo "Pre-commit hooks installed successfully."
+
+# Run pre-commit on all files
+lint-pre-commit: install-dev
+	@echo "Running pre-commit on all files..."
+	uv run pre-commit run --all-files --show-diff-on-failure
+
 # Run linting
 lint:
-	uv run flake8 openhands_cli/
+	uv run ruff check openhands_cli/
 	uv run mypy openhands_cli/
 
 # Format code
 format:
-	uv run black openhands_cli/
-	uv run isort openhands_cli/
+	uv run ruff format openhands_cli/
 
 # Clean build artifacts
 clean:
