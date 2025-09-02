@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openhands-cli"
+version = "0.1.0"
+description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
+authors = [{name = "OpenHands Team", email = "contact@all-hands.dev"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "prompt-toolkit>=3.0.0",
+    "openhands @ git+https://github.com/All-Hands-AI/agent-sdk.git@37749a54c18bc628b6bf7517ad96286cecdb8a67",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+openhands-cli = "openhands_cli.simple_main:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# Keep Poetry configuration for compatibility
+[tool.poetry]
+name = "openhands-cli"
+version = "0.1.0"
+description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
+authors = ["OpenHands Team <contact@all-hands.dev>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "openhands_cli"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+prompt-toolkit = "^3.0.0"
+openhands = {git = "https://github.com/All-Hands-AI/agent-sdk.git", rev = "37749a54c18bc628b6bf7517ad96286cecdb8a67"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+black = "^23.0.0"
+isort = "^5.0.0"
+flake8 = "^6.0.0"
+mypy = "^1.0.0"
+
+[tool.poetry.scripts]
+openhands-cli = "openhands_cli.simple_main:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
