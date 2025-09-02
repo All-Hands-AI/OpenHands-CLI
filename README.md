@@ -28,10 +28,9 @@ This project uses pre-commit hooks to ensure code quality. The following tools a
 
 ```bash
 # Run all pre-commit hooks
-make lint-pre-commit
+make lint
 
-# Run individual linters
-make lint        # Run ruff and mypy
+# Format code
 make format      # Format code with ruff
 ```
 
