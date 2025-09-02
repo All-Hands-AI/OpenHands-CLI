@@ -33,31 +33,16 @@ def clean_build_directories():
     print("✅ Cleanup complete!")
 
 
-def install_dependencies(install_pyinstaller=False):
-    """Install required dependencies for building."""
-    if not install_pyinstaller:
-        print("⚠️  Skipping PyInstaller installation (use --install-pyinstaller to install)")
+def check_pyinstaller():
+    """Check if PyInstaller is available."""
+    try:
+        subprocess.run(["uv", "run", "pyinstaller", "--version"], 
+                      check=True, capture_output=True)
         return True
-        
-    print("📦 Installing build dependencies with uv...")
-    
-    try:
-        # Check if uv is available
-        subprocess.run(["uv", "--version"], check=True, capture_output=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ uv is not available. Please install uv first.")
+        print("❌ PyInstaller is not available. Use --install-pyinstaller flag or install manually with:")
+        print("   uv add --dev pyinstaller")
         return False
-    
-    try:
-        subprocess.run([
-            "uv", "add", "--dev", "pyinstaller"
-        ], check=True, capture_output=True)
-        print("✅ PyInstaller installed successfully with uv!")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install PyInstaller: {e}")
-        return False
-    
-    return True
 
 
 def build_executable(spec_file="openhands-cli.spec", clean=True, install_pyinstaller=False):
@@ -65,7 +50,8 @@ def build_executable(spec_file="openhands-cli.spec", clean=True, install_pyinsta
     if clean:
         clean_build_directories()
     
-    if not install_dependencies(install_pyinstaller):
+    # Check if PyInstaller is available (installation is handled by build.sh)
+    if not check_pyinstaller():
         return False
     
     print(f"🔨 Building executable using {spec_file}...")
