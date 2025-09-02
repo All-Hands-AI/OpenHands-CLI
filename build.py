@@ -33,15 +33,26 @@ def clean_build_directories():
     print("✅ Cleanup complete!")
 
 
-def install_dependencies():
+def install_dependencies(install_pyinstaller=False):
     """Install required dependencies for building."""
-    print("📦 Installing build dependencies...")
+    if not install_pyinstaller:
+        print("⚠️  Skipping PyInstaller installation (use --install-pyinstaller to install)")
+        return True
+        
+    print("📦 Installing build dependencies with uv...")
+    
+    try:
+        # Check if uv is available
+        subprocess.run(["uv", "--version"], check=True, capture_output=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("❌ uv is not available. Please install uv first.")
+        return False
     
     try:
         subprocess.run([
-            sys.executable, "-m", "pip", "install", "pyinstaller"
+            "uv", "add", "--dev", "pyinstaller"
         ], check=True, capture_output=True)
-        print("✅ PyInstaller installed successfully!")
+        print("✅ PyInstaller installed successfully with uv!")
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to install PyInstaller: {e}")
         return False
@@ -49,19 +60,19 @@ def install_dependencies():
     return True
 
 
-def build_executable(spec_file="openhands-cli.spec", clean=True):
+def build_executable(spec_file="openhands-cli.spec", clean=True, install_pyinstaller=False):
     """Build the executable using PyInstaller."""
     if clean:
         clean_build_directories()
     
-    if not install_dependencies():
+    if not install_dependencies(install_pyinstaller):
         return False
     
     print(f"🔨 Building executable using {spec_file}...")
     
     try:
-        # Run PyInstaller with the spec file
-        cmd = [sys.executable, "-m", "PyInstaller", spec_file, "--clean"]
+        # Run PyInstaller with uv
+        cmd = ["uv", "run", "pyinstaller", spec_file, "--clean"]
         
         print(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -141,6 +152,8 @@ def main():
                        help="Skip cleaning build directories")
     parser.add_argument("--no-test", action="store_true", 
                        help="Skip testing the built executable")
+    parser.add_argument("--install-pyinstaller", action="store_true",
+                       help="Install PyInstaller using uv before building")
     
     args = parser.parse_args()
     
@@ -153,7 +166,7 @@ def main():
         return 1
     
     # Build the executable
-    if not build_executable(args.spec, clean=not args.no_clean):
+    if not build_executable(args.spec, clean=not args.no_clean, install_pyinstaller=args.install_pyinstaller):
         return 1
     
     # Test the executable

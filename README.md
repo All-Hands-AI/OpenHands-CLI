@@ -66,23 +66,23 @@ The OpenHands CLI can be packaged into a standalone executable binary using PyIn
 Use the provided build script to create a standalone executable:
 
 ```bash
-# Using Python script
-python3 build.py
+# Using Python script (install PyInstaller first)
+python3 build.py --install-pyinstaller
 
 # Using shell script (Unix/Linux/macOS)
-./build.sh
+./build.sh --install-pyinstaller
 ```
 
 #### Manual Build
 
-You can also build manually using PyInstaller:
+You can also build manually using PyInstaller with uv:
 
 ```bash
-# Install PyInstaller
-pip install pyinstaller
+# Install PyInstaller as dev dependency
+uv add --dev pyinstaller
 
 # Build using the spec file
-pyinstaller openhands-cli.spec --clean
+uv run pyinstaller openhands-cli.spec --clean
 ```
 
 ### Build Options
@@ -90,18 +90,23 @@ pyinstaller openhands-cli.spec --clean
 The build script supports several options:
 
 ```bash
+# Install PyInstaller and build
+python3 build.py --install-pyinstaller
+
 # Build without testing the executable
-python3 build.py --no-test
+python3 build.py --install-pyinstaller --no-test
 
 # Build without cleaning previous artifacts
-python3 build.py --no-clean
+python3 build.py --install-pyinstaller --no-clean
 
 # Use a custom spec file
-python3 build.py --spec custom.spec
+python3 build.py --install-pyinstaller --spec custom.spec
 
 # Show help
 python3 build.py --help
 ```
+
+**Note:** Use `--install-pyinstaller` flag to automatically install PyInstaller as a dev dependency using uv. If PyInstaller is already installed, you can omit this flag.
 
 ### Output
 
