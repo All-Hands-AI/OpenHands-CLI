@@ -22,15 +22,20 @@ from pydantic import SecretStr
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 try:
-    from openhands.core.agent.codeact_agent import CodeActAgent
-    from openhands.core.config import LLMConfig
-    from openhands.core.conversation import Conversation
-    from openhands.core.event import EventType
-    from openhands.core.llm import LLM, Message, TextContent
-    from openhands.core.tool import Tool
-    from openhands.tools.execute_bash import BashExecutor, execute_bash_tool
-    from openhands.tools.str_replace_editor import (
+    from openhands.sdk import (
+        LLM,
+        Agent,
+        Conversation,
+        EventType,
+        LLMConfig,
+        Message,
+        TextContent,
+        Tool,
+    )
+    from openhands.tools import (
+        BashExecutor,
         FileEditorExecutor,
+        execute_bash_tool,
         str_replace_editor_tool,
     )
 except ImportError as e:
@@ -44,7 +49,7 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]:
+def setup_agent() -> tuple[LLM | None, Agent | None, Conversation | None]:
     """Setup the agent with environment variables."""
     try:
         # Get API configuration from environment
@@ -81,7 +86,7 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
         ]
 
         # Create agent
-        agent = CodeActAgent(llm=llm, tools=tools)
+        agent = Agent(llm=llm, tools=tools)
 
         # Setup conversation with callback
         def conversation_callback(event: EventType) -> None:
