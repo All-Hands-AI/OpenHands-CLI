@@ -66,9 +66,8 @@ def main() -> int:
             if choice == "1":
                 # Start agent chat
                 try:
-                    from openhands_cli.agent_chat import SimpleAgentChat
-                    chat = SimpleAgentChat()
-                    chat.run_chat()
+                    from openhands_cli.agent_chat import main as run_agent_chat
+                    run_agent_chat()
                 except ImportError as e:
                     print_formatted_text(HTML(
                         f"<red>Error: Agent chat requires additional dependencies: {e}</red>"
