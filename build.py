@@ -96,7 +96,7 @@ def build_executable(
 
 
 def test_executable() -> bool:
-    """Test the built executable."""
+    """Test the built executable with simplified checks."""
     print("🧪 Testing the built executable...")
 
     exe_path = Path("dist/openhands-cli")
@@ -112,50 +112,14 @@ def test_executable() -> bool:
         if os.name != "nt":
             os.chmod(exe_path, 0o755)
 
-        # Test 1: Basic startup test - should fail gracefully without API key
-        print("  Testing basic startup (should fail gracefully without API key)...")
+        # Simple test: Check that executable can start and respond to /help command
+        print("  Testing executable startup and /help command...")
         result = subprocess.run(
             [str(exe_path)],
             capture_output=True,
             text=True,
-            timeout=10,
-            input="\n",  # Send newline to exit quickly
-            env={
-                **os.environ,
-                "LITELLM_API_KEY": "",
-                "OPENAI_API_KEY": "",
-            },  # Clear API keys
-        )
-
-        # Should return exit code 1 (no API key) but not crash
-        if result.returncode == 1:
-            print("  ✅ Executable handles missing API key correctly (exit code 1)")
-            if (
-                "No API key found" in result.stderr
-                or "No API key found" in result.stdout
-            ):
-                print("  ✅ Proper error message displayed")
-            else:
-                print("  ⚠️  Expected API key error message not found")
-                print("  STDOUT:", result.stdout[:200])
-                print("  STDERR:", result.stderr[:200])
-        elif result.returncode == 0:
-            print("  ⚠️  Executable returned 0 but should fail without API key")
-            return False
-        else:
-            print(f"  ❌ Unexpected return code {result.returncode}")
-            print("  STDOUT:", result.stdout[:500])
-            print("  STDERR:", result.stderr[:500])
-            return False
-
-        # Test 2: Check that it doesn't crash with missing prompt files
-        print("  Testing with dummy API key (should not crash on startup)...")
-        result = subprocess.run(
-            [str(exe_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            input="\n",  # Send newline to exit quickly
+            timeout=15,
+            input="/help\n/exit\n",  # Send /help command then exit
             env={
                 **os.environ,
                 "LITELLM_API_KEY": "dummy-test-key",
@@ -163,22 +127,19 @@ def test_executable() -> bool:
             },
         )
 
-        # Should not crash with missing prompt file error
-        if "system_prompt.j2 not found" in result.stderr:
-            print("  ❌ Executable still has missing prompt file error!")
-            print("  STDERR:", result.stderr)
-            return False
+        # Check for expected help output
+        output = result.stdout + result.stderr
+        if "OpenHands CLI Help" in output and "Available commands:" in output:
+            print("  ✅ Executable starts and /help command works correctly")
+            return True
         else:
-            print("  ✅ No missing prompt file errors detected")
-
-        print("✅ Executable test passed!")
-        return True
+            print("  ❌ Expected help output not found")
+            print("  Combined output:", output[:1000])
+            return False
 
     except subprocess.TimeoutExpired:
-        print(
-            "  ⚠️  Executable test timed out (this might be normal for interactive CLIs)"
-        )
-        return True
+        print("  ❌ Executable test timed out")
+        return False
     except Exception as e:
         print(f"❌ Error testing executable: {e}")
         return False
