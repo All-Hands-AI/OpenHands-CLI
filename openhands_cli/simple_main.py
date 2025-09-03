@@ -4,7 +4,6 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
-import sys
 import traceback
 
 from prompt_toolkit import PromptSession, print_formatted_text
