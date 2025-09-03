@@ -112,28 +112,71 @@ def test_executable() -> bool:
         if os.name != "nt":
             os.chmod(exe_path, 0o755)
 
-        # Run the executable with a timeout
+        # Test 1: Basic startup test - should fail gracefully without API key
+        print("  Testing basic startup (should fail gracefully without API key)...")
         result = subprocess.run(
-            [str(exe_path)], capture_output=True, text=True, timeout=30
+            [str(exe_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            input="\n",  # Send newline to exit quickly
+            env={
+                **os.environ,
+                "LITELLM_API_KEY": "",
+                "OPENAI_API_KEY": "",
+            },  # Clear API keys
         )
 
-        if result.returncode == 0:
-            print("✅ Executable test passed!")
-            print("Output preview:")
-            print(
-                result.stdout[:500] + "..."
-                if len(result.stdout) > 500
-                else result.stdout
-            )
-            return True
-        else:
-            print(f"❌ Executable test failed with return code {result.returncode}")
-            print("STDERR:", result.stderr)
+        # Should return exit code 1 (no API key) but not crash
+        if result.returncode == 1:
+            print("  ✅ Executable handles missing API key correctly (exit code 1)")
+            if (
+                "No API key found" in result.stderr
+                or "No API key found" in result.stdout
+            ):
+                print("  ✅ Proper error message displayed")
+            else:
+                print("  ⚠️  Expected API key error message not found")
+                print("  STDOUT:", result.stdout[:200])
+                print("  STDERR:", result.stderr[:200])
+        elif result.returncode == 0:
+            print("  ⚠️  Executable returned 0 but should fail without API key")
             return False
+        else:
+            print(f"  ❌ Unexpected return code {result.returncode}")
+            print("  STDOUT:", result.stdout[:500])
+            print("  STDERR:", result.stderr[:500])
+            return False
+
+        # Test 2: Check that it doesn't crash with missing prompt files
+        print("  Testing with dummy API key (should not crash on startup)...")
+        result = subprocess.run(
+            [str(exe_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            input="\n",  # Send newline to exit quickly
+            env={
+                **os.environ,
+                "LITELLM_API_KEY": "dummy-test-key",
+                "LITELLM_MODEL": "dummy-model",
+            },
+        )
+
+        # Should not crash with missing prompt file error
+        if "system_prompt.j2 not found" in result.stderr:
+            print("  ❌ Executable still has missing prompt file error!")
+            print("  STDERR:", result.stderr)
+            return False
+        else:
+            print("  ✅ No missing prompt file errors detected")
+
+        print("✅ Executable test passed!")
+        return True
 
     except subprocess.TimeoutExpired:
         print(
-            "⚠️  Executable test timed out (this might be normal for interactive CLIs)"
+            "  ⚠️  Executable test timed out (this might be normal for interactive CLIs)"
         )
         return True
     except Exception as e:

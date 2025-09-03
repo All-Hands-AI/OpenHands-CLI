@@ -34,7 +34,7 @@ a = Analysis(
         *collect_data_files('tiktoken_ext'),
         *collect_data_files('litellm'),
         # Include Jinja prompt templates required by the agent SDK
-        *collect_data_files('openhands.core.agent.codeact_agent', includes=['prompts/*.j2']),
+        *collect_data_files('openhands.sdk.agent.agent', includes=['prompts/*.j2']),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
@@ -42,7 +42,7 @@ a = Analysis(
         'openhands_cli.pt_style',
         *collect_submodules('prompt_toolkit'),
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
-        *collect_submodules('openhands.core'),
+        *collect_submodules('openhands.sdk'),
         *collect_submodules('openhands.tools'),
 
         *collect_submodules('tiktoken'),

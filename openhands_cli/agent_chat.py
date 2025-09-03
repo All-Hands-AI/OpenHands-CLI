@@ -49,8 +49,12 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-def setup_agent() -> tuple[LLM | None, Agent | None, Conversation | None]:
-    """Setup the agent with environment variables."""
+def setup_agent() -> tuple[LLM | None, Agent | None, Conversation | None, int]:
+    """Setup the agent with environment variables.
+
+    Returns:
+        tuple: (llm, agent, conversation, exit_code) where exit_code is 0 for success, non-zero for error
+    """
     try:
         # Get API configuration from environment
         api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -63,7 +67,7 @@ def setup_agent() -> tuple[LLM | None, Agent | None, Conversation | None]:
                     "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
                 )
             )
-            return None, None, None
+            return None, None, None, 1
 
         # Configure LLM
         llm_config = LLMConfig(
@@ -97,12 +101,12 @@ def setup_agent() -> tuple[LLM | None, Agent | None, Conversation | None]:
         print_formatted_text(
             HTML(f"<green>✓ Agent initialized with model: {model}</green>")
         )
-        return llm, agent, conversation
+        return llm, agent, conversation, 0
 
     except Exception as e:
         print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
         traceback.print_exc()
-        return None, None, None
+        return None, None, None, 2
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -118,12 +122,16 @@ def display_welcome(session_id: str = "chat") -> None:
     print()
 
 
-def run_agent_chat() -> None:
-    """Run the agent chat session using the agent SDK."""
+def run_agent_chat() -> int:
+    """Run the agent chat session using the agent SDK.
+
+    Returns:
+        int: Exit code (0 for success, non-zero for error)
+    """
     # Setup agent
-    llm, agent, conversation = setup_agent()
+    llm, agent, conversation, exit_code = setup_agent()
     if not agent or not conversation:
-        return
+        return exit_code
 
     # Generate session ID
     import uuid
@@ -203,17 +211,25 @@ def run_agent_chat() -> None:
             print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
             break
 
+    return 0
 
-def main() -> None:
-    """Main entry point for agent chat."""
+
+def main() -> int:
+    """Main entry point for agent chat.
+
+    Returns:
+        int: Exit code (0 for success, non-zero for error)
+    """
     try:
-        run_agent_chat()
+        return run_agent_chat()
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        return 0
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
+        return 3
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

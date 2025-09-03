@@ -13,7 +13,7 @@ class TestMainEntryPoint:
         self, mock_run_agent_chat: MagicMock
     ) -> None:
         """Test that main() starts agent chat directly without menu."""
-        mock_run_agent_chat.return_value = None
+        mock_run_agent_chat.return_value = 0
 
         result = simple_main.main()
 

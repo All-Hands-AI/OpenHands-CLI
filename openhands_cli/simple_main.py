@@ -64,8 +64,7 @@ def main() -> int:
         # Start agent chat directly by default
         from openhands_cli.agent_chat import main as run_agent_chat
 
-        run_agent_chat()
-        return 0
+        return run_agent_chat()
 
     except ImportError as e:
         print_formatted_text(
