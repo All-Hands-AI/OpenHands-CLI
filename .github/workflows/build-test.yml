@@ -1,15 +1,14 @@
 # Workflow that builds and tests the binary executable
 name: Build and Test Binary
 
-# Run on PRs to ensure binary builds work correctly
+# Run on commits to every branch to ensure binary builds work correctly
 on:
+  push:
   pull_request:
-    branches:
-      - main
 
-# Cancel previous runs if a new commit is pushed to the PR
+# Cancel previous runs if a new commit is pushed
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,39 +36,6 @@ jobs:
         run: |
           uv sync --dev
       
-      - name: Build binary executable
+      - name: Build and test binary executable
         run: |
           ./build.sh --install-pyinstaller
-      
-      - name: Verify binary was created
-        run: |
-          if [ ! -f "dist/openhands-cli" ]; then
-            echo "❌ Binary executable not found at dist/openhands-cli"
-            exit 1
-          fi
-          echo "✅ Binary executable found"
-          ls -la dist/
-      
-      - name: Test binary executable
-        run: |
-          # Make the binary executable
-          chmod +x dist/openhands-cli
-          
-          # Test that the binary runs without errors
-          echo "🧪 Testing binary executable..."
-          timeout 30s ./dist/openhands-cli || true
-          
-          # Check if the binary at least starts (exit code 0 or timeout is acceptable)
-          if ./dist/openhands-cli --help >/dev/null 2>&1 || [ $? -eq 124 ]; then
-            echo "✅ Binary executable test passed"
-          else
-            echo "❌ Binary executable test failed"
-            exit 1
-          fi
-      
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: openhands-cli-binary
-          path: dist/openhands-cli
-          retention-days: 7
