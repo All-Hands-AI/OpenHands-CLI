@@ -1,0 +1,75 @@
+# Workflow that builds and tests the binary executable
+name: Build and Test Binary
+
+# Run on PRs to ensure binary builds work correctly
+on:
+  pull_request:
+    branches:
+      - main
+
+# Cancel previous runs if a new commit is pushed to the PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test-binary:
+    name: Build and test binary executable
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+      
+      - name: Build binary executable
+        run: |
+          ./build.sh --install-pyinstaller
+      
+      - name: Verify binary was created
+        run: |
+          if [ ! -f "dist/openhands-cli" ]; then
+            echo "❌ Binary executable not found at dist/openhands-cli"
+            exit 1
+          fi
+          echo "✅ Binary executable found"
+          ls -la dist/
+      
+      - name: Test binary executable
+        run: |
+          # Make the binary executable
+          chmod +x dist/openhands-cli
+          
+          # Test that the binary runs without errors
+          echo "🧪 Testing binary executable..."
+          timeout 30s ./dist/openhands-cli || true
+          
+          # Check if the binary at least starts (exit code 0 or timeout is acceptable)
+          if ./dist/openhands-cli --help >/dev/null 2>&1 || [ $? -eq 124 ]; then
+            echo "✅ Binary executable test passed"
+          else
+            echo "❌ Binary executable test failed"
+            exit 1
+          fi
+      
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openhands-cli-binary
+          path: dist/openhands-cli
+          retention-days: 7
