@@ -25,12 +25,8 @@ try:
     from openhands.core.event import EventType
     from openhands.core.llm import LLM, Message, TextContent
     from openhands.core.tool import Tool
-    from openhands.tools import (
-        BashExecutor,
-        FileEditorExecutor,
-        execute_bash_tool,
-        str_replace_editor_tool,
-    )
+    from openhands.tools.execute_bash import BashExecutor, execute_bash_tool
+    from openhands.tools.str_replace_editor import FileEditorExecutor, str_replace_editor_tool
 except ImportError as e:
     print_formatted_text(HTML(f"<red>Error importing OpenHands SDK: {e}</red>"))
     print_formatted_text(
