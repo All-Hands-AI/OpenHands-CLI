@@ -1,14 +1,16 @@
 # Workflow that builds and tests the binary executable
 name: Build and Test Binary
 
-# Run on commits to every branch to ensure binary builds work correctly
+# Run on pushes to main branch and all pull requests to ensure binary builds work correctly
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 # Cancel previous runs if a new commit is pushed
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
