@@ -44,7 +44,7 @@ a = Analysis(
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.core'),
         *collect_submodules('openhands.tools'),
-        
+
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),

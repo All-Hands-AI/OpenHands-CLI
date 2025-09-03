@@ -19,7 +19,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
-from openhands_cli.tui import display_banner, display_help, CommandCompleter
+from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 try:
     from openhands.core.agent.codeact_agent import CodeActAgent
@@ -106,7 +106,9 @@ def display_welcome(session_id: str = "chat") -> None:
     display_banner(session_id)
     print_formatted_text(HTML("<gold>Let's start building!</gold>"))
     print_formatted_text(
-        HTML("<green>What do you want to build? <grey>Type /help for help</grey></green>")
+        HTML(
+            "<green>What do you want to build? <grey>Type /help for help</grey></green>"
+        )
     )
     print()
 
@@ -120,8 +122,9 @@ def run_agent_chat() -> None:
 
     # Generate session ID
     import uuid
+
     session_id = str(uuid.uuid4())[:8]
-    
+
     display_welcome(session_id)
 
     # Create prompt session with command completer
@@ -155,7 +158,9 @@ def run_agent_chat() -> None:
                 print_formatted_text(HTML("<grey>Status: Active</grey>"))
                 continue
             elif command == "/new":
-                print_formatted_text(HTML("<yellow>Starting new conversation...</yellow>"))
+                print_formatted_text(
+                    HTML("<yellow>Starting new conversation...</yellow>")
+                )
                 session_id = str(uuid.uuid4())[:8]
                 display_welcome(session_id)
                 continue

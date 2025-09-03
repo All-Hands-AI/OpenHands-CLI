@@ -1,4 +1,4 @@
-from typing import Generator
+from collections.abc import Generator
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
@@ -12,11 +12,11 @@ DEFAULT_STYLE = get_cli_style()
 
 # Available commands with descriptions
 COMMANDS = {
-    '/exit': 'Exit the application',
-    '/help': 'Display available commands',
-    '/clear': 'Clear the screen',
-    '/status': 'Display conversation details',
-    '/new': 'Create a new conversation',
+    "/exit": "Exit the application",
+    "/help": "Display available commands",
+    "/clear": "Clear the screen",
+    "/status": "Display conversation details",
+    "/new": "Create a new conversation",
 }
 
 
@@ -27,14 +27,14 @@ class CommandCompleter(Completer):
         self, document: Document, complete_event: CompleteEvent
     ) -> Generator[Completion, None, None]:
         text = document.text_before_cursor.lstrip()
-        if text.startswith('/'):
+        if text.startswith("/"):
             for command, description in COMMANDS.items():
                 if command.startswith(text):
                     yield Completion(
                         command,
                         start_position=-len(text),
                         display_meta=description,
-                        style='bg:ansidarkgray fg:gold',
+                        style="bg:ansidarkgray fg:gold",
                     )
 
 
@@ -64,10 +64,10 @@ def display_help() -> None:
     print_formatted_text(HTML("<gold>🤖 OpenHands CLI Help</gold>"))
     print_formatted_text(HTML("<grey>Available commands:</grey>"))
     print_formatted_text("")
-    
+
     for command, description in COMMANDS.items():
         print_formatted_text(HTML(f"  <white>{command}</white> - {description}"))
-    
+
     print_formatted_text("")
     print_formatted_text(HTML("<grey>Tips:</grey>"))
     print_formatted_text("  • Type / and press Tab to see command suggestions")
