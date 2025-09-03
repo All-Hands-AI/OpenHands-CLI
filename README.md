@@ -1,140 +1,45 @@
 # OpenHands CLI
 
-A command-line interface for OpenHands AI Agent with Terminal User Interface (TUI) support.
+A lightweight CLI/TUI to interact with the OpenHands agent (powered by agent-sdk). Build and run locally or as a single executable.
 
-## Development
+## Quickstart
 
-### Setup
+- Prerequisites: Python 3.12+, curl
+- Install uv (package manager):
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Restart your shell so "uv" is on PATH, or follow the installer hint
+  ```
 
-1. Install dependencies:
-   ```bash
-   make install-dev
-   ```
-
-2. Install pre-commit hooks:
-   ```bash
-   make install-pre-commit-hooks
-   ```
-
-### Code Quality
-
-This project uses pre-commit hooks to ensure code quality. The following tools are configured:
-
-- **Ruff**: Fast Python linter and formatter
-- **MyPy**: Static type checking
-- **Pre-commit hooks**: Various code quality checks
-
-#### Running Linters
-
+### Run the CLI locally
 ```bash
-# Run all pre-commit hooks
-make lint
+# Install dependencies (incl. dev tools)
+make install-dev
 
-# Format code
-make format      # Format code with ruff
+# Optional: install pre-commit hooks
+make install-pre-commit-hooks
+
+# Start the CLI
+make run
+# or
+uv run openhands-cli
 ```
 
-#### Pre-commit Hooks
-
-Pre-commit hooks will automatically run on every commit. To run them manually:
-
+Tip: Set your model key (one of) so the agent can talk to an LLM:
 ```bash
-# Run on all files
-uv run pre-commit run --all-files
-
-# Run on staged files only
-uv run pre-commit run
+export OPENAI_API_KEY=...
+# or
+export LITELLM_API_KEY=...
 ```
 
-### Available Commands
-
-Run `make help` to see all available commands:
-
+### Build a standalone executable
 ```bash
-make help
-```
-
-## Binary Packaging
-
-The OpenHands CLI can be packaged into a standalone executable binary using PyInstaller. This allows distribution of the CLI without requiring users to install Python or dependencies.
-
-### Building the Executable
-
-#### Quick Build
-
-Use the provided build script to create a standalone executable:
-
-```bash
-# Using shell script (recommended - handles installation automatically)
+# Build (installs PyInstaller if needed)
 ./build.sh --install-pyinstaller
 
-# Using Python script directly (requires PyInstaller to be pre-installed)
-uv run python build.py
+# The binary will be in dist/
+./dist/openhands-cli            # macOS/Linux
+# dist/openhands-cli.exe        # Windows
 ```
 
-#### Manual Build
-
-You can also build manually using PyInstaller with uv:
-
-```bash
-# Install PyInstaller as dev dependency
-uv add --dev pyinstaller
-
-# Build using the spec file
-uv run pyinstaller openhands-cli.spec --clean
-```
-
-### Build Options
-
-The build script supports several options:
-
-```bash
-# Install PyInstaller and build (shell script handles installation)
-./build.sh --install-pyinstaller
-
-# Build without testing the executable
-./build.sh --install-pyinstaller --no-test
-
-# Build without cleaning previous artifacts
-./build.sh --install-pyinstaller --no-clean
-
-# Use a custom spec file
-./build.sh --install-pyinstaller --spec custom.spec
-
-# Show help
-./build.sh --help
-```
-
-**Note:** The shell script (`build.sh`) automatically handles PyInstaller installation when using the `--install-pyinstaller` flag. The Python script (`build.py`) can be used directly but requires PyInstaller to be pre-installed.
-
-### Output
-
-The build process creates:
-- `dist/openhands-cli` - The standalone executable
-- `build/` - Temporary build files (automatically cleaned)
-
-The executable is typically 10-15 MB and includes all necessary dependencies.
-
-### Testing the Executable
-
-The build script automatically tests the executable, but you can also test manually:
-
-```bash
-# Run the executable
-./dist/openhands-cli
-
-# Check that it displays the CLI interface
-```
-
-### Packaging Configuration
-
-The packaging is configured through:
-- `openhands-cli.spec` - PyInstaller specification file
-- `build.py` - Build automation script
-- `build.sh` - Shell wrapper script
-
-The spec file is optimized for:
-- Single-file executable
-- Minimal size through exclusions
-- All required dependencies included
-- Console application mode
+For advanced development (adding deps, updating the spec file, debugging builds), see Development.md.
