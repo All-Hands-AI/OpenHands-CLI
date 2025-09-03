@@ -1,0 +1,43 @@
+# Workflow that builds and tests the binary executable
+name: Build and Test Binary
+
+# Run on pushes to main branch and all pull requests to ensure binary builds work correctly
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# Cancel previous runs if a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test-binary:
+    name: Build and test binary executable
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Build and test binary executable
+        run: |
+          ./build.sh --install-pyinstaller
