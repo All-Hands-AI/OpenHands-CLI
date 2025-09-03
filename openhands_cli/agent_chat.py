@@ -16,6 +16,7 @@ if "/openhands/code" in sys.path:
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
+from pydantic import SecretStr
 
 try:
     from openhands.core.agent.codeact_agent import CodeActAgent
@@ -58,8 +59,6 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
             return None, None, None
 
         # Configure LLM
-        from pydantic import SecretStr
-
         llm_config = LLMConfig(
             model=model,
             api_key=SecretStr(api_key) if api_key else None,
