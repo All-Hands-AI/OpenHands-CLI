@@ -7,8 +7,18 @@ for the OpenHands CLI application.
 """
 
 from pathlib import Path
+import os
 import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
+# Ensure build-time import resolution prefers the packaged SDK over the monorepo path
+# Remove any OpenHands monorepo paths if present (prevents importing /openhands/code/openhands)
+_sys_paths_to_remove = [p for p in list(sys.path) if p.startswith('/openhands/code')]
+for _p in _sys_paths_to_remove:
+    try:
+        sys.path.remove(_p)
+    except ValueError:
+        pass
 
 # Get the project root directory (current working directory when running PyInstaller)
 project_root = Path.cwd()
@@ -29,9 +39,10 @@ a = Analysis(
         'openhands_cli.tui',
         'openhands_cli.pt_style',
         *collect_submodules('prompt_toolkit'),
+        # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.core'),
         *collect_submodules('openhands.tools'),
-
+        
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
@@ -52,7 +63,8 @@ a = Analysis(
         'notebook',
     ],
     noarchive=False,
-    optimize=2,  # Enable Python optimization
+    # IMPORTANT: do not use optimize=2 (-OO) because it strips docstrings used by PLY/bashlex grammar
+    optimize=0,
 )
 pyz = PYZ(a.pure)
 
