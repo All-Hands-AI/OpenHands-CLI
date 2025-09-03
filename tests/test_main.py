@@ -28,11 +28,11 @@ class TestMainEntryPoint:
         """Test that main() handles ImportError gracefully."""
         mock_run_agent_chat.side_effect = ImportError("Missing dependency")
 
-        # Should raise SystemExit with code 1
-        with pytest.raises(SystemExit) as exc_info:
+        # Should raise ImportError (no longer using sys.exit)
+        with pytest.raises(ImportError) as exc_info:
             simple_main.main()
 
-        assert exc_info.value.code == 1
+        assert str(exc_info.value) == "Missing dependency"
 
     @patch("openhands_cli.agent_chat.main")
     def test_main_handles_keyboard_interrupt(
@@ -59,8 +59,8 @@ class TestMainEntryPoint:
         """Test that main() handles general exceptions."""
         mock_run_agent_chat.side_effect = Exception("Unexpected error")
 
-        # Should raise SystemExit with code 1
-        with pytest.raises(SystemExit) as exc_info:
+        # Should raise Exception (no longer using sys.exit)
+        with pytest.raises(Exception) as exc_info:
             simple_main.main()
 
-        assert exc_info.value.code == 1
+        assert str(exc_info.value) == "Unexpected error"
