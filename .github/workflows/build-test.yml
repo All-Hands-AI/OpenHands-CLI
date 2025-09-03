@@ -39,5 +39,8 @@ jobs:
           uv sync --dev
 
       - name: Build and test binary executable
+        env:
+          LITELLM_API_KEY: dummy-ci-key
+          LITELLM_MODEL: dummy-ci-model
         run: |
           ./build.sh --install-pyinstaller
