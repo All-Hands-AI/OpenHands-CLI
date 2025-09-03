@@ -96,7 +96,7 @@ def build_executable(
 
 
 def test_executable() -> bool:
-    """Test the built executable."""
+    """Test the built executable with simplified checks."""
     print("🧪 Testing the built executable...")
 
     exe_path = Path("dist/openhands-cli")
@@ -112,30 +112,34 @@ def test_executable() -> bool:
         if os.name != "nt":
             os.chmod(exe_path, 0o755)
 
-        # Run the executable with a timeout
+        # Simple test: Check that executable can start and respond to /help command
+        print("  Testing executable startup and /help command...")
         result = subprocess.run(
-            [str(exe_path)], capture_output=True, text=True, timeout=30
+            [str(exe_path)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            input="/help\n/exit\n",  # Send /help command then exit
+            env={
+                **os.environ,
+                "LITELLM_API_KEY": "dummy-test-key",
+                "LITELLM_MODEL": "dummy-model",
+            },
         )
 
-        if result.returncode == 0:
-            print("✅ Executable test passed!")
-            print("Output preview:")
-            print(
-                result.stdout[:500] + "..."
-                if len(result.stdout) > 500
-                else result.stdout
-            )
+        # Check for expected help output
+        output = result.stdout + result.stderr
+        if "OpenHands CLI Help" in output and "Available commands:" in output:
+            print("  ✅ Executable starts and /help command works correctly")
             return True
         else:
-            print(f"❌ Executable test failed with return code {result.returncode}")
-            print("STDERR:", result.stderr)
+            print("  ❌ Expected help output not found")
+            print("  Combined output:", output[:1000])
             return False
 
     except subprocess.TimeoutExpired:
-        print(
-            "⚠️  Executable test timed out (this might be normal for interactive CLIs)"
-        )
-        return True
+        print("  ❌ Executable test timed out")
+        return False
     except Exception as e:
         print(f"❌ Error testing executable: {e}")
         return False

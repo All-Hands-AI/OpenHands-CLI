@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from openhands_cli import simple_main
 
 
@@ -15,21 +17,22 @@ class TestMainEntryPoint:
         """Test that main() starts agent chat directly without menu."""
         mock_run_agent_chat.return_value = None
 
-        result = simple_main.main()
+        # Should complete without raising an exception
+        simple_main.main()
 
         # Should call run_agent_chat directly
         mock_run_agent_chat.assert_called_once()
-        assert result == 0
 
     @patch("openhands_cli.agent_chat.main")
     def test_main_handles_import_error(self, mock_run_agent_chat: MagicMock) -> None:
         """Test that main() handles ImportError gracefully."""
         mock_run_agent_chat.side_effect = ImportError("Missing dependency")
 
-        result = simple_main.main()
+        # Should raise ImportError (no longer using sys.exit)
+        with pytest.raises(ImportError) as exc_info:
+            simple_main.main()
 
-        # Should return error code 1
-        assert result == 1
+        assert str(exc_info.value) == "Missing dependency"
 
     @patch("openhands_cli.agent_chat.main")
     def test_main_handles_keyboard_interrupt(
@@ -38,20 +41,16 @@ class TestMainEntryPoint:
         """Test that main() handles KeyboardInterrupt gracefully."""
         mock_run_agent_chat.side_effect = KeyboardInterrupt()
 
-        result = simple_main.main()
-
-        # Should return success code 0 for graceful exit
-        assert result == 0
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
 
     @patch("openhands_cli.agent_chat.main")
     def test_main_handles_eof_error(self, mock_run_agent_chat: MagicMock) -> None:
         """Test that main() handles EOFError gracefully."""
         mock_run_agent_chat.side_effect = EOFError()
 
-        result = simple_main.main()
-
-        # Should return success code 0 for graceful exit
-        assert result == 0
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
 
     @patch("openhands_cli.agent_chat.main")
     def test_main_handles_general_exception(
@@ -60,7 +59,8 @@ class TestMainEntryPoint:
         """Test that main() handles general exceptions."""
         mock_run_agent_chat.side_effect = Exception("Unexpected error")
 
-        result = simple_main.main()
+        # Should raise Exception (no longer using sys.exit)
+        with pytest.raises(Exception) as exc_info:
+            simple_main.main()
 
-        # Should return error code 1
-        assert result == 1
+        assert str(exc_info.value) == "Unexpected error"

@@ -22,15 +22,20 @@ from pydantic import SecretStr
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 try:
-    from openhands.core.agent.codeact_agent import CodeActAgent
-    from openhands.core.config import LLMConfig
-    from openhands.core.conversation import Conversation
-    from openhands.core.event import EventType
-    from openhands.core.llm import LLM, Message, TextContent
-    from openhands.core.tool import Tool
-    from openhands.tools.execute_bash import BashExecutor, execute_bash_tool
-    from openhands.tools.str_replace_editor import (
+    from openhands.sdk import (
+        LLM,
+        Agent,
+        Conversation,
+        EventType,
+        LLMConfig,
+        Message,
+        TextContent,
+        Tool,
+    )
+    from openhands.tools import (
+        BashExecutor,
         FileEditorExecutor,
+        execute_bash_tool,
         str_replace_editor_tool,
     )
 except ImportError as e:
@@ -38,14 +43,27 @@ except ImportError as e:
     print_formatted_text(
         HTML("<yellow>Please ensure the openhands-sdk is properly installed.</yellow>")
     )
-    sys.exit(1)
+    raise
 
 
 logger = logging.getLogger(__name__)
 
 
-def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]:
-    """Setup the agent with environment variables."""
+class AgentSetupError(Exception):
+    """Exception raised when agent setup fails."""
+
+    pass
+
+
+def setup_agent() -> tuple[LLM, Agent, Conversation]:
+    """Setup the agent with environment variables.
+
+    Returns:
+        tuple: (llm, agent, conversation)
+
+    Raises:
+        AgentSetupError: If agent setup fails
+    """
     try:
         # Get API configuration from environment
         api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -58,7 +76,9 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
                     "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
                 )
             )
-            return None, None, None
+            raise AgentSetupError(
+                "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
+            )
 
         # Configure LLM
         llm_config = LLMConfig(
@@ -81,7 +101,7 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
         ]
 
         # Create agent
-        agent = CodeActAgent(llm=llm, tools=tools)
+        agent = Agent(llm=llm, tools=tools)
 
         # Setup conversation with callback
         def conversation_callback(event: EventType) -> None:
@@ -94,10 +114,13 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
         )
         return llm, agent, conversation
 
+    except AgentSetupError:
+        # Re-raise AgentSetupError as-is
+        raise
     except Exception as e:
         print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
         traceback.print_exc()
-        return None, None, None
+        raise AgentSetupError(f"Error setting up agent: {str(e)}") from e
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -114,11 +137,15 @@ def display_welcome(session_id: str = "chat") -> None:
 
 
 def run_agent_chat() -> None:
-    """Run the agent chat session using the agent SDK."""
-    # Setup agent
+    """Run the agent chat session using the agent SDK.
+
+    Raises:
+        AgentSetupError: If agent setup fails
+        KeyboardInterrupt: If user interrupts the session
+        EOFError: If EOF is encountered
+    """
+    # Setup agent - let exceptions bubble up
     llm, agent, conversation = setup_agent()
-    if not agent or not conversation:
-        return
 
     # Generate session ID
     import uuid
@@ -200,14 +227,24 @@ def run_agent_chat() -> None:
 
 
 def main() -> None:
-    """Main entry point for agent chat."""
+    """Main entry point for agent chat.
+
+    Raises:
+        AgentSetupError: If agent setup fails
+        Exception: On unexpected errors
+    """
     try:
         run_agent_chat()
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+    except AgentSetupError as e:
+        # Agent setup errors are already printed in setup_agent()
+        logger.error(f"Agent setup failed: {e}")
+        raise
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
+        raise
 
 
 if __name__ == "__main__":
