@@ -4,11 +4,13 @@ Agent chat functionality for OpenHands CLI.
 Provides a conversation interface with an AI agent using OpenHands patterns.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
 import traceback
-from typing import Any, Dict
+from typing import Any
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
@@ -20,14 +22,13 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
-from openhands_cli.tui import CommandCompleter, display_banner, display_help
 from openhands_cli.confirmation import (
-    confirmation_mode,
-    read_confirmation_input,
     analyze_action_risk,
+    confirmation_mode,
     display_risk_warning,
+    read_confirmation_input,
 )
-from openhands_cli.security import ActionSecurityRisk
+from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 try:
     from openhands.core.agent.codeact_agent import CodeActAgent
@@ -52,66 +53,92 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-async def confirm_action_if_needed(action_type: str, action_data: Dict[str, Any]) -> bool:
+async def confirm_action_if_needed(
+    action_type: str, action_data: dict[str, Any]
+) -> bool:
     """Check if an action needs confirmation and get user approval if needed.
-    
+
     Returns True if the action should proceed, False if it should be cancelled.
     """
     # Analyze the security risk of the action
     risk = analyze_action_risk(action_type, action_data)
-    
+
     # Check if confirmation is needed based on current mode
     if not confirmation_mode.should_confirm(risk):
         return True
-    
+
     # Create action description for display
     if action_type == "execute_bash":
-        action_description = f"Execute command: {action_data.get('command', 'Unknown command')}"
+        action_description = (
+            f"Execute command: {action_data.get('command', 'Unknown command')}"
+        )
     elif action_type == "str_replace_editor":
-        command = action_data.get('command', 'unknown')
-        path = action_data.get('path', 'unknown file')
+        command = action_data.get("command", "unknown")
+        path = action_data.get("path", "unknown file")
         action_description = f"File operation: {command} on {path}"
     else:
         action_description = f"Action: {action_type}"
-    
+
     # Display risk warning
     display_risk_warning(risk, action_description)
-    
+
     # Get user confirmation
     confirmation_result = await read_confirmation_input(risk)
-    
+
     # Handle the user's choice
     if confirmation_result == "yes":
         return True
     elif confirmation_result == "no":
         print_formatted_text(
-            HTML("<yellow>Action cancelled. Please provide alternative instructions.</yellow>")
+            HTML(
+                "<yellow>Action cancelled. Please provide alternative instructions.</yellow>"
+            )
         )
         return False
     elif confirmation_result == "always":
         confirmation_mode.set_mode("never")
         print_formatted_text(
-            HTML("<yellow>Confirmation mode disabled. All actions will proceed automatically.</yellow>")
+            HTML(
+                "<yellow>Confirmation mode disabled. All actions will proceed automatically.</yellow>"
+            )
         )
         return True
     elif confirmation_result == "auto_highrisk":
         confirmation_mode.set_mode("auto_highrisk")
         print_formatted_text(
-            HTML("<yellow>Auto-confirm mode enabled. Only HIGH risk actions will require confirmation.</yellow>")
+            HTML(
+                "<yellow>Auto-confirm mode enabled. Only HIGH risk actions will require confirmation.</yellow>"
+            )
         )
         return True
-    
+
     return False
 
 
 def display_confirmation_help() -> None:
     """Display help for confirmation mode commands."""
     print_formatted_text(HTML("<gold>Confirmation Mode Commands:</gold>"))
-    print_formatted_text(HTML("  <green>/confirm status</green> - Show current confirmation mode"))
-    print_formatted_text(HTML("  <green>/confirm default</green> - Default mode (confirm MEDIUM/HIGH risk actions)"))
-    print_formatted_text(HTML("  <green>/confirm auto</green> - Auto-confirm LOW/MEDIUM risk, ask for HIGH risk"))
-    print_formatted_text(HTML("  <green>/confirm always</green> - Always confirm all actions"))
-    print_formatted_text(HTML("  <green>/confirm never</green> - Never ask for confirmation (NOT RECOMMENDED)"))
+    print_formatted_text(
+        HTML("  <green>/confirm status</green> - Show current confirmation mode")
+    )
+    print_formatted_text(
+        HTML(
+            "  <green>/confirm default</green> - Default mode (confirm MEDIUM/HIGH risk actions)"
+        )
+    )
+    print_formatted_text(
+        HTML(
+            "  <green>/confirm auto</green> - Auto-confirm LOW/MEDIUM risk, ask for HIGH risk"
+        )
+    )
+    print_formatted_text(
+        HTML("  <green>/confirm always</green> - Always confirm all actions")
+    )
+    print_formatted_text(
+        HTML(
+            "  <green>/confirm never</green> - Never ask for confirmation (NOT RECOMMENDED)"
+        )
+    )
     print_formatted_text("")
 
 
@@ -121,37 +148,63 @@ def handle_confirmation_command(command: str) -> None:
     if len(parts) < 2:
         display_confirmation_help()
         return
-    
+
     subcommand = parts[1].lower()
-    
+
     if subcommand == "status":
         if confirmation_mode.never_confirm:
             print_formatted_text(HTML("<yellow>Confirmation Mode: Disabled</yellow>"))
         elif confirmation_mode.always_confirm:
-            print_formatted_text(HTML("<yellow>Confirmation Mode: Always confirm</yellow>"))
+            print_formatted_text(
+                HTML("<yellow>Confirmation Mode: Always confirm</yellow>")
+            )
         elif confirmation_mode.auto_highrisk_confirm:
-            print_formatted_text(HTML("<yellow>Confirmation Mode: Auto-confirm LOW/MEDIUM risk</yellow>"))
+            print_formatted_text(
+                HTML("<yellow>Confirmation Mode: Auto-confirm LOW/MEDIUM risk</yellow>")
+            )
         else:
-            print_formatted_text(HTML("<yellow>Confirmation Mode: Confirm MEDIUM/HIGH risk (default)</yellow>"))
-    
+            print_formatted_text(
+                HTML(
+                    "<yellow>Confirmation Mode: Confirm MEDIUM/HIGH risk (default)</yellow>"
+                )
+            )
+
     elif subcommand == "default":
         confirmation_mode.set_mode("default")
-        print_formatted_text(HTML("<green>✓ Confirmation mode set to default (confirm MEDIUM/HIGH risk actions)</green>"))
-    
+        print_formatted_text(
+            HTML(
+                "<green>✓ Confirmation mode set to default (confirm MEDIUM/HIGH risk actions)</green>"
+            )
+        )
+
     elif subcommand == "auto":
         confirmation_mode.set_mode("auto_highrisk")
-        print_formatted_text(HTML("<green>✓ Auto-confirm mode enabled (only HIGH risk actions require confirmation)</green>"))
-    
+        print_formatted_text(
+            HTML(
+                "<green>✓ Auto-confirm mode enabled (only HIGH risk actions require confirmation)</green>"
+            )
+        )
+
     elif subcommand == "always":
         confirmation_mode.set_mode("always")
-        print_formatted_text(HTML("<yellow>⚠️  Always confirm mode enabled (all actions require confirmation)</yellow>"))
-    
+        print_formatted_text(
+            HTML(
+                "<yellow>⚠️  Always confirm mode enabled (all actions require confirmation)</yellow>"
+            )
+        )
+
     elif subcommand == "never":
         confirmation_mode.set_mode("never")
-        print_formatted_text(HTML("<red>⚠️  Confirmation disabled (NOT RECOMMENDED - all actions will proceed automatically)</red>"))
-    
+        print_formatted_text(
+            HTML(
+                "<red>⚠️  Confirmation disabled (NOT RECOMMENDED - all actions will proceed automatically)</red>"
+            )
+        )
+
     else:
-        print_formatted_text(HTML(f"<red>Unknown confirmation command: {subcommand}</red>"))
+        print_formatted_text(
+            HTML(f"<red>Unknown confirmation command: {subcommand}</red>")
+        )
         display_confirmation_help()
 
 
@@ -186,11 +239,11 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
         cwd = os.getcwd()
         bash = BashExecutor(working_dir=cwd)
         file_editor = FileEditorExecutor()
-        
+
         # Create confirmation-aware tool wrappers
         bash_tool = execute_bash_tool.set_executor(executor=bash)
         editor_tool = str_replace_editor_tool.set_executor(executor=file_editor)
-        
+
         tools: list[Tool] = [bash_tool, editor_tool]
 
         # Create agent
@@ -276,13 +329,25 @@ def run_agent_chat() -> None:
                 print_formatted_text(HTML("<grey>Status: Active</grey>"))
                 # Display confirmation mode status
                 if confirmation_mode.never_confirm:
-                    print_formatted_text(HTML("<grey>Confirmation Mode: Disabled</grey>"))
+                    print_formatted_text(
+                        HTML("<grey>Confirmation Mode: Disabled</grey>")
+                    )
                 elif confirmation_mode.always_confirm:
-                    print_formatted_text(HTML("<grey>Confirmation Mode: Always confirm</grey>"))
+                    print_formatted_text(
+                        HTML("<grey>Confirmation Mode: Always confirm</grey>")
+                    )
                 elif confirmation_mode.auto_highrisk_confirm:
-                    print_formatted_text(HTML("<grey>Confirmation Mode: Auto-confirm LOW/MEDIUM risk</grey>"))
+                    print_formatted_text(
+                        HTML(
+                            "<grey>Confirmation Mode: Auto-confirm LOW/MEDIUM risk</grey>"
+                        )
+                    )
                 else:
-                    print_formatted_text(HTML("<grey>Confirmation Mode: Confirm MEDIUM/HIGH risk (default)</grey>"))
+                    print_formatted_text(
+                        HTML(
+                            "<grey>Confirmation Mode: Confirm MEDIUM/HIGH risk (default)</grey>"
+                        )
+                    )
                 continue
             elif command == "/new":
                 print_formatted_text(
