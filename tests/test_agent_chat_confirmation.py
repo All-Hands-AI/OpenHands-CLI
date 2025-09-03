@@ -21,24 +21,26 @@ class TestConfirmActionIfNeeded:
 
     def setup_method(self) -> None:
         """Reset confirmation mode before each test."""
-        confirmation_mode.set_mode("default")
+        confirmation_mode.set_enabled(True)
 
     @pytest.mark.asyncio
-    async def test_low_risk_action_no_confirmation(self) -> None:
-        """Test that low-risk actions don't require confirmation in default mode."""
+    async def test_confirmation_disabled_no_prompt(self) -> None:
+        """Test that actions proceed without confirmation when disabled."""
+        confirmation_mode.set_enabled(False)
+
         action_data = {"command": "ls -la"}
         result = await confirm_action_if_needed("execute_bash", action_data)
         assert result is True
 
     @pytest.mark.asyncio
     @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_high_risk_action_requires_confirmation(
+    async def test_confirmation_enabled_user_says_yes(
         self, mock_read_confirmation: Any
     ) -> None:
-        """Test that high-risk actions require confirmation."""
+        """Test that actions proceed when user confirms."""
         mock_read_confirmation.return_value = "yes"
 
-        action_data = {"command": "rm -rf /"}
+        action_data = {"command": "ls -la"}
         result = await confirm_action_if_needed("execute_bash", action_data)
 
         assert result is True
@@ -46,11 +48,13 @@ class TestConfirmActionIfNeeded:
 
     @pytest.mark.asyncio
     @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_user_denies_action(self, mock_read_confirmation: Any) -> None:
-        """Test handling when user denies an action."""
+    async def test_confirmation_enabled_user_says_no(
+        self, mock_read_confirmation: Any
+    ) -> None:
+        """Test that actions are cancelled when user denies."""
         mock_read_confirmation.return_value = "no"
 
-        action_data = {"command": "rm -rf /"}
+        action_data = {"command": "ls -la"}
         result = await confirm_action_if_needed("execute_bash", action_data)
 
         assert result is False
@@ -58,80 +62,17 @@ class TestConfirmActionIfNeeded:
 
     @pytest.mark.asyncio
     @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_user_chooses_always_confirm(
+    async def test_user_chooses_always_proceed(
         self, mock_read_confirmation: Any
     ) -> None:
-        """Test handling when user chooses always confirm mode."""
+        """Test handling when user chooses always proceed."""
         mock_read_confirmation.return_value = "always"
-
-        action_data = {"command": "rm -rf /"}
-        result = await confirm_action_if_needed("execute_bash", action_data)
-
-        assert result is True
-        assert confirmation_mode.never_confirm is True
-        mock_read_confirmation.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_user_chooses_auto_highrisk(
-        self, mock_read_confirmation: Any
-    ) -> None:
-        """Test handling when user chooses auto high-risk mode."""
-        mock_read_confirmation.return_value = "auto_highrisk"
-
-        action_data = {"command": "sudo apt install package"}
-        result = await confirm_action_if_needed("execute_bash", action_data)
-
-        assert result is True
-        assert confirmation_mode.auto_highrisk_confirm is True
-        mock_read_confirmation.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_never_confirm_mode(self) -> None:
-        """Test that never confirm mode skips all confirmations."""
-        confirmation_mode.set_mode("never")
-
-        action_data = {"command": "rm -rf /"}
-        result = await confirm_action_if_needed("execute_bash", action_data)
-
-        assert result is True
-
-    @pytest.mark.asyncio
-    @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_always_confirm_mode(self, mock_read_confirmation: Any) -> None:
-        """Test that always confirm mode requires confirmation for all actions."""
-        confirmation_mode.set_mode("always")
-        mock_read_confirmation.return_value = "yes"
-
-        action_data = {"command": "ls -la"}  # Low-risk command
-        result = await confirm_action_if_needed("execute_bash", action_data)
-
-        assert result is True
-        mock_read_confirmation.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_auto_highrisk_mode_low_risk(self) -> None:
-        """Test that auto high-risk mode doesn't confirm low-risk actions."""
-        confirmation_mode.set_mode("auto_highrisk")
 
         action_data = {"command": "ls -la"}
         result = await confirm_action_if_needed("execute_bash", action_data)
 
         assert result is True
-
-    @pytest.mark.asyncio
-    @patch("openhands_cli.agent_chat.read_confirmation_input")
-    async def test_auto_highrisk_mode_high_risk(
-        self, mock_read_confirmation: Any
-    ) -> None:
-        """Test that auto high-risk mode confirms high-risk actions."""
-        confirmation_mode.set_mode("auto_highrisk")
-        mock_read_confirmation.return_value = "yes"
-
-        action_data = {"command": "rm -rf /"}
-        result = await confirm_action_if_needed("execute_bash", action_data)
-
-        assert result is True
+        assert confirmation_mode.enabled is False
         mock_read_confirmation.assert_called_once()
 
 
@@ -140,7 +81,7 @@ class TestConfirmationCommands:
 
     def setup_method(self) -> None:
         """Reset confirmation mode before each test."""
-        confirmation_mode.set_mode("default")
+        confirmation_mode.set_enabled(True)
 
     @patch("openhands_cli.agent_chat.print_formatted_text")
     def test_display_confirmation_help(self, mock_print: Any) -> None:
@@ -148,73 +89,52 @@ class TestConfirmationCommands:
         display_confirmation_help()
 
         # Should have multiple print calls for the help text
-        assert mock_print.call_count > 5
+        assert mock_print.call_count >= 3
 
         # Check that key commands are mentioned
         help_text = " ".join([str(call[0][0]) for call in mock_print.call_args_list])
         assert "/confirm status" in help_text
-        assert "/confirm default" in help_text
-        assert "/confirm auto" in help_text
-        assert "/confirm always" in help_text
-        assert "/confirm never" in help_text
+        assert "/confirm on" in help_text
+        assert "/confirm off" in help_text
 
     @patch("openhands_cli.agent_chat.print_formatted_text")
-    def test_handle_confirmation_status(self, mock_print: Any) -> None:
-        """Test handling of confirmation status command."""
+    def test_handle_confirmation_status_enabled(self, mock_print: Any) -> None:
+        """Test handling of confirmation status command when enabled."""
+        confirmation_mode.set_enabled(True)
         handle_confirmation_command("/confirm status")
 
         mock_print.assert_called_once()
         call_text = str(mock_print.call_args[0][0])
-        assert "default" in call_text.lower()
+        assert "enabled" in call_text.lower()
 
     @patch("openhands_cli.agent_chat.print_formatted_text")
-    def test_handle_confirmation_set_default(self, mock_print: Any) -> None:
-        """Test setting confirmation mode to default."""
-        handle_confirmation_command("/confirm default")
-
-        assert not confirmation_mode.always_confirm
-        assert not confirmation_mode.auto_highrisk_confirm
-        assert not confirmation_mode.never_confirm
+    def test_handle_confirmation_status_disabled(self, mock_print: Any) -> None:
+        """Test handling of confirmation status command when disabled."""
+        confirmation_mode.set_enabled(False)
+        handle_confirmation_command("/confirm status")
 
         mock_print.assert_called_once()
         call_text = str(mock_print.call_args[0][0])
-        assert "default" in call_text.lower()
+        assert "disabled" in call_text.lower()
 
     @patch("openhands_cli.agent_chat.print_formatted_text")
-    def test_handle_confirmation_set_auto(self, mock_print: Any) -> None:
-        """Test setting confirmation mode to auto high-risk."""
-        handle_confirmation_command("/confirm auto")
+    def test_handle_confirmation_set_on(self, mock_print: Any) -> None:
+        """Test enabling confirmation mode."""
+        confirmation_mode.set_enabled(False)  # Start disabled
+        handle_confirmation_command("/confirm on")
 
-        assert confirmation_mode.auto_highrisk_confirm is True
-        assert confirmation_mode.always_confirm is False
-        assert confirmation_mode.never_confirm is False
-
+        assert confirmation_mode.enabled is True
         mock_print.assert_called_once()
         call_text = str(mock_print.call_args[0][0])
-        assert "auto-confirm" in call_text.lower()
+        assert "enabled" in call_text.lower()
 
     @patch("openhands_cli.agent_chat.print_formatted_text")
-    def test_handle_confirmation_set_always(self, mock_print: Any) -> None:
-        """Test setting confirmation mode to always."""
-        handle_confirmation_command("/confirm always")
+    def test_handle_confirmation_set_off(self, mock_print: Any) -> None:
+        """Test disabling confirmation mode."""
+        confirmation_mode.set_enabled(True)  # Start enabled
+        handle_confirmation_command("/confirm off")
 
-        assert confirmation_mode.always_confirm is True
-        assert confirmation_mode.auto_highrisk_confirm is False
-        assert confirmation_mode.never_confirm is False
-
-        mock_print.assert_called_once()
-        call_text = str(mock_print.call_args[0][0])
-        assert "always confirm" in call_text.lower()
-
-    @patch("openhands_cli.agent_chat.print_formatted_text")
-    def test_handle_confirmation_set_never(self, mock_print: Any) -> None:
-        """Test setting confirmation mode to never."""
-        handle_confirmation_command("/confirm never")
-
-        assert confirmation_mode.never_confirm is True
-        assert confirmation_mode.always_confirm is False
-        assert confirmation_mode.auto_highrisk_confirm is False
-
+        assert confirmation_mode.enabled is False
         mock_print.assert_called_once()
         call_text = str(mock_print.call_args[0][0])
         assert "disabled" in call_text.lower()

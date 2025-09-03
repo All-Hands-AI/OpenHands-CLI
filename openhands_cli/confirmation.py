@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Confirmation mode functionality for OpenHands CLI.
-Provides user confirmation prompts for potentially risky actions.
+Provides user confirmation prompts before executing commands.
 """
 
 from __future__ import annotations
@@ -17,46 +17,23 @@ from prompt_toolkit.layout.containers import HSplit, Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.layout import Layout
-from prompt_toolkit.widgets import Frame
 
 from openhands_cli.pt_style import get_cli_style
-from openhands_cli.security import ActionSecurityRisk, security_analyzer
 
 
 class ConfirmationMode:
     """Manages confirmation mode settings and behavior."""
 
     def __init__(self) -> None:
-        self.always_confirm = False  # Always confirm all actions
-        self.auto_highrisk_confirm = False  # Auto-confirm LOW/MEDIUM, ask for HIGH
-        self.never_confirm = False  # Never ask for confirmation
+        self.enabled = True  # Whether confirmation is enabled
 
-    def should_confirm(self, risk: ActionSecurityRisk) -> bool:
-        """Determine if an action should require confirmation."""
-        if self.never_confirm:
-            return False
+    def should_confirm(self) -> bool:
+        """Determine if actions should require confirmation."""
+        return self.enabled
 
-        if self.always_confirm:
-            return True
-
-        if self.auto_highrisk_confirm:
-            return risk == ActionSecurityRisk.HIGH
-
-        # Default behavior: confirm MEDIUM and HIGH risk actions
-        return risk in [ActionSecurityRisk.MEDIUM, ActionSecurityRisk.HIGH]
-
-    def set_mode(self, mode: str) -> None:
-        """Set the confirmation mode based on user choice."""
-        self.always_confirm = False
-        self.auto_highrisk_confirm = False
-        self.never_confirm = False
-
-        if mode == "always":
-            self.always_confirm = True
-        elif mode == "auto_highrisk":
-            self.auto_highrisk_confirm = True
-        elif mode == "never":
-            self.never_confirm = True
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable confirmation mode."""
+        self.enabled = enabled
 
 
 class UserCancelledError(Exception):
@@ -69,7 +46,6 @@ def cli_confirm(
     question: str = "Are you sure?",
     choices: list[str] | None = None,
     initial_selection: int = 0,
-    security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN,
 ) -> int:
     """Display a confirmation prompt with the given question and choices.
 
@@ -81,15 +57,8 @@ def cli_confirm(
     selected = [initial_selection]  # Using list to allow modification in closure
 
     def get_choice_text() -> list:
-        # Use red styling for HIGH risk questions
-        question_style = (
-            "class:risk-high"
-            if security_risk == ActionSecurityRisk.HIGH
-            else "class:question"
-        )
-
         return [
-            (question_style, f"{question}\n\n"),
+            ("class:question", f"{question}\n\n"),
         ] + [
             (
                 "class:selected" if i == selected[0] else "class:unselected",
@@ -128,28 +97,14 @@ def cli_confirm(
     def _handle_ctrl_c(event: KeyPressEvent) -> None:
         event.app.exit(exception=UserCancelledError())
 
-    # Create layout with risk-based styling
+    # Create layout
     content_window = Window(
         FormattedTextControl(get_choice_text),
         always_hide_cursor=True,
         height=Dimension(max=8),  # Limit height to prevent screen takeover
     )
 
-    # Add frame for HIGH risk commands
-    if security_risk == ActionSecurityRisk.HIGH:
-        layout = Layout(
-            HSplit(
-                [
-                    Frame(
-                        content_window,
-                        title="HIGH RISK",
-                        style="fg:#FF0000 bold",  # Red color for HIGH risk
-                    )
-                ]
-            )
-        )
-    else:
-        layout = Layout(HSplit([content_window]))
+    layout = Layout(HSplit([content_window]))
 
     app: Application[int] = Application(
         layout=layout,
@@ -161,31 +116,19 @@ def cli_confirm(
     return cast(int, app.run())
 
 
-async def read_confirmation_input(security_risk: ActionSecurityRisk) -> str:
-    """Read user confirmation input with appropriate choices based on risk level."""
+async def read_confirmation_input() -> str:
+    """Read user confirmation input."""
     try:
-        if security_risk == ActionSecurityRisk.HIGH:
-            question = "HIGH RISK command detected.\nReview carefully before proceeding.\n\nChoose an option:"
-            choices = [
-                "Yes, proceed (HIGH RISK - Use with caution)",
-                "No (and allow to enter instructions)",
-                "Always proceed (don't ask again - NOT RECOMMENDED)",
-            ]
-            choice_mapping = {0: "yes", 1: "no", 2: "always"}
-        else:
-            question = "Choose an option:"
-            choices = [
-                "Yes, proceed",
-                "No (and allow to enter instructions)",
-                "Auto-confirm action with LOW/MEDIUM risk, ask for HIGH risk",
-                "Always proceed (don't ask again)",
-            ]
-            choice_mapping = {0: "yes", 1: "no", 2: "auto_highrisk", 3: "always"}
+        question = "The agent wants to execute a command. Do you want to proceed?"
+        choices = [
+            "Yes, proceed",
+            "No (and allow to enter instructions)",
+            "Always proceed (don't ask again)",
+        ]
+        choice_mapping = {0: "yes", 1: "no", 2: "always"}
 
         # Run the confirmation dialog in a thread to keep the event loop responsive
-        index = await asyncio.to_thread(
-            cli_confirm, question, choices, 0, security_risk
-        )
+        index = await asyncio.to_thread(cli_confirm, question, choices, 0)
 
         return choice_mapping.get(index, "no")
 
@@ -193,27 +136,19 @@ async def read_confirmation_input(security_risk: ActionSecurityRisk) -> str:
         return "no"
 
 
-def analyze_action_risk(
-    action_type: str, action_data: dict[str, Any]
-) -> ActionSecurityRisk:
-    """Analyze an action and return its security risk level."""
-    return security_analyzer.analyze_action(action_type, action_data)
-
-
-def display_risk_warning(risk: ActionSecurityRisk, action_description: str) -> None:
-    """Display a warning message about the action's risk level."""
-    if risk == ActionSecurityRisk.HIGH:
+def display_action_info(action_type: str, action_data: dict[str, Any]) -> None:
+    """Display information about the action to be executed."""
+    if action_type == "execute_bash":
+        command = action_data.get("command", "Unknown command")
+        print_formatted_text(HTML(f"<yellow>Command to execute: {command}</yellow>"))
+    elif action_type == "str_replace_editor":
+        command = action_data.get("command", "unknown")
+        path = action_data.get("path", "unknown file")
         print_formatted_text(
-            HTML(f"<red>⚠️  HIGH RISK ACTION: {action_description}</red>")
-        )
-    elif risk == ActionSecurityRisk.MEDIUM:
-        print_formatted_text(
-            HTML(f"<yellow>⚠️  MEDIUM RISK ACTION: {action_description}</yellow>")
+            HTML(f"<yellow>File operation: {command} on {path}</yellow>")
         )
     else:
-        print_formatted_text(
-            HTML(f"<green>ℹ️  LOW RISK ACTION: {action_description}</green>")
-        )
+        print_formatted_text(HTML(f"<yellow>Action: {action_type}</yellow>"))
 
 
 # Global confirmation mode instance
