@@ -27,13 +27,13 @@ def show_menu() -> str:
     print("  2. Show TUI Demo - Display TUI components")
     print("  3. Exit")
     print()
-    
+
     session = PromptSession()
-    choice = session.prompt("Select an option (1-3): ")
+    choice: str = session.prompt("Select an option (1-3): ")
     return choice.strip()
 
 
-def show_tui_demo():
+def show_tui_demo() -> None:
     """Show the TUI demo functionality."""
     print()
     print("📱 TUI Demo:")
@@ -62,45 +62,52 @@ def main() -> int:
     while True:
         try:
             choice = show_menu()
-            
+
             if choice == "1":
                 # Start agent chat
                 try:
                     from openhands_cli.agent_chat import main as run_agent_chat
+
                     run_agent_chat()
                 except ImportError as e:
-                    print_formatted_text(HTML(
-                        f"<red>Error: Agent chat requires additional dependencies: {e}</red>"
-                    ))
-                    print_formatted_text(HTML(
-                        "<yellow>Please ensure the agent SDK is properly installed.</yellow>"
-                    ))
+                    print_formatted_text(
+                        HTML(
+                            f"<red>Error: Agent chat requires additional dependencies: {e}</red>"
+                        )
+                    )
+                    print_formatted_text(
+                        HTML(
+                            "<yellow>Please ensure the agent SDK is properly installed.</yellow>"
+                        )
+                    )
                 except Exception as e:
-                    print_formatted_text(HTML(
-                        f"<red>Error starting agent chat: {e}</red>"
-                    ))
-                    
+                    print_formatted_text(
+                        HTML(f"<red>Error starting agent chat: {e}</red>")
+                    )
+
             elif choice == "2":
                 # Show TUI demo
                 show_tui_demo()
-                
+
             elif choice == "3":
                 # Exit
                 print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
                 break
-                
+
             else:
-                print_formatted_text(HTML("<red>Invalid choice. Please select 1, 2, or 3.</red>"))
-                
+                print_formatted_text(
+                    HTML("<red>Invalid choice. Please select 1, 2, or 3.</red>")
+                )
+
             print()  # Add spacing between menu iterations
-            
+
         except KeyboardInterrupt:
             print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
             break
         except EOFError:
             print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
             break
-    
+
     return 0
 
 
