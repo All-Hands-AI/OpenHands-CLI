@@ -43,7 +43,7 @@ except ImportError as e:
     print_formatted_text(
         HTML("<yellow>Please ensure the openhands-sdk is properly installed.</yellow>")
     )
-    sys.exit(1)
+    raise
 
 
 logger = logging.getLogger(__name__)
@@ -230,7 +230,8 @@ def main() -> None:
     """Main entry point for agent chat.
 
     Raises:
-        SystemExit: On normal exit or error conditions
+        AgentSetupError: If agent setup fails
+        Exception: On unexpected errors
     """
     try:
         run_agent_chat()
@@ -239,11 +240,11 @@ def main() -> None:
     except AgentSetupError as e:
         # Agent setup errors are already printed in setup_agent()
         logger.error(f"Agent setup failed: {e}")
-        sys.exit(1)
+        raise
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
-        sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":

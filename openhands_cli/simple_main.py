@@ -62,7 +62,8 @@ def main() -> None:
     """Main entry point for the OpenHands CLI.
 
     Raises:
-        SystemExit: On error conditions
+        ImportError: If agent chat dependencies are missing
+        Exception: On other error conditions
     """
     try:
         # Start agent chat directly by default
@@ -77,7 +78,7 @@ def main() -> None:
         print_formatted_text(
             HTML("<yellow>Please ensure the agent SDK is properly installed.</yellow>")
         )
-        sys.exit(1)
+        raise
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except EOFError:
@@ -85,7 +86,7 @@ def main() -> None:
     except Exception as e:
         print_formatted_text(HTML(f"<red>Error starting agent chat: {e}</red>"))
         traceback.print_exc()
-        sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":
