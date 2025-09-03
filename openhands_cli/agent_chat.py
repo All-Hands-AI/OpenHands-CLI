@@ -19,18 +19,13 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
 try:
-    from openhands.core import (
-        LLM,
-        CodeActAgent,
-        Conversation,
-        EventType,
-        LLMConfig,
-        LLMConvertibleEvent,
-        Message,
-        TextContent,
-        Tool,
-        get_logger,
-    )
+    from openhands.core.agent.codeact_agent import CodeActAgent
+    from openhands.core.config import LLMConfig
+    from openhands.core.conversation import Conversation
+    from openhands.core.event import EventType, LLMConvertibleEvent
+    from openhands.core.llm import LLM, Message, TextContent
+    from openhands.core.logger import get_logger
+    from openhands.core.tool import Tool
     from openhands.tools import (
         BashExecutor,
         FileEditorExecutor,
