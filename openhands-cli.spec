@@ -6,9 +6,8 @@ This spec file configures PyInstaller to create a standalone executable
 for the OpenHands CLI application.
 """
 
-import os
-import sys
 from pathlib import Path
+import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # Get the project root directory (current working directory when running PyInstaller)
@@ -23,6 +22,7 @@ a = Analysis(
         # Add more data files here if needed in the future
         *collect_data_files('tiktoken'),
         *collect_data_files('tiktoken_ext'),
+        *collect_data_files('litellm'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
@@ -31,8 +31,10 @@ a = Analysis(
         *collect_submodules('prompt_toolkit'),
         *collect_submodules('openhands.core'),
         *collect_submodules('openhands.tools'),
+
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
+        *collect_submodules('litellm'),
     ],
     hookspath=[],
     hooksconfig={},

@@ -5,6 +5,7 @@ This is a simplified version that demonstrates the TUI functionality.
 """
 
 import sys
+import traceback
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
@@ -65,17 +66,13 @@ def main() -> int:
 
         run_agent_chat()
         return 0
-        
+
     except ImportError as e:
         print_formatted_text(
-            HTML(
-                f"<red>Error: Agent chat requires additional dependencies: {e}</red>"
-            )
+            HTML(f"<red>Error: Agent chat requires additional dependencies: {e}</red>")
         )
         print_formatted_text(
-            HTML(
-                "<yellow>Please ensure the agent SDK is properly installed.</yellow>"
-            )
+            HTML("<yellow>Please ensure the agent SDK is properly installed.</yellow>")
         )
         return 1
     except KeyboardInterrupt:
@@ -85,9 +82,8 @@ def main() -> int:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return 0
     except Exception as e:
-        print_formatted_text(
-            HTML(f"<red>Error starting agent chat: {e}</red>")
-        )
+        print_formatted_text(HTML(f"<red>Error starting agent chat: {e}</red>"))
+        traceback.print_exc()
         return 1
 
 
