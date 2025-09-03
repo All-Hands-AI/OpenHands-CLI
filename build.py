@@ -178,7 +178,8 @@ def main() -> int:
     # Test the executable
     if not args.no_test:
         if not test_executable():
-            print("⚠️  Executable test failed, but build completed")
+            print("❌ Executable test failed, build process failed")
+            return 1
 
     print("\n🎉 Build process completed!")
     print("📁 Check the 'dist/' directory for your executable")

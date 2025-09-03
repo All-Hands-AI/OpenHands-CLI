@@ -5,6 +5,7 @@ This is a simplified version that demonstrates the TUI functionality.
 """
 
 import sys
+import traceback
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
@@ -59,56 +60,31 @@ def show_tui_demo() -> None:
 
 def main() -> int:
     """Main entry point for the OpenHands CLI."""
-    while True:
-        try:
-            choice = show_menu()
+    try:
+        # Start agent chat directly by default
+        from openhands_cli.agent_chat import main as run_agent_chat
 
-            if choice == "1":
-                # Start agent chat
-                try:
-                    from openhands_cli.agent_chat import main as run_agent_chat
+        run_agent_chat()
+        return 0
 
-                    run_agent_chat()
-                except ImportError as e:
-                    print_formatted_text(
-                        HTML(
-                            f"<red>Error: Agent chat requires additional dependencies: {e}</red>"
-                        )
-                    )
-                    print_formatted_text(
-                        HTML(
-                            "<yellow>Please ensure the agent SDK is properly installed.</yellow>"
-                        )
-                    )
-                except Exception as e:
-                    print_formatted_text(
-                        HTML(f"<red>Error starting agent chat: {e}</red>")
-                    )
-
-            elif choice == "2":
-                # Show TUI demo
-                show_tui_demo()
-
-            elif choice == "3":
-                # Exit
-                print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
-                break
-
-            else:
-                print_formatted_text(
-                    HTML("<red>Invalid choice. Please select 1, 2, or 3.</red>")
-                )
-
-            print()  # Add spacing between menu iterations
-
-        except KeyboardInterrupt:
-            print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-            break
-        except EOFError:
-            print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-            break
-
-    return 0
+    except ImportError as e:
+        print_formatted_text(
+            HTML(f"<red>Error: Agent chat requires additional dependencies: {e}</red>")
+        )
+        print_formatted_text(
+            HTML("<yellow>Please ensure the agent SDK is properly installed.</yellow>")
+        )
+        return 1
+    except KeyboardInterrupt:
+        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        return 0
+    except EOFError:
+        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        return 0
+    except Exception as e:
+        print_formatted_text(HTML(f"<red>Error starting agent chat: {e}</red>"))
+        traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":

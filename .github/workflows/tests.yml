@@ -1,21 +1,19 @@
-# Workflow that builds and tests the binary executable
-name: Build and Test Binary
+# Workflow that runs Python unit tests with pytest
+name: Unit Tests
 
-# Run on pushes to main branch and all pull requests to ensure binary builds work correctly
 on:
   push:
     branches:
       - main
   pull_request:
 
-# Cancel previous runs if a new commit is pushed
 concurrency:
   group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test-binary:
-    name: Build and test binary executable
+  test-python:
+    name: Run unit tests (pytest)
     runs-on: ubuntu-latest
 
     steps:
@@ -36,11 +34,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --dev
+          uv sync --extra dev
 
-      - name: Build and test binary executable
-        env:
-          LITELLM_API_KEY: dummy-ci-key
-          LITELLM_MODEL: dummy-ci-model
+      - name: Run tests
         run: |
-          ./build.sh --install-pyinstaller
+          uv run pytest -v
