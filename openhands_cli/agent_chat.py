@@ -73,7 +73,48 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
 
         # Setup tools
         cwd = os.getcwd()
-        bash = BashExecutor(working_dir=cwd)
+        try:
+            bash = BashExecutor(working_dir=cwd)
+        except Exception as e:
+            # Provide a friendly message when tmux is missing locally
+            tmux_missing = e.__class__.__name__ == "TmuxCommandNotFound"
+            if not tmux_missing:
+                try:
+                    from libtmux.exc import (
+                        TmuxCommandNotFound as _TmuxCommandNotFound,  # type: ignore
+                    )
+
+                    tmux_missing = isinstance(e, _TmuxCommandNotFound)
+                except Exception:
+                    pass
+            if not tmux_missing:
+                msg = str(e)
+                if msg:
+                    lower = msg.lower()
+                    tmux_missing = (
+                        "tmuxcommandnotfound" in lower
+                        or "tmux command not found" in lower
+                        or "tmux" in lower
+                    )
+            if tmux_missing:
+                print_formatted_text(
+                    HTML(
+                        "<red>Error: tmux is not installed or not found in PATH.</red>"
+                    )
+                )
+                print_formatted_text(
+                    HTML(
+                        "<yellow>OpenHands CLI requires tmux to manage the local shell session.</yellow>"
+                    )
+                )
+                print_formatted_text(
+                    HTML(
+                        "<grey>Install examples — macOS: brew install tmux | Ubuntu/Debian: sudo apt-get install tmux | Fedora: sudo dnf install tmux | Arch: sudo pacman -S tmux</grey>"
+                    )
+                )
+                return None, None, None
+            # Re-raise to be handled by the outer exception handler
+            raise
         file_editor = FileEditorExecutor()
         tools: list[Tool] = [
             execute_bash_tool.set_executor(executor=bash),
