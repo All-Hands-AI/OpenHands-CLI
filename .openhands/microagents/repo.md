@@ -20,6 +20,9 @@ To set up the development environment:
 ## Linting Requirements
 **Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files. The project uses:
 
+## Typing Requirements
+When using types, prefer modern typing syntax (e.g., use `| None` instead of `Optional`).
+
 ## Documentation Guidelines
 - **Do NOT send summary updates in the README.md** for the repository
 - **Do NOT create .md files in the root** of the repository to track or send updates
