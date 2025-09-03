@@ -42,36 +42,83 @@ jobs:
         run: |
           ./build.sh --install-pyinstaller
 
-      - name: Test binary startup without API key (should fail gracefully)
+      - name: Test binary startup without API key (should show error message)
         run: |
-          # Test that binary fails gracefully without API key
-          if ./dist/openhands-cli 2>&1 | grep -q "No API key found"; then
+          # Test that binary shows appropriate error message without API key
+          # Since the process is long-lived, we need to send it an exit command
+          echo "/exit" | timeout 30s ./dist/openhands-cli 2>&1 | tee no_api_key_output.log || true
+
+          # Check for the expected error message
+          if grep -q "No API key found" no_api_key_output.log; then
             echo "✅ Binary correctly reports missing API key"
-            exit 0
           else
             echo "❌ Binary did not report missing API key correctly"
+            echo "Output was:"
+            cat no_api_key_output.log
             exit 1
           fi
         timeout-minutes: 1
 
-      - name: Test binary startup with dummy API key (should not crash)
+      - name: Test binary startup with dummy API key (should start successfully)
         env:
           LITELLM_API_KEY: dummy-ci-key
           LITELLM_MODEL: dummy-ci-model
         run: |
-          # Test that binary doesn't crash with missing prompt files
-          timeout 10s ./dist/openhands-cli 2>&1 | tee output.log || true
+          # Test that binary starts successfully and shows welcome message
+          # Send /exit command to gracefully exit the long-lived process
+          echo -e "/exit" | timeout 30s ./dist/openhands-cli 2>&1 | tee startup_output.log || true
 
-          # Check for specific error patterns that indicate problems
-          if grep -q "system_prompt.j2 not found" output.log; then
+          # Check for successful startup indicators
+          if grep -q "system_prompt.j2 not found" startup_output.log; then
             echo "❌ Binary has missing prompt file error"
-            cat output.log
+            cat startup_output.log
             exit 1
-          elif grep -q "Error setting up agent" output.log && grep -q "system_prompt.j2" output.log; then
+          elif grep -q "Error setting up agent" startup_output.log && grep -q "system_prompt.j2" startup_output.log; then
             echo "❌ Binary has prompt file related errors"
-            cat output.log
+            cat startup_output.log
             exit 1
+          elif grep -q "Let's start building!" startup_output.log || grep -q "OpenHands CLI" startup_output.log; then
+            echo "✅ Binary starts successfully and shows welcome message"
           else
-            echo "✅ Binary starts without critical errors"
-            exit 0
+            echo "❌ Binary did not start properly or show expected messages"
+            echo "Output was:"
+            cat startup_output.log
+            exit 1
+          fi
+
+      - name: Test binary interactive commands
+        env:
+          LITELLM_API_KEY: dummy-ci-key
+          LITELLM_MODEL: dummy-ci-model
+        run: |
+          # Test that binary responds to commands correctly
+          # Send a few commands and then exit
+          echo -e "/help\n/status\n/exit" | timeout 30s ./dist/openhands-cli 2>&1 | tee commands_output.log || true
+
+          # Check for expected command responses
+          if grep -q "Available commands:" commands_output.log || grep -q "help" commands_output.log; then
+            echo "✅ Binary responds to /help command"
+          else
+            echo "❌ Binary did not respond to /help command properly"
+            echo "Output was:"
+            cat commands_output.log
+            exit 1
+          fi
+
+          if grep -q "Status: Active" commands_output.log || grep -q "Session ID:" commands_output.log; then
+            echo "✅ Binary responds to /status command"
+          else
+            echo "❌ Binary did not respond to /status command properly"
+            echo "Output was:"
+            cat commands_output.log
+            exit 1
+          fi
+
+          if grep -q "Goodbye!" commands_output.log; then
+            echo "✅ Binary exits gracefully with /exit command"
+          else
+            echo "❌ Binary did not exit gracefully"
+            echo "Output was:"
+            cat commands_output.log
+            exit 1
           fi

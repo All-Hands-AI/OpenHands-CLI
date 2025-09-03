@@ -52,9 +52,7 @@ logger = logging.getLogger(__name__)
 class AgentSetupError(Exception):
     """Exception raised when agent setup fails."""
 
-    def __init__(self, message: str, exit_code: int = 1):
-        super().__init__(message)
-        self.exit_code = exit_code
+    pass
 
 
 def setup_agent() -> tuple[LLM, Agent, Conversation]:
@@ -79,8 +77,7 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
                 )
             )
             raise AgentSetupError(
-                "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.",
-                1,
+                "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
             )
 
         # Configure LLM
@@ -123,7 +120,7 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
     except Exception as e:
         print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
         traceback.print_exc()
-        raise AgentSetupError(f"Error setting up agent: {str(e)}", 2) from e
+        raise AgentSetupError(f"Error setting up agent: {str(e)}") from e
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -139,17 +136,16 @@ def display_welcome(session_id: str = "chat") -> None:
     print()
 
 
-def run_agent_chat() -> int:
+def run_agent_chat() -> None:
     """Run the agent chat session using the agent SDK.
 
-    Returns:
-        int: Exit code (0 for success, non-zero for error)
+    Raises:
+        AgentSetupError: If agent setup fails
+        KeyboardInterrupt: If user interrupts the session
+        EOFError: If EOF is encountered
     """
-    # Setup agent
-    try:
-        llm, agent, conversation = setup_agent()
-    except AgentSetupError as e:
-        return e.exit_code
+    # Setup agent - let exceptions bubble up
+    llm, agent, conversation = setup_agent()
 
     # Generate session ID
     import uuid
@@ -229,25 +225,26 @@ def run_agent_chat() -> int:
             print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
             break
 
-    return 0
 
-
-def main() -> int:
+def main() -> None:
     """Main entry point for agent chat.
 
-    Returns:
-        int: Exit code (0 for success, non-zero for error)
+    Raises:
+        SystemExit: On normal exit or error conditions
     """
     try:
-        return run_agent_chat()
+        run_agent_chat()
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-        return 0
+    except AgentSetupError as e:
+        # Agent setup errors are already printed in setup_agent()
+        logger.error(f"Agent setup failed: {e}")
+        sys.exit(1)
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
-        return 3
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

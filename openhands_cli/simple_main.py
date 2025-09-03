@@ -58,13 +58,17 @@ def show_tui_demo() -> None:
     print("TUI demo complete! 🎉")
 
 
-def main() -> int:
-    """Main entry point for the OpenHands CLI."""
+def main() -> None:
+    """Main entry point for the OpenHands CLI.
+
+    Raises:
+        SystemExit: On error conditions
+    """
     try:
         # Start agent chat directly by default
         from openhands_cli.agent_chat import main as run_agent_chat
 
-        return run_agent_chat()
+        run_agent_chat()
 
     except ImportError as e:
         print_formatted_text(
@@ -73,18 +77,16 @@ def main() -> int:
         print_formatted_text(
             HTML("<yellow>Please ensure the agent SDK is properly installed.</yellow>")
         )
-        return 1
+        sys.exit(1)
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-        return 0
     except EOFError:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-        return 0
     except Exception as e:
         print_formatted_text(HTML(f"<red>Error starting agent chat: {e}</red>"))
         traceback.print_exc()
-        return 1
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
