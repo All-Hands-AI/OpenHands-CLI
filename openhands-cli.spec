@@ -12,7 +12,7 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # Ensure build-time import resolution prefers the packaged SDK over the monorepo path
-# Remove any OpenHands monorepo paths if present (prevents importing /openhands/code/openhands)
+# Needed when running build inside OpenHands conversation (due to nested runtimes)
 _sys_paths_to_remove = [p for p in list(sys.path) if p.startswith('/openhands/code')]
 for _p in _sys_paths_to_remove:
     try:
