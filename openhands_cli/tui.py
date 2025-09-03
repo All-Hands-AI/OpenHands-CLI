@@ -17,6 +17,7 @@ COMMANDS = {
     "/clear": "Clear the screen",
     "/status": "Display conversation details",
     "/new": "Create a new conversation",
+    "/confirm": "Manage confirmation mode settings",
 }
 
 
@@ -68,6 +69,15 @@ def display_help() -> None:
     for command, description in COMMANDS.items():
         print_formatted_text(HTML(f"  <white>{command}</white> - {description}"))
 
+    print_formatted_text("")
+    print_formatted_text(HTML("<gold>🔒 Confirmation Mode</gold>"))
+    print_formatted_text("  OpenHands CLI includes confirmation mode to protect against risky actions.")
+    print_formatted_text("  Use <white>/confirm</white> to manage confirmation settings:")
+    print_formatted_text("    • <white>/confirm status</white> - Show current mode")
+    print_formatted_text("    • <white>/confirm default</white> - Confirm MEDIUM/HIGH risk actions")
+    print_formatted_text("    • <white>/confirm auto</white> - Auto-confirm LOW/MEDIUM, ask for HIGH")
+    print_formatted_text("    • <white>/confirm always</white> - Always confirm all actions")
+    print_formatted_text("    • <white>/confirm never</white> - Disable confirmation (not recommended)")
     print_formatted_text("")
     print_formatted_text(HTML("<grey>Tips:</grey>"))
     print_formatted_text("  • Type / and press Tab to see command suggestions")
