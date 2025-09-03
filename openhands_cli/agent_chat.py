@@ -19,6 +19,8 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
+from openhands_cli.tui import display_banner, display_help, CommandCompleter
+
 try:
     from openhands.core.agent.codeact_agent import CodeActAgent
     from openhands.core.config import LLMConfig
@@ -98,19 +100,13 @@ def setup_agent() -> tuple[LLM | None, CodeActAgent | None, Conversation | None]
         return None, None, None
 
 
-def display_welcome() -> None:
+def display_welcome(session_id: str = "chat") -> None:
     """Display welcome message."""
     clear()
-    print_formatted_text(HTML("<gold>🤖 OpenHands Agent Chat</gold>"))
-    print_formatted_text(HTML("<grey>AI Agent Conversation Interface</grey>"))
-    print()
-    print_formatted_text(HTML("<skyblue>Commands:</skyblue>"))
-    print_formatted_text(HTML("  <white>/exit</white> - Exit the chat"))
-    print_formatted_text(HTML("  <white>/clear</white> - Clear the screen"))
-    print_formatted_text(HTML("  <white>/help</white> - Show this help"))
-    print()
+    display_banner(session_id)
+    print_formatted_text(HTML("<gold>Let's start building!</gold>"))
     print_formatted_text(
-        HTML("<green>Type your message and press Enter to chat with the agent.</green>")
+        HTML("<green>What do you want to build? <grey>Type /help for help</grey></green>")
     )
     print()
 
@@ -122,17 +118,21 @@ def run_agent_chat() -> None:
     if not agent or not conversation:
         return
 
-    display_welcome()
+    # Generate session ID
+    import uuid
+    session_id = str(uuid.uuid4())[:8]
+    
+    display_welcome(session_id)
 
-    # Create prompt session
-    session = PromptSession()
+    # Create prompt session with command completer
+    session = PromptSession(completer=CommandCompleter())
 
     # Main chat loop
     while True:
         try:
             # Get user input
             user_input = session.prompt(
-                HTML("<blue>You: </blue>"),
+                HTML("<gold>> </gold>"),
                 multiline=False,
             )
 
@@ -140,15 +140,24 @@ def run_agent_chat() -> None:
                 continue
 
             # Handle commands
-            if user_input.strip().lower() == "/exit":
+            command = user_input.strip().lower()
+            if command == "/exit":
                 print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
                 break
-            elif user_input.strip().lower() == "/clear":
-                clear()
-                display_welcome()
+            elif command == "/clear":
+                display_welcome(session_id)
                 continue
-            elif user_input.strip().lower() == "/help":
-                display_welcome()
+            elif command == "/help":
+                display_help()
+                continue
+            elif command == "/status":
+                print_formatted_text(HTML(f"<grey>Session ID: {session_id}</grey>"))
+                print_formatted_text(HTML("<grey>Status: Active</grey>"))
+                continue
+            elif command == "/new":
+                print_formatted_text(HTML("<yellow>Starting new conversation...</yellow>"))
+                session_id = str(uuid.uuid4())[:8]
+                display_welcome(session_id)
                 continue
 
             # Send message to agent
