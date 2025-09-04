@@ -236,16 +236,7 @@ class ConversationRunner:
             if not approved:
                 self.conversation.reject_pending_actions("User rejected the actions")
                 return False
-            return True
-        else:
-            # Defensive: clear the flag if somehow set without actions
-            print_formatted_text(
-                HTML(
-                    "<yellow>⚠️ Agent is waiting for confirmation but no pending actions were found.</yellow>"
-                )
-            )
-            self.conversation.state.waiting_for_confirmation = False
-            return True
+        return True
 
 
 def display_welcome(session_id: str = "chat") -> None:
