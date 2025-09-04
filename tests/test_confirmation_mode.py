@@ -4,10 +4,7 @@ Tests for confirmation mode functionality in OpenHands CLI.
 """
 
 import os
-import unittest.mock
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from openhands_cli.agent_chat import ask_user_confirmation, setup_agent
 
@@ -17,80 +14,79 @@ class TestConfirmationMode:
 
     def test_confirmation_mode_env_var_true(self):
         """Test that CONFIRMATION_MODE=true enables confirmation mode."""
-        with patch.dict(os.environ, {
-            "CONFIRMATION_MODE": "true",
-            "LITELLM_API_KEY": "test-key"
-        }):
-            with patch("openhands_cli.agent_chat.LLM") as mock_llm, \
-                 patch("openhands_cli.agent_chat.Agent") as mock_agent, \
-                 patch("openhands_cli.agent_chat.Conversation") as mock_conversation, \
-                 patch("openhands_cli.agent_chat.BashExecutor"), \
-                 patch("openhands_cli.agent_chat.FileEditorExecutor"):
-                
+        with patch.dict(
+            os.environ, {"CONFIRMATION_MODE": "true", "LITELLM_API_KEY": "test-key"}
+        ):
+            with (
+                patch("openhands_cli.agent_chat.LLM"),
+                patch("openhands_cli.agent_chat.Agent"),
+                patch("openhands_cli.agent_chat.Conversation") as mock_conversation,
+                patch("openhands_cli.agent_chat.BashExecutor"),
+                patch("openhands_cli.agent_chat.FileEditorExecutor"),
+            ):
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
-                
+
                 llm, agent, conversation = setup_agent()
-                
+
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
 
     def test_confirmation_mode_env_var_1(self):
         """Test that CONFIRMATION_MODE=1 enables confirmation mode."""
-        with patch.dict(os.environ, {
-            "CONFIRMATION_MODE": "1",
-            "LITELLM_API_KEY": "test-key"
-        }):
-            with patch("openhands_cli.agent_chat.LLM") as mock_llm, \
-                 patch("openhands_cli.agent_chat.Agent") as mock_agent, \
-                 patch("openhands_cli.agent_chat.Conversation") as mock_conversation, \
-                 patch("openhands_cli.agent_chat.BashExecutor"), \
-                 patch("openhands_cli.agent_chat.FileEditorExecutor"):
-                
+        with patch.dict(
+            os.environ, {"CONFIRMATION_MODE": "1", "LITELLM_API_KEY": "test-key"}
+        ):
+            with (
+                patch("openhands_cli.agent_chat.LLM"),
+                patch("openhands_cli.agent_chat.Agent"),
+                patch("openhands_cli.agent_chat.Conversation") as mock_conversation,
+                patch("openhands_cli.agent_chat.BashExecutor"),
+                patch("openhands_cli.agent_chat.FileEditorExecutor"),
+            ):
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
-                
+
                 llm, agent, conversation = setup_agent()
-                
+
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
 
     def test_confirmation_mode_env_var_false(self):
         """Test that CONFIRMATION_MODE=false does not enable confirmation mode."""
-        with patch.dict(os.environ, {
-            "CONFIRMATION_MODE": "false",
-            "LITELLM_API_KEY": "test-key"
-        }):
-            with patch("openhands_cli.agent_chat.LLM") as mock_llm, \
-                 patch("openhands_cli.agent_chat.Agent") as mock_agent, \
-                 patch("openhands_cli.agent_chat.Conversation") as mock_conversation, \
-                 patch("openhands_cli.agent_chat.BashExecutor"), \
-                 patch("openhands_cli.agent_chat.FileEditorExecutor"):
-                
+        with patch.dict(
+            os.environ, {"CONFIRMATION_MODE": "false", "LITELLM_API_KEY": "test-key"}
+        ):
+            with (
+                patch("openhands_cli.agent_chat.LLM"),
+                patch("openhands_cli.agent_chat.Agent"),
+                patch("openhands_cli.agent_chat.Conversation") as mock_conversation,
+                patch("openhands_cli.agent_chat.BashExecutor"),
+                patch("openhands_cli.agent_chat.FileEditorExecutor"),
+            ):
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
-                
+
                 llm, agent, conversation = setup_agent()
-                
+
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
 
     def test_confirmation_mode_env_var_not_set(self):
         """Test that confirmation mode is not enabled when env var is not set."""
-        with patch.dict(os.environ, {
-            "LITELLM_API_KEY": "test-key"
-        }, clear=True):
-            with patch("openhands_cli.agent_chat.LLM") as mock_llm, \
-                 patch("openhands_cli.agent_chat.Agent") as mock_agent, \
-                 patch("openhands_cli.agent_chat.Conversation") as mock_conversation, \
-                 patch("openhands_cli.agent_chat.BashExecutor"), \
-                 patch("openhands_cli.agent_chat.FileEditorExecutor"):
-                
+        with patch.dict(os.environ, {"LITELLM_API_KEY": "test-key"}, clear=True):
+            with (
+                patch("openhands_cli.agent_chat.LLM"),
+                patch("openhands_cli.agent_chat.Agent"),
+                patch("openhands_cli.agent_chat.Conversation") as mock_conversation,
+                patch("openhands_cli.agent_chat.BashExecutor"),
+                patch("openhands_cli.agent_chat.FileEditorExecutor"),
+            ):
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
-                
+
                 llm, agent, conversation = setup_agent()
-                
+
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
 
@@ -105,11 +101,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.return_value = "yes"
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "ls -la"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is True
 
@@ -119,11 +115,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.return_value = "no"
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "rm -rf /"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is False
 
@@ -133,11 +129,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.return_value = "y"
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "echo hello"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is True
 
@@ -147,11 +143,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.return_value = "n"
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "dangerous command"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is False
 
@@ -161,11 +157,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.side_effect = ["invalid", "maybe", "yes"]
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is True
         assert mock_session.prompt.call_count == 3
@@ -176,11 +172,11 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.side_effect = KeyboardInterrupt()
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is False
 
@@ -190,33 +186,36 @@ class TestConfirmationMode:
         mock_session = MagicMock()
         mock_session.prompt.side_effect = EOFError()
         mock_prompt_session.return_value = mock_session
-        
+
         mock_action = MagicMock()
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
-        
+
         result = ask_user_confirmation([mock_action])
         assert result is False
 
     def test_ask_user_confirmation_multiple_actions(self):
         """Test that ask_user_confirmation displays multiple actions correctly."""
-        with patch("openhands_cli.agent_chat.PromptSession") as mock_prompt_session, \
-             patch("openhands_cli.agent_chat.print_formatted_text") as mock_print:
-            
+        with (
+            patch("openhands_cli.agent_chat.PromptSession") as mock_prompt_session,
+            patch("openhands_cli.agent_chat.print_formatted_text") as mock_print,
+        ):
             mock_session = MagicMock()
             mock_session.prompt.return_value = "yes"
             mock_prompt_session.return_value = mock_session
-            
+
             mock_action1 = MagicMock()
             mock_action1.tool_name = "bash"
             mock_action1.action = "ls -la"
-            
+
             mock_action2 = MagicMock()
             mock_action2.tool_name = "str_replace_editor"
             mock_action2.action = "create file.txt"
-            
+
             result = ask_user_confirmation([mock_action1, mock_action2])
             assert result is True
-            
+
             # Verify that both actions were displayed
-            assert mock_print.call_count >= 3  # Header + 2 actions + at least approval message
+            assert (
+                mock_print.call_count >= 3
+            )  # Header + 2 actions + at least approval message

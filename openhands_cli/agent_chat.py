@@ -8,6 +8,8 @@ import logging
 import os
 import sys
 import traceback
+from dataclasses import dataclass
+from enum import Enum
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
@@ -47,6 +49,23 @@ except ImportError as e:
 
 
 logger = logging.getLogger(__name__)
+
+
+class ConversationStatus(Enum):
+    """Status of conversation processing."""
+
+    COMPLETED = "completed"
+    ERROR = "error"
+    INTERRUPTED = "interrupted"
+
+
+@dataclass
+class ConversationResult:
+    """Result of processing a conversation message."""
+
+    status: ConversationStatus
+    message: str = ""
+    error: str = ""
 
 
 class AgentSetupError(Exception):
@@ -190,6 +209,88 @@ def ask_user_confirmation(pending_actions: list) -> bool:
             return False
 
 
+class ConversationRunner:
+    """Handles the conversation state machine logic cleanly."""
+
+    def __init__(self, conversation: Conversation):
+        self.conversation = conversation
+
+    def process_message(self, message: Message) -> ConversationResult:
+        """Process a user message through the conversation.
+
+        Args:
+            message: The user message to process
+
+        Returns:
+            ConversationResult with status and any needed information
+        """
+        try:
+            # Send message to conversation
+            self.conversation.send_message(message)
+
+            # Run conversation until completion or confirmation needed
+            return self._run_until_completion_or_confirmation()
+
+        except Exception as e:
+            return ConversationResult(status=ConversationStatus.ERROR, error=str(e))
+
+    def _run_until_completion_or_confirmation(self) -> ConversationResult:
+        """Run conversation until agent finishes or needs confirmation.
+
+        Returns:
+            ConversationResult indicating the outcome
+        """
+        while not self.conversation.state.agent_finished:
+            self.conversation.run()
+
+            # Check if agent is waiting for confirmation
+            if self.conversation.state.waiting_for_confirmation:
+                if not self._handle_confirmation_request():
+                    # User rejected - continue the loop as agent may produce new actions or finish
+                    continue
+                # If approved, continue to run() which will execute the actions
+            else:
+                # Agent finished normally
+                break
+
+        return ConversationResult(
+            status=ConversationStatus.COMPLETED,
+            message="Agent has processed your request.",
+        )
+
+    def _handle_confirmation_request(self) -> bool:
+        """Handle confirmation request from user.
+
+        Returns:
+            True if user approved actions, False if rejected
+        """
+        pending_actions = self.conversation.get_pending_actions()
+
+        if pending_actions:
+            approved = ask_user_confirmation(pending_actions)
+            if not approved:
+                self._reject_pending_actions("User rejected the actions")
+                return False
+            return True
+        else:
+            # Defensive: clear the flag if somehow set without actions
+            print_formatted_text(
+                HTML(
+                    "<yellow>⚠️ Agent is waiting for confirmation but no pending actions were found.</yellow>"
+                )
+            )
+            self.conversation.state.waiting_for_confirmation = False
+            return True
+
+    def _reject_pending_actions(self, reason: str) -> None:
+        """Reject pending actions with reason.
+
+        Args:
+            reason: Reason for rejecting the actions
+        """
+        self.conversation.reject_pending_actions(reason)
+
+
 def display_welcome(session_id: str = "chat") -> None:
     """Display welcome message."""
     clear()
@@ -223,6 +324,9 @@ def run_agent_chat() -> None:
 
     # Create prompt session with command completer
     session = PromptSession(completer=CommandCompleter())
+
+    # Create conversation runner to handle state machine logic
+    runner = ConversationRunner(conversation)
 
     # Main chat loop
     while True:
@@ -276,50 +380,19 @@ def run_agent_chat() -> None:
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
-            try:
-                # Create message and send to conversation
-                message = Message(
-                    role="user",
-                    content=[TextContent(text=user_input)],
-                )
+            # Create message and process through conversation runner
+            message = Message(
+                role="user",
+                content=[TextContent(text=user_input)],
+            )
 
-                conversation.send_message(message)
+            result = runner.process_message(message)
 
-                # Run conversation until agent finishes or needs confirmation
-                while not conversation.state.agent_finished:
-                    conversation.run()
-
-                    # Check if agent is waiting for confirmation
-                    if conversation.state.waiting_for_confirmation:
-                        pending_actions = conversation.get_pending_actions()
-
-                        if pending_actions:
-                            approved = ask_user_confirmation(pending_actions)
-                            if not approved:
-                                conversation.reject_pending_actions(
-                                    "User rejected the actions"
-                                )
-                                # Continue the loop - agent may produce new actions or finish
-                                continue
-                            # If approved, continue to run() which will execute the actions
-                        else:
-                            # Defensive: clear the flag if somehow set without actions
-                            print_formatted_text(
-                                HTML(
-                                    "<yellow>⚠️ Agent is waiting for confirmation but no pending actions were found.</yellow>"
-                                )
-                            )
-                            conversation.state.waiting_for_confirmation = False
-                    else:
-                        # Agent finished normally
-                        break
-
-                print_formatted_text(
-                    HTML("<green>✓ Agent has processed your request.</green>")
-                )
-
-            except Exception as e:
-                print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
+            # Handle result based on status
+            if result.status == ConversationStatus.COMPLETED:
+                print_formatted_text(HTML(f"<green>✓ {result.message}</green>"))
+            elif result.status == ConversationStatus.ERROR:
+                print_formatted_text(HTML(f"<red>Error: {result.error}</red>"))
 
             print()  # Add spacing
 
