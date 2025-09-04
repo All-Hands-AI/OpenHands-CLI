@@ -32,6 +32,7 @@ try:
         TextContent,
         Tool,
     )
+    from openhands.sdk.event.utils import get_unmatched_actions
     from openhands.tools import (
         BashExecutor,
         FileEditorExecutor,
@@ -214,7 +215,7 @@ class ConversationRunner:
             self.conversation.run()
 
             # Check if agent is waiting for confirmation
-            if self.conversation.state.waiting_for_confirmation:
+            if self.conversation.state.agent_waiting_for_confirmation:
                 if not self._handle_confirmation_request():
                     # User rejected - continue the loop as agent may produce new actions or finish
                     continue
@@ -229,7 +230,7 @@ class ConversationRunner:
         Returns:
             True if user approved actions, False if rejected
         """
-        pending_actions = self.conversation.get_pending_actions()
+        pending_actions = get_unmatched_actions(self.conversation.state.events)
 
         if pending_actions:
             approved = ask_user_confirmation(pending_actions)
