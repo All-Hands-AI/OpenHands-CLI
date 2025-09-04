@@ -269,7 +269,7 @@ class ConversationRunner:
         if pending_actions:
             approved = ask_user_confirmation(pending_actions)
             if not approved:
-                self._reject_pending_actions("User rejected the actions")
+                self.conversation.reject_pending_actions("User rejected the actions")
                 return False
             return True
         else:
@@ -281,14 +281,6 @@ class ConversationRunner:
             )
             self.conversation.state.waiting_for_confirmation = False
             return True
-
-    def _reject_pending_actions(self, reason: str) -> None:
-        """Reject pending actions with reason.
-
-        Args:
-            reason: Reason for rejecting the actions
-        """
-        self.conversation.reject_pending_actions(reason)
 
 
 def display_welcome(session_id: str = "chat") -> None:
