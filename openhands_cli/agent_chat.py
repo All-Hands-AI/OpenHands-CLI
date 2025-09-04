@@ -8,8 +8,6 @@ import logging
 import os
 import sys
 import traceback
-from dataclasses import dataclass
-from enum import Enum
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
@@ -49,23 +47,6 @@ except ImportError as e:
 
 
 logger = logging.getLogger(__name__)
-
-
-class ConversationStatus(Enum):
-    """Status of conversation processing."""
-
-    COMPLETED = "completed"
-    ERROR = "error"
-    INTERRUPTED = "interrupted"
-
-
-@dataclass
-class ConversationResult:
-    """Result of processing a conversation message."""
-
-    status: ConversationStatus
-    message: str = ""
-    error: str = ""
 
 
 class AgentSetupError(Exception):
@@ -215,31 +196,20 @@ class ConversationRunner:
     def __init__(self, conversation: Conversation):
         self.conversation = conversation
 
-    def process_message(self, message: Message) -> ConversationResult:
+    def process_message(self, message: Message) -> None:
         """Process a user message through the conversation.
 
         Args:
             message: The user message to process
-
-        Returns:
-            ConversationResult with status and any needed information
         """
-        try:
-            # Send message to conversation
-            self.conversation.send_message(message)
+        # Send message to conversation
+        self.conversation.send_message(message)
 
-            # Run conversation until completion or confirmation needed
-            return self._run_until_completion_or_confirmation()
+        # Run conversation until completion or confirmation needed
+        self._run_until_completion_or_confirmation()
 
-        except Exception as e:
-            return ConversationResult(status=ConversationStatus.ERROR, error=str(e))
-
-    def _run_until_completion_or_confirmation(self) -> ConversationResult:
-        """Run conversation until agent finishes or needs confirmation.
-
-        Returns:
-            ConversationResult indicating the outcome
-        """
+    def _run_until_completion_or_confirmation(self) -> None:
+        """Run conversation until agent finishes or needs confirmation."""
         while not self.conversation.state.agent_finished:
             self.conversation.run()
 
@@ -252,11 +222,6 @@ class ConversationRunner:
             else:
                 # Agent finished normally
                 break
-
-        return ConversationResult(
-            status=ConversationStatus.COMPLETED,
-            message="Agent has processed your request.",
-        )
 
     def _handle_confirmation_request(self) -> bool:
         """Handle confirmation request from user.
@@ -372,19 +337,20 @@ def run_agent_chat() -> None:
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
-            # Create message and process through conversation runner
-            message = Message(
-                role="user",
-                content=[TextContent(text=user_input)],
-            )
+            try:
+                # Create message and process through conversation runner
+                message = Message(
+                    role="user",
+                    content=[TextContent(text=user_input)],
+                )
 
-            result = runner.process_message(message)
+                runner.process_message(message)
+                print_formatted_text(
+                    HTML("<green>✓ Agent has processed your request.</green>")
+                )
 
-            # Handle result based on status
-            if result.status == ConversationStatus.COMPLETED:
-                print_formatted_text(HTML(f"<green>✓ {result.message}</green>"))
-            elif result.status == ConversationStatus.ERROR:
-                print_formatted_text(HTML(f"<red>Error: {result.error}</red>"))
+            except Exception as e:
+                print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
 
             print()  # Add spacing
 
