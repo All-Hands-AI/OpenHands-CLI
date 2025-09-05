@@ -19,7 +19,14 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
-from openhands_cli.tui import CommandCompleter, display_banner, display_help
+from openhands_cli.tui import (
+    CommandCompleter,
+    confirm_dropdown,
+    display_banner,
+    display_command_box,
+    display_help,
+    display_output_box,
+)
 
 try:
     from openhands.sdk import (
@@ -32,6 +39,7 @@ try:
         TextContent,
         Tool,
     )
+    from openhands.sdk.event import ActionEvent, ObservationEvent
     from openhands.sdk.event.utils import get_unmatched_actions
     from openhands.tools import (
         BashExecutor,
@@ -106,6 +114,41 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
 
         # Setup conversation with callback
         def conversation_callback(event: EventType) -> None:
+            # Render UI parity for command + output boxes
+            try:
+                if isinstance(event, ActionEvent):
+                    # Tool call: show command if bash
+                    tool_name = getattr(event, "tool_name", "")
+                    action = getattr(event, "action", None)
+                    if (
+                        tool_name in ("execute_bash", "bash", "BashTool")
+                        and action is not None
+                    ):
+                        cmd = (
+                            getattr(action, "command", None)
+                            or getattr(action, "bash_command", None)
+                            or str(action)
+                        )
+                        if cmd:
+                            display_command_box(str(cmd))
+                elif isinstance(event, ObservationEvent):
+                    # Tool result: show output for bash
+                    if getattr(event, "tool_name", "") in (
+                        "execute_bash",
+                        "bash",
+                        "BashTool",
+                    ):
+                        obs = getattr(event, "observation", None)
+                        out = (
+                            getattr(obs, "agent_observation", None)
+                            or getattr(obs, "output", None)
+                            or str(obs)
+                        )
+                        if out:
+                            display_output_box(str(out))
+            except Exception as _:
+                # Don't block on UI errors
+                pass
             logger.debug(f"Conversation event: {str(event)[:200]}...")
 
         conversation = Conversation(agent=agent, callbacks=[conversation_callback])
@@ -135,7 +178,9 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
 
 
 def ask_user_confirmation(pending_actions: list) -> bool:
-    """Ask user to confirm pending actions.
+    """Ask user to confirm pending actions using a dropdown.
+
+    Falls back to textual yes/no on error for testability.
 
     Args:
         pending_actions: List of pending actions from the agent
@@ -159,6 +204,25 @@ def ask_user_confirmation(pending_actions: list) -> bool:
             HTML(f"<grey>  {i}. {tool_name}: {action_content}...</grey>")
         )
 
+    # Try dropdown Application for parity; fallback to prompt
+    use_dropdown = sys.stdin.isatty() and sys.stdout.isatty()
+    if use_dropdown:
+        try:
+            choice = confirm_dropdown()
+            if choice == "yes" or choice is True:
+                print_formatted_text(
+                    HTML("<green>✅ Approved — executing actions…</green>")
+                )
+                return True
+            elif choice == "always":
+                print_formatted_text(HTML("<green>✅ Always proceed enabled.</green>"))
+                return True
+            else:
+                print_formatted_text(HTML("<red>❌ Rejected — skipping actions…</red>"))
+                return False
+        except Exception:
+            # Fall through to text prompt
+            pass
     session = PromptSession()
     while True:
         try:

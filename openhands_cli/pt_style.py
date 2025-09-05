@@ -9,6 +9,8 @@ from prompt_toolkit.styles.defaults import default_ui_style
 COLOR_GOLD = "#FFD700"
 COLOR_GREY = "#808080"
 COLOR_AGENT_BLUE = "#4682B4"  # Steel blue - readable on light/dark backgrounds
+COLOR_PURPLE = "#6A0DAD"
+COLOR_LIGHT_GREY = "#A9A9A9"
 
 
 def get_cli_style() -> BaseStyle:
@@ -24,6 +26,12 @@ def get_cli_style() -> BaseStyle:
             "completion-menu.completion.current fuzzymatch.outside": "fg:#ffffff bg:#888888",
             "selected": COLOR_GOLD,
             "risk-high": "#FF0000 bold",  # Red bold for HIGH risk
+            # Boxes and headers
+            "cmdtitle": f"fg:#ffffff bg:{COLOR_PURPLE} bold",
+            "outtitle": f"fg:#ffffff bg:{COLOR_LIGHT_GREY} bold",
+            "cmdbox": f"fg:{COLOR_PURPLE}",
+            "outbox": f"fg:{COLOR_LIGHT_GREY}",
+            "status": f"fg:{COLOR_AGENT_BLUE}",
         }
     )
     return merge_styles([base, custom])
