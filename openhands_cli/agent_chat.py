@@ -9,12 +9,29 @@ import os
 import sys
 import threading
 import traceback
+import typing
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
 if "/openhands/code" in sys.path:
     sys.path.remove("/openhands/code")
 
+from openhands.sdk import (
+    LLM,
+    Agent,
+    Conversation,
+    EventType,
+    Message,
+    TextContent,
+    Tool,
+)
+from openhands.sdk.event.utils import get_unmatched_actions
+from openhands.tools import (
+    BashExecutor,
+    FileEditorExecutor,
+    execute_bash_tool,
+    str_replace_editor_tool,
+)
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.input import create_input
@@ -23,108 +40,6 @@ from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
-
-SDK_AVAILABLE = True
-SDK_IMPORT_ERROR: Exception | None = None
-try:
-    from openhands.sdk import (
-        LLM,
-        Agent,
-        Conversation,
-        EventType,
-        LLMConfig,
-        Message,
-        TextContent,
-        Tool,
-    )
-    from openhands.sdk.event.utils import get_unmatched_actions
-    from openhands.tools import (
-        BashExecutor,
-        FileEditorExecutor,
-        execute_bash_tool,
-        str_replace_editor_tool,
-    )
-except ImportError as e:
-    # Do not fail module import — allow tests to patch these symbols.
-    SDK_AVAILABLE = False
-    SDK_IMPORT_ERROR = e
-
-    class LLM:  # type: ignore
-        pass
-
-    class Agent:  # type: ignore
-        def pause(self):  # noqa: D401
-            pass
-
-    class Conversation:  # type: ignore
-        class State:
-            agent_finished = True
-            agent_waiting_for_confirmation = False
-            confirmation_mode = False
-            events: list = []
-
-        state = State()
-
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def send_message(self, *args, **kwargs):
-            pass
-
-        def run(self, *args, **kwargs):
-            pass
-
-        def set_confirmation_mode(self, *args, **kwargs):
-            self.state.confirmation_mode = bool(args[0]) if args else False
-
-        def reject_pending_actions(self, *args, **kwargs):
-            pass
-
-        def pause(self):  # noqa: D401
-            pass
-
-    class EventType:  # type: ignore
-        pass
-
-    class LLMConfig:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            self.model = kwargs.get("model")
-            self.api_key = kwargs.get("api_key")
-            self.base_url = kwargs.get("base_url")
-
-    class Message:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class TextContent:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class Tool:  # type: ignore
-        def set_executor(self, *args, **kwargs):
-            return self
-
-    def get_unmatched_actions(events):  # type: ignore
-        return []
-
-    class BashExecutor:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class FileEditorExecutor:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class _DummyTool:  # type: ignore
-        def set_executor(self, *args, **kwargs):
-            return self
-
-    execute_bash_tool = _DummyTool()  # type: ignore
-    str_replace_editor_tool = _DummyTool()  # type: ignore
-
-    # Informational print, but do not raise to keep tests importable
-    print_formatted_text(HTML(f"<yellow>Note: {e}. Using stub SDK symbols for testing.</yellow>"))
-
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +59,7 @@ class PauseListener(threading.Thread):
     Starts and stops around agent run() loops to avoid interfering with user prompts.
     """
 
-    def __init__(self, on_pause: callable):
+    def __init__(self, on_pause: typing.Callable):
         super().__init__(daemon=True)
         self.on_pause = on_pause
         self._stop_event = threading.Event()
@@ -203,16 +118,11 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
                 "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
             )
 
-        # Configure LLM
-        llm_config = LLMConfig(
+        llm = LLM(
             model=model,
             api_key=SecretStr(api_key) if api_key else None,
+            base_url=base_url,
         )
-
-        if base_url:
-            llm_config.base_url = base_url
-
-        llm = LLM(config=llm_config)
 
         # Setup tools
         cwd = os.getcwd()
@@ -320,20 +230,6 @@ class ConversationRunner:
         self.conversation = conversation
         self.agent = agent
 
-    def _pause_callback(self) -> None:
-        """Attempt to pause via conversation.pause() or agent.pause()."""
-        try:
-            if hasattr(self.conversation, "pause"):
-                self.conversation.pause()  # type: ignore[attr-defined]
-                return
-        except Exception:
-            pass
-        if self.agent and hasattr(self.agent, "pause"):
-            try:
-                self.agent.pause()  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
     def process_message(self, message: Message) -> None:
         """Process a user message through the conversation.
 
@@ -350,10 +246,13 @@ class ConversationRunner:
         """Run conversation until agent finishes or needs confirmation."""
         listener: PauseListener | None = None
         try:
-            while not self.conversation.state.agent_finished:
+            while not (
+                self.conversation.state.agent_finished
+                or self.conversation.state.agent_paused
+            ):
                 # ensure listener is active during run cycles so Ctrl-P can pause
                 if listener is None or not listener.is_alive():
-                    listener = PauseListener(on_pause=self._pause_callback)
+                    listener = PauseListener(on_pause=self.conversation.pause)
                     listener.start()
 
                 self.conversation.run()
@@ -368,9 +267,16 @@ class ConversationRunner:
                         continue
                     # If approved, continue to run() which will execute the actions
                 else:
-                    # Agent finished normally
                     break
+
+        except Exception:
+            pass
         finally:
+            print(
+                "stopping",
+                self.conversation.state.agent_paused,
+                len(self.conversation.state.events),
+            )
             if listener is not None:
                 listener.stop()
 
