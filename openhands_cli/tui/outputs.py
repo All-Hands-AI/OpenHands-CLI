@@ -3,11 +3,6 @@ import re
 import sys
 import threading
 
-# Ensure we use the agent-sdk openhands package, not the main OpenHands package
-# Remove the main OpenHands code path if it exists
-if "/openhands/code" in sys.path:
-    sys.path.remove("/openhands/code")
-
 from openhands.sdk import Conversation
 from openhands.sdk.event import (
     ActionEvent,
@@ -41,8 +36,6 @@ recent_thoughts: list[str] = []
 MAX_RECENT_THOUGHTS = 5
 
 streaming_output_text_area: TextArea | None = None
-
-
 
 
 class CustomDiffLexer(Lexer):
@@ -79,14 +72,14 @@ def _render_basic_markdown(text: str | None) -> str | None:
     """
     if text is None:
         return None
-    if text == '':
-        return ''
+    if text == "":
+        return ""
 
     safe = html.escape(text)
     # Bold: greedy within a line, non-overlapping
-    safe = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', safe)
+    safe = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe)
     # Underline: double underscore
-    safe = re.sub(r'__(.+?)__', r'<u>\1</u>', safe)
+    safe = re.sub(r"__(.+?)__", r"<u>\1</u>", safe)
     return safe
 
 
@@ -101,7 +94,7 @@ def display_message(message: str, is_agent_message: bool = False) -> None:
 
     if message:
         # Add spacing before the message
-        print_formatted_text('')
+        print_formatted_text("")
 
         try:
             # Render only basic markdown (bold/underline), escaping any HTML
@@ -117,10 +110,10 @@ def display_message(message: str, is_agent_message: bool = False) -> None:
                 print_formatted_text(HTML(html_content))
         except Exception as e:
             # If HTML rendering fails, fall back to plain text
-            print(f'Warning: HTML rendering failed: {str(e)}', file=sys.stderr)
+            print(f"Warning: HTML rendering failed: {str(e)}", file=sys.stderr)
             if is_agent_message:
                 print_formatted_text(
-                    FormattedText([('fg:' + COLOR_AGENT_BLUE, message)])
+                    FormattedText([("fg:" + COLOR_AGENT_BLUE, message)])
                 )
             else:
                 print_formatted_text(message)
@@ -148,27 +141,29 @@ def display_action(event: ActionEvent) -> None:
     # Handle different action types
     if isinstance(event.action, ExecuteBashAction):
         # Create simple command frame for bash commands
-        command_text = f'$ {event.action.command}'
-        title = 'Command'
+        command_text = f"$ {event.action.command}"
+        title = "Command"
     elif isinstance(event.action, StrReplaceEditorAction):
         # Create frame for file editor commands
-        if event.action.command == 'view':
-            command_text = f'View: {event.action.path}'
-        elif event.action.command == 'create':
-            command_text = f'Create: {event.action.path}'
-        elif event.action.command == 'str_replace':
-            command_text = f'Edit: {event.action.path}'
-        elif event.action.command == 'insert':
-            command_text = f'Insert: {event.action.path} (line {event.action.insert_line})'
-        elif event.action.command == 'undo_edit':
-            command_text = f'Undo: {event.action.path}'
+        if event.action.command == "view":
+            command_text = f"View: {event.action.path}"
+        elif event.action.command == "create":
+            command_text = f"Create: {event.action.path}"
+        elif event.action.command == "str_replace":
+            command_text = f"Edit: {event.action.path}"
+        elif event.action.command == "insert":
+            command_text = (
+                f"Insert: {event.action.path} (line {event.action.insert_line})"
+            )
+        elif event.action.command == "undo_edit":
+            command_text = f"Undo: {event.action.path}"
         else:
-            command_text = f'{event.action.command}: {event.action.path}'
-        title = 'File Editor'
+            command_text = f"{event.action.command}: {event.action.path}"
+        title = "File Editor"
     else:
         # Generic action display
-        command_text = f'{event.tool_name}: {str(event.action)}'
-        title = 'Action'
+        command_text = f"{event.tool_name}: {str(event.action)}"
+        title = "Action"
 
     container = Frame(
         TextArea(
@@ -178,9 +173,9 @@ def display_action(event: ActionEvent) -> None:
             wrap_lines=True,
         ),
         title=title,
-        style='ansiblue',
+        style="ansiblue",
     )
-    print_formatted_text('')
+    print_formatted_text("")
     print_container(container)
 
 
@@ -198,10 +193,17 @@ def display_event(event: EventType, conversation: Conversation) -> None:
 
         elif isinstance(event, ObservationEvent):
             # Handle different observation types based on tool name
-            if event.tool_name == 'execute_bash' and isinstance(event.observation, ExecuteBashObservation):
+            if event.tool_name == "execute_bash" and isinstance(
+                event.observation, ExecuteBashObservation
+            ):
                 display_command_output(event.observation.output)
-            elif event.tool_name == 'str_replace_editor' and isinstance(event.observation, StrReplaceEditorObservation):
-                if event.observation.path and event.observation.old_content != event.observation.new_content:
+            elif event.tool_name == "str_replace_editor" and isinstance(
+                event.observation, StrReplaceEditorObservation
+            ):
+                if (
+                    event.observation.path
+                    and event.observation.old_content != event.observation.new_content
+                ):
                     # File was edited, show diff-like output
                     display_file_edit_observation(event.observation)
                 else:
@@ -213,23 +215,23 @@ def display_event(event: EventType, conversation: Conversation) -> None:
 
         elif isinstance(event, MessageEvent):
             # Display messages from agent or user
-            if event.source == 'agent':
+            if event.source == "agent":
                 # Extract text content from the message
                 text_parts = []
                 for content in event.llm_message.content:
-                    if hasattr(content, 'text'):
+                    if hasattr(content, "text"):
                         text_parts.append(content.text)
                 if text_parts:
-                    message_text = ' '.join(text_parts)
+                    message_text = " ".join(text_parts)
                     display_message(message_text, is_agent_message=True)
-            elif event.source == 'user':
+            elif event.source == "user":
                 # Extract text content from user message
                 text_parts = []
                 for content in event.llm_message.content:
-                    if hasattr(content, 'text'):
+                    if hasattr(content, "text"):
                         text_parts.append(content.text)
                 if text_parts:
-                    message_text = ' '.join(text_parts)
+                    message_text = " ".join(text_parts)
                     display_message(message_text, is_agent_message=False)
 
         elif isinstance(event, AgentErrorEvent):
@@ -244,28 +246,25 @@ def display_error(error: str) -> None:
             TextArea(
                 text=error,
                 read_only=True,
-                style='ansired',
+                style="ansired",
                 wrap_lines=True,
             ),
-            title='Error',
-            style='ansired',
+            title="Error",
+            style="ansired",
         )
-        print_formatted_text('')
+        print_formatted_text("")
         print_container(container)
 
 
-
-
-
 def display_command_output(output: str) -> None:
-    lines = output.split('\n')
+    lines = output.split("\n")
     formatted_lines = []
     for line in lines:
-        if line.startswith('[Python Interpreter') or line.startswith('openhands@'):
+        if line.startswith("[Python Interpreter") or line.startswith("openhands@"):
             # TODO: clean this up once we clean up terminal output
             continue
         formatted_lines.append(line)
-        formatted_lines.append('\n')
+        formatted_lines.append("\n")
 
     # Remove the last newline if it exists
     if formatted_lines:
@@ -273,19 +272,16 @@ def display_command_output(output: str) -> None:
 
     container = Frame(
         TextArea(
-            text=''.join(formatted_lines),
+            text="".join(formatted_lines),
             read_only=True,
             style=COLOR_GREY,
             wrap_lines=True,
         ),
-        title='Command Output',
-        style=f'fg:{COLOR_GREY}',
+        title="Command Output",
+        style=f"fg:{COLOR_GREY}",
     )
-    print_formatted_text('')
+    print_formatted_text("")
     print_container(container)
-
-
-
 
 
 def display_file_edit_observation(observation: StrReplaceEditorObservation) -> None:
@@ -295,12 +291,13 @@ def display_file_edit_observation(observation: StrReplaceEditorObservation) -> N
         return
 
     # Create a simple diff-like display
+    # TODO: add diff view to upstream observation `observation.visualize_diff(n_context_lines=4),`
     if observation.old_content and observation.new_content:
         # Show the file path and operation
-        title = f'File Edit: {observation.path}'
+        title = f"File Edit: {observation.path}"
         content = observation.output
     else:
-        title = 'File Edit'
+        title = "File Edit"
         content = observation.output
 
     container = Frame(
@@ -309,11 +306,12 @@ def display_file_edit_observation(observation: StrReplaceEditorObservation) -> N
             read_only=True,
             style=COLOR_GREY,
             wrap_lines=True,
+            lexer=CustomDiffLexer(),
         ),
         title=title,
-        style=f'fg:{COLOR_GREY}',
+        style=f"fg:{COLOR_GREY}",
     )
-    print_formatted_text('')
+    print_formatted_text("")
     print_container(container)
 
 
@@ -323,43 +321,32 @@ def display_file_read_observation(observation: StrReplaceEditorObservation) -> N
         display_error(observation.error)
         return
 
-    title = f'File View: {observation.path}' if observation.path else 'File View'
-    content = observation.output
-
+    title = f"File View: {observation.path}" if observation.path else "File View"
     container = Frame(
         TextArea(
-            text=content,
+            text=observation.output,
             read_only=True,
             style=COLOR_GREY,
             wrap_lines=True,
         ),
         title=title,
-        style=f'fg:{COLOR_GREY}',
+        style=f"fg:{COLOR_GREY}",
     )
-    print_formatted_text('')
+    print_formatted_text("")
     print_container(container)
 
 
-def display_generic_observation(observation) -> None:
+def display_generic_observation(observation: ObservationEvent) -> None:
     """Display generic observation."""
-    if hasattr(observation, 'agent_observation'):
-        content = observation.agent_observation
-    elif hasattr(observation, 'output'):
-        content = observation.output
-    else:
-        content = str(observation)
-
     container = Frame(
         TextArea(
-            text=content,
+            text=observation.observation,
             read_only=True,
             style=COLOR_GREY,
             wrap_lines=True,
         ),
-        title='Observation',
-        style=f'fg:{COLOR_GREY}',
+        title="Observation",
+        style=f"fg:{COLOR_GREY}",
     )
-    print_formatted_text('')
+    print_formatted_text("")
     print_container(container)
-
-
