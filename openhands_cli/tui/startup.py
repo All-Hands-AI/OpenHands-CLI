@@ -7,7 +7,7 @@ from prompt_toolkit.formatted_text import HTML, FormattedText
 
 from openhands_cli import __version__
 from openhands_cli.pt_style import COLOR_GOLD
-from openhands_cli.tui import DEFAULT_STYLE
+from openhands_cli.tui.commands import DEFAULT_STYLE
 
 
 def display_runtime_initialization_message() -> None:

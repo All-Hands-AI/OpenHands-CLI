@@ -3,7 +3,7 @@
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from openhands_cli.tui import COMMANDS, CommandCompleter
+from openhands_cli.tui.commands import COMMANDS, CommandCompleter
 
 
 class TestCommandCompleter:

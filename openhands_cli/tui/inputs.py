@@ -19,7 +19,7 @@ from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.patch_stdout import patch_stdout
 
-from openhands_cli.tui import COMMANDS, DEFAULT_STYLE
+from openhands_cli.tui.commands import COMMANDS, DEFAULT_STYLE
 
 pause_task: asyncio.Task | None = None  # No more than one pause task
 
