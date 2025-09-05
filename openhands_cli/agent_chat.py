@@ -32,6 +32,7 @@ try:
         TextContent,
         Tool,
     )
+    from openhands.sdk.event.utils import get_unmatched_actions
     from openhands.tools import (
         BashExecutor,
         FileEditorExecutor,
@@ -109,6 +110,16 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
 
         conversation = Conversation(agent=agent, callbacks=[conversation_callback])
 
+        # Check for confirmation mode
+        confirmation_mode = os.getenv("CONFIRMATION_MODE", "").lower() in ("true", "1")
+        if confirmation_mode:
+            conversation.set_confirmation_mode(True)
+            print_formatted_text(
+                HTML(
+                    "<yellow>⚠️  Confirmation mode enabled - you will be asked to approve actions</yellow>"
+                )
+            )
+
         print_formatted_text(
             HTML(f"<green>✓ Agent initialized with model: {model}</green>")
         )
@@ -121,6 +132,112 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
         print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
         traceback.print_exc()
         raise AgentSetupError(f"Error setting up agent: {str(e)}") from e
+
+
+def ask_user_confirmation(pending_actions: list) -> bool:
+    """Ask user to confirm pending actions.
+
+    Args:
+        pending_actions: List of pending actions from the agent
+
+    Returns:
+        True if user approves, False if user rejects
+    """
+    if not pending_actions:
+        return True
+
+    print_formatted_text(
+        HTML(
+            f"<yellow>🔍 Agent created {len(pending_actions)} action(s) and is waiting for confirmation:</yellow>"
+        )
+    )
+
+    for i, action in enumerate(pending_actions, 1):
+        tool_name = getattr(action, "tool_name", "<unknown tool>")
+        action_content = str(getattr(action, "action", ""))[:100].replace("\n", " ")
+        print_formatted_text(
+            HTML(f"<grey>  {i}. {tool_name}: {action_content}...</grey>")
+        )
+
+    session = PromptSession()
+    while True:
+        try:
+            user_input = (
+                session.prompt(
+                    HTML(
+                        "<gold>Do you want to execute these actions? (yes/no): </gold>"
+                    )
+                )
+                .strip()
+                .lower()
+            )
+
+            if user_input in ("yes", "y"):
+                print_formatted_text(
+                    HTML("<green>✅ Approved — executing actions…</green>")
+                )
+                return True
+            elif user_input in ("no", "n"):
+                print_formatted_text(HTML("<red>❌ Rejected — skipping actions…</red>"))
+                return False
+            else:
+                print_formatted_text(
+                    HTML("<yellow>Please enter 'yes' or 'no'.</yellow>")
+                )
+        except (EOFError, KeyboardInterrupt):
+            print_formatted_text(
+                HTML("\n<red>❌ No input received; rejecting by default.</red>")
+            )
+            return False
+
+
+class ConversationRunner:
+    """Handles the conversation state machine logic cleanly."""
+
+    def __init__(self, conversation: Conversation):
+        self.conversation = conversation
+
+    def process_message(self, message: Message) -> None:
+        """Process a user message through the conversation.
+
+        Args:
+            message: The user message to process
+        """
+        # Send message to conversation
+        self.conversation.send_message(message)
+
+        # Run conversation until completion or confirmation needed
+        self._run_until_completion_or_confirmation()
+
+    def _run_until_completion_or_confirmation(self) -> None:
+        """Run conversation until agent finishes or needs confirmation."""
+        while not self.conversation.state.agent_finished:
+            self.conversation.run()
+
+            # Check if agent is waiting for confirmation
+            if self.conversation.state.agent_waiting_for_confirmation:
+                if not self._handle_confirmation_request():
+                    # User rejected - continue the loop as agent may produce new actions or finish
+                    continue
+                # If approved, continue to run() which will execute the actions
+            else:
+                # Agent finished normally
+                break
+
+    def _handle_confirmation_request(self) -> bool:
+        """Handle confirmation request from user.
+
+        Returns:
+            True if user approved actions, False if rejected
+        """
+        pending_actions = get_unmatched_actions(self.conversation.state.events)
+
+        if pending_actions:
+            approved = ask_user_confirmation(pending_actions)
+            if not approved:
+                self.conversation.reject_pending_actions("User rejected the actions")
+                return False
+        return True
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -157,6 +274,9 @@ def run_agent_chat() -> None:
     # Create prompt session with command completer
     session = PromptSession(completer=CommandCompleter())
 
+    # Create conversation runner to handle state machine logic
+    runner = ConversationRunner(conversation)
+
     # Main chat loop
     while True:
         try:
@@ -183,6 +303,20 @@ def run_agent_chat() -> None:
             elif command == "/status":
                 print_formatted_text(HTML(f"<grey>Session ID: {session_id}</grey>"))
                 print_formatted_text(HTML("<grey>Status: Active</grey>"))
+                confirmation_status = (
+                    "enabled" if conversation.state.confirmation_mode else "disabled"
+                )
+                print_formatted_text(
+                    HTML(f"<grey>Confirmation mode: {confirmation_status}</grey>")
+                )
+                continue
+            elif command == "/confirm":
+                current_mode = conversation.state.confirmation_mode
+                conversation.set_confirmation_mode(not current_mode)
+                new_status = "enabled" if not current_mode else "disabled"
+                print_formatted_text(
+                    HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
+                )
                 continue
             elif command == "/new":
                 print_formatted_text(
@@ -196,17 +330,13 @@ def run_agent_chat() -> None:
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
             try:
-                # Create message and send to conversation
+                # Create message and process through conversation runner
                 message = Message(
                     role="user",
                     content=[TextContent(text=user_input)],
                 )
 
-                conversation.send_message(message)
-                conversation.run()
-
-                # Get the last response from the conversation
-                # For simplicity, we'll just indicate the agent processed the request
+                runner.process_message(message)
                 print_formatted_text(
                     HTML("<green>✓ Agent has processed your request.</green>")
                 )
