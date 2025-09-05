@@ -1,71 +1,38 @@
-import asyncio
-import contextlib
-import datetime
 import html
-import json
 import re
 import sys
 import threading
-import time
-from typing import Generator
 
-from prompt_toolkit import PromptSession, print_formatted_text
-from prompt_toolkit.application import Application
-from prompt_toolkit.completion import CompleteEvent, Completer, Completion
+# Ensure we use the agent-sdk openhands package, not the main OpenHands package
+# Remove the main OpenHands code path if it exists
+if "/openhands/code" in sys.path:
+    sys.path.remove("/openhands/code")
+
+from openhands.sdk import Conversation
+from openhands.sdk.event import (
+    ActionEvent,
+    AgentErrorEvent,
+    EventType,
+    MessageEvent,
+    ObservationEvent,
+)
+from openhands.tools import (
+    ExecuteBashAction,
+    ExecuteBashObservation,
+    StrReplaceEditorAction,
+    StrReplaceEditorObservation,
+)
+from prompt_toolkit import print_formatted_text
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML, FormattedText, StyleAndTextTuples
-from prompt_toolkit.input import create_input
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.key_binding.key_processor import KeyPressEvent
-from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout.containers import HSplit, Window
-from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.layout.dimension import Dimension
-from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.lexers import Lexer
-from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.shortcuts import print_container
 from prompt_toolkit.widgets import Frame, TextArea
 
-from openhands import __version__
 from openhands_cli.pt_style import (
     COLOR_AGENT_BLUE,
-    COLOR_GOLD,
     COLOR_GREY,
-    get_cli_style,
 )
-from openhands.core.config import OpenHandsConfig
-from openhands.core.schema import AgentState
-from openhands.events import EventSource, EventStream
-from openhands.events.action import (
-    Action,
-    ActionConfirmationStatus,
-    ActionSecurityRisk,
-    ChangeAgentStateAction,
-    CmdRunAction,
-    MCPAction,
-    MessageAction,
-    TaskTrackingAction,
-)
-from openhands.events.event import Event
-from openhands.events.observation import (
-    AgentStateChangedObservation,
-    CmdOutputObservation,
-    ErrorObservation,
-    FileEditObservation,
-    FileReadObservation,
-    MCPObservation,
-    TaskTrackingObservation,
-)
-from openhands.llm.metrics import Metrics
-from openhands.mcp.error_collector import mcp_error_collector
-
-from openhands.sdk.event import (
-    ActionEvent
-)
-
-from openhands.sdk import Conversation
-
 
 print_lock = threading.Lock()
 
@@ -178,8 +145,30 @@ def display_thought_if_new(thought: str, is_agent_message: bool = False) -> None
 
 
 def display_action(event: ActionEvent) -> None:
-    # Create simple command frame
-    command_text = f'$ {event.action}'
+    # Handle different action types
+    if isinstance(event.action, ExecuteBashAction):
+        # Create simple command frame for bash commands
+        command_text = f'$ {event.action.command}'
+        title = 'Command'
+    elif isinstance(event.action, StrReplaceEditorAction):
+        # Create frame for file editor commands
+        if event.action.command == 'view':
+            command_text = f'View: {event.action.path}'
+        elif event.action.command == 'create':
+            command_text = f'Create: {event.action.path}'
+        elif event.action.command == 'str_replace':
+            command_text = f'Edit: {event.action.path}'
+        elif event.action.command == 'insert':
+            command_text = f'Insert: {event.action.path} (line {event.action.insert_line})'
+        elif event.action.command == 'undo_edit':
+            command_text = f'Undo: {event.action.path}'
+        else:
+            command_text = f'{event.action.command}: {event.action.path}'
+        title = 'File Editor'
+    else:
+        # Generic action display
+        command_text = f'{event.tool_name}: {str(event.action)}'
+        title = 'Action'
 
     container = Frame(
         TextArea(
@@ -188,49 +177,63 @@ def display_action(event: ActionEvent) -> None:
             style=COLOR_GREY,
             wrap_lines=True,
         ),
-        title='Command',
+        title=title,
         style='ansiblue',
     )
     print_formatted_text('')
     print_container(container)
 
 
-def display_event(event: Event, conversation: Conversation) -> None:
+def display_event(event: EventType, conversation: Conversation) -> None:
     global streaming_output_text_area
     with print_lock:
         if isinstance(event, ActionEvent):
-            # For CmdRunAction, display thought first, then command
-            if hasattr(event, 'thought') and event.thought:
-                display_thought_if_new(event.thought)
+            # Display agent thoughts first
+            if event.thought:
+                for thought_content in event.thought:
+                    display_thought_if_new(thought_content.text, is_agent_message=True)
 
+            # Display the action
             display_action(event)
-       
-        elif isinstance(event, Action):
-            # For other actions, display thoughts normally
-            if hasattr(event, 'thought') and event.thought:
-                display_thought_if_new(event.thought)
-            if hasattr(event, 'final_thought') and event.final_thought:
-                # Display final thoughts with agent styling
-                display_message(event.final_thought, is_agent_message=True)
 
-        if isinstance(event, MessageAction):
-            if event.source == EventSource.AGENT:
-                # Display agent messages with styling and markdown rendering
-                display_thought_if_new(event.content, is_agent_message=True)
-        elif isinstance(event, CmdOutputObservation):
-            display_command_output(event.content)
-        elif isinstance(event, FileEditObservation):
-            display_file_edit(event)
-        elif isinstance(event, FileReadObservation):
-            display_file_read(event)
-        elif isinstance(event, MCPObservation):
-            display_mcp_observation(event)
-        elif isinstance(event, TaskTrackingObservation):
-            display_task_tracking_observation(event)
-        elif isinstance(event, AgentStateChangedObservation):
-            display_agent_state_change_message(event.agent_state)
-        elif isinstance(event, ErrorObservation):
-            display_error(event.content)
+        elif isinstance(event, ObservationEvent):
+            # Handle different observation types based on tool name
+            if event.tool_name == 'execute_bash' and isinstance(event.observation, ExecuteBashObservation):
+                display_command_output(event.observation.output)
+            elif event.tool_name == 'str_replace_editor' and isinstance(event.observation, StrReplaceEditorObservation):
+                if event.observation.path and event.observation.old_content != event.observation.new_content:
+                    # File was edited, show diff-like output
+                    display_file_edit_observation(event.observation)
+                else:
+                    # File was viewed or created, show content
+                    display_file_read_observation(event.observation)
+            else:
+                # Generic observation display
+                display_generic_observation(event.observation)
+
+        elif isinstance(event, MessageEvent):
+            # Display messages from agent or user
+            if event.source == 'agent':
+                # Extract text content from the message
+                text_parts = []
+                for content in event.llm_message.content:
+                    if hasattr(content, 'text'):
+                        text_parts.append(content.text)
+                if text_parts:
+                    message_text = ' '.join(text_parts)
+                    display_message(message_text, is_agent_message=True)
+            elif event.source == 'user':
+                # Extract text content from user message
+                text_parts = []
+                for content in event.llm_message.content:
+                    if hasattr(content, 'text'):
+                        text_parts.append(content.text)
+                if text_parts:
+                    message_text = ' '.join(text_parts)
+                    display_message(message_text, is_agent_message=False)
+
+        elif isinstance(event, AgentErrorEvent):
+            display_error(event.error)
 
 
 def display_error(error: str) -> None:
@@ -282,23 +285,24 @@ def display_command_output(output: str) -> None:
     print_container(container)
 
 
-def display_file_edit(event: FileEditObservation) -> None:
-    container = Frame(
-        TextArea(
-            text=event.visualize_diff(n_context_lines=4),
-            read_only=True,
-            wrap_lines=True,
-            lexer=CustomDiffLexer(),
-        ),
-        title='File Edit',
-        style=f'fg:{COLOR_GREY}',
-    )
-    print_formatted_text('')
-    print_container(container)
 
 
-def display_file_read(event: FileReadObservation) -> None:
-    content = event.content.replace('\t', ' ')
+
+def display_file_edit_observation(observation: StrReplaceEditorObservation) -> None:
+    """Display file edit observation with diff-like output."""
+    if observation.error:
+        display_error(observation.error)
+        return
+
+    # Create a simple diff-like display
+    if observation.old_content and observation.new_content:
+        # Show the file path and operation
+        title = f'File Edit: {observation.path}'
+        content = observation.output
+    else:
+        title = 'File Edit'
+        content = observation.output
+
     container = Frame(
         TextArea(
             text=content,
@@ -306,7 +310,53 @@ def display_file_read(event: FileReadObservation) -> None:
             style=COLOR_GREY,
             wrap_lines=True,
         ),
-        title='File Read',
+        title=title,
+        style=f'fg:{COLOR_GREY}',
+    )
+    print_formatted_text('')
+    print_container(container)
+
+
+def display_file_read_observation(observation: StrReplaceEditorObservation) -> None:
+    """Display file read observation."""
+    if observation.error:
+        display_error(observation.error)
+        return
+
+    title = f'File View: {observation.path}' if observation.path else 'File View'
+    content = observation.output
+
+    container = Frame(
+        TextArea(
+            text=content,
+            read_only=True,
+            style=COLOR_GREY,
+            wrap_lines=True,
+        ),
+        title=title,
+        style=f'fg:{COLOR_GREY}',
+    )
+    print_formatted_text('')
+    print_container(container)
+
+
+def display_generic_observation(observation) -> None:
+    """Display generic observation."""
+    if hasattr(observation, 'agent_observation'):
+        content = observation.agent_observation
+    elif hasattr(observation, 'output'):
+        content = observation.output
+    else:
+        content = str(observation)
+
+    container = Frame(
+        TextArea(
+            text=content,
+            read_only=True,
+            style=COLOR_GREY,
+            wrap_lines=True,
+        ),
+        title='Observation',
         style=f'fg:{COLOR_GREY}',
     )
     print_formatted_text('')
