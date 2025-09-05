@@ -174,9 +174,6 @@ def run_agent_chat() -> None:
             if command == "/exit":
                 print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
                 break
-            elif command == "/clear":
-                display_welcome(session_id)
-                continue
             elif command == "/help":
                 display_help()
                 continue
