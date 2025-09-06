@@ -43,7 +43,7 @@ class PauseListener(threading.Thread):
     def run(self) -> None:
         try:
             with self._input.raw_mode():
-                while not self._stop_event.is_set():
+                while not self.is_paused():
                     if self._detect_pause_key_presses():
                         self._execute_pause()
         finally:
@@ -54,3 +54,6 @@ class PauseListener(threading.Thread):
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def is_paused(self) -> bool:
+        return self._stop_event.is_set()

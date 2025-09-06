@@ -183,6 +183,7 @@ class ConversationRunner:
     def __init__(self, conversation: Conversation, agent: Agent | None = None):
         self.conversation = conversation
         self.agent = agent
+        self.awaiting_confirmation = False
 
     def process_message(self, message: Message) -> None:
         """Process a user message through the conversation.
@@ -211,6 +212,10 @@ class ConversationRunner:
     def _run_until_completion_or_confirmation(self) -> None:
         """Run conversation until agent finishes or needs confirmation."""
         resume = True  # invoking this method always resumes conversation
+
+        if self.awaiting_confirmation:
+            self._handle_confirmation_request()
+
         listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
         listener.start()
 
@@ -222,22 +227,19 @@ class ConversationRunner:
                     listener.start()
 
                 self.conversation.run()
-                listener.stop()
+                self.awaiting_confirmation = (
+                    self.conversation.state.agent_waiting_for_confirmation
+                )
 
                 # Check if agent is waiting for confirmation: stop listener before prompting
-                if (
-                    self.conversation.state.agent_waiting_for_confirmation
-                    and not self.conversation.state.agent_paused
-                ):
-                    if not self._handle_confirmation_request():
-                        # User rejected - continue the loop as agent may produce new actions or finish
-                        continue
-                    # If approved, continue to run() which will execute the actions
+                if self.awaiting_confirmation and not listener.is_paused():
+                    listener.stop()
+                    self._handle_confirmation_request()
                 else:
                     break
 
-        except Exception:
-            pass
+        except Exception as e:
+            print("exception", e)
         finally:
             listener.stop()
 
