@@ -184,6 +184,11 @@ class ConversationRunner:
         self.conversation = conversation
         self.agent = agent
         self.awaiting_confirmation = False
+        self.listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
+
+    def _start_listener(self) -> None:
+        self.listener = PauseListener(on_pause=self.conversation.pause)
+        self.listener.start()
 
     def process_message(self, message: Message) -> None:
         """Process a user message through the conversation.
@@ -201,10 +206,10 @@ class ConversationRunner:
         if resume:
             return True
 
-        if not self.conversation.state.agent_finished:
-            return True
+        if self.listener.is_paused():
+            return False
 
-        if not self.conversation.state.agent_paused:
+        if not self.conversation.state.agent_finished:
             return True
 
         return False
@@ -216,15 +221,13 @@ class ConversationRunner:
         if self.awaiting_confirmation:
             self._handle_confirmation_request()
 
-        listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
-        listener.start()
+        self._start_listener()
 
         try:
             while self._conditions_to_run_loop_are_met(resume):
                 resume = False  # loop has been resumed, can reset
-                if not listener.is_alive():
-                    listener = PauseListener(on_pause=self.conversation.pause)
-                    listener.start()
+                if not self.listener.is_alive():
+                    self._start_listener()
 
                 self.conversation.run()
                 self.awaiting_confirmation = (
@@ -232,16 +235,14 @@ class ConversationRunner:
                 )
 
                 # Check if agent is waiting for confirmation: stop listener before prompting
-                if self.awaiting_confirmation and not listener.is_paused():
-                    listener.stop()
+                if self.awaiting_confirmation and not self.listener.is_paused():
+                    self.listener.stop()
                     self._handle_confirmation_request()
-                else:
-                    break
 
         except Exception as e:
             print("exception", e)
         finally:
-            listener.stop()
+            self.listener.stop()
 
     def _handle_confirmation_request(self) -> bool:
         """Handle confirmation request from user.
