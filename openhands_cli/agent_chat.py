@@ -7,9 +7,7 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 import logging
 import os
 import sys
-import threading
 import traceback
-import typing
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
@@ -34,63 +32,19 @@ from openhands.tools import (
 )
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.input import create_input
-from prompt_toolkit.keys import Keys
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
+from openhands_cli.listeners import PauseListener
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 logger = logging.getLogger(__name__)
-
-# Serialize prints across threads to avoid interleaving
-_print_lock = threading.Lock()
 
 
 class AgentSetupError(Exception):
     """Exception raised when agent setup fails."""
 
     pass
-
-
-class PauseListener(threading.Thread):
-    """Background key listener that triggers pause on Ctrl-P.
-
-    Starts and stops around agent run() loops to avoid interfering with user prompts.
-    """
-
-    def __init__(self, on_pause: typing.Callable):
-        super().__init__(daemon=True)
-        self.on_pause = on_pause
-        self._stop_event = threading.Event()
-        self._input = create_input()
-
-    def run(self) -> None:
-        try:
-            with self._input.raw_mode():
-                while not self._stop_event.is_set():
-                    for key_press in self._input.read_keys():
-                        if self._stop_event.is_set():
-                            break
-                        if key_press.key == Keys.ControlP:
-                            with _print_lock:
-                                print_formatted_text(HTML(""))
-                                print_formatted_text(
-                                    HTML("<gold>Pausing the agent...</gold>")
-                                )
-                            try:
-                                self.on_pause()
-                            except Exception:
-                                # Best-effort; swallow pause errors to not crash UI
-                                pass
-        finally:
-            try:
-                self._input.close()
-            except Exception:
-                pass
-
-    def stop(self) -> None:
-        self._stop_event.set()
 
 
 def setup_agent() -> tuple[LLM, Agent, Conversation]:
@@ -257,23 +211,22 @@ class ConversationRunner:
     def _run_until_completion_or_confirmation(self) -> None:
         """Run conversation until agent finishes or needs confirmation."""
         resume = True  # invoking this method always reumes conversation
-        listener: PauseListener | None = None
+        listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
         try:
             while self._conditions_to_run_loop_are_met(resume):
                 resume = False  # loop has been resumed, can reset
 
                 # ensure listener is active during run cycles so Ctrl-P can pause
-                if listener is None or not listener.is_alive():
+                if not listener.is_alive():
                     listener = PauseListener(on_pause=self.conversation.pause)
                     listener.start()
 
                 self.conversation.run()
 
+                listener.stop()
+
                 # Check if agent is waiting for confirmation: stop listener before prompting
                 if self.conversation.state.agent_waiting_for_confirmation:
-                    if listener is not None:
-                        listener.stop()
-                        listener = None
                     if not self._handle_confirmation_request():
                         # User rejected - continue the loop as agent may produce new actions or finish
                         continue
@@ -284,8 +237,7 @@ class ConversationRunner:
         except Exception:
             pass
         finally:
-            if listener is not None:
-                listener.stop()
+            listener.stop()
 
     def _handle_confirmation_request(self) -> bool:
         """Handle confirmation request from user.
