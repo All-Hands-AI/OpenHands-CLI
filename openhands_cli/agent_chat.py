@@ -425,6 +425,20 @@ def run_agent_chat() -> None:
                     )
                 continue
 
+            # Check if conversation is paused and resume it for any user input
+            if conversation.state.agent_paused:
+                print_formatted_text(
+                    HTML("<yellow>Resuming paused conversation...</yellow>")
+                )
+                if runner.resume_conversation():
+                    print_formatted_text(
+                        HTML("<green>✓ Conversation resumed successfully.</green>")
+                    )
+                else:
+                    print_formatted_text(
+                        HTML("<red>Failed to resume conversation.</red>")
+                    )
+
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
