@@ -7,53 +7,90 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 import logging
 import os
 import sys
+import threading
 import traceback
+import typing
 
 # Ensure we use the agent-sdk openhands package, not the main OpenHands package
 # Remove the main OpenHands code path if it exists
 if "/openhands/code" in sys.path:
     sys.path.remove("/openhands/code")
 
+from openhands.sdk import (
+    LLM,
+    Agent,
+    Conversation,
+    EventType,
+    Message,
+    TextContent,
+    Tool,
+)
+from openhands.sdk.event.utils import get_unmatched_actions
+from openhands.tools import (
+    BashExecutor,
+    FileEditorExecutor,
+    execute_bash_tool,
+    str_replace_editor_tool,
+)
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.input import create_input
+from prompt_toolkit.keys import Keys
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
-try:
-    from openhands.sdk import (
-        LLM,
-        Agent,
-        Conversation,
-        EventType,
-        LLMConfig,
-        Message,
-        TextContent,
-        Tool,
-    )
-    from openhands.sdk.event.utils import get_unmatched_actions
-    from openhands.tools import (
-        BashExecutor,
-        FileEditorExecutor,
-        execute_bash_tool,
-        str_replace_editor_tool,
-    )
-except ImportError as e:
-    print_formatted_text(HTML(f"<red>Error importing OpenHands SDK: {e}</red>"))
-    print_formatted_text(
-        HTML("<yellow>Please ensure the openhands-sdk is properly installed.</yellow>")
-    )
-    raise
-
-
 logger = logging.getLogger(__name__)
+
+# Serialize prints across threads to avoid interleaving
+_print_lock = threading.Lock()
 
 
 class AgentSetupError(Exception):
     """Exception raised when agent setup fails."""
 
     pass
+
+
+class PauseListener(threading.Thread):
+    """Background key listener that triggers pause on Ctrl-P.
+
+    Starts and stops around agent run() loops to avoid interfering with user prompts.
+    """
+
+    def __init__(self, on_pause: typing.Callable):
+        super().__init__(daemon=True)
+        self.on_pause = on_pause
+        self._stop_event = threading.Event()
+        self._input = create_input()
+
+    def run(self) -> None:
+        try:
+            with self._input.raw_mode():
+                while not self._stop_event.is_set():
+                    for key_press in self._input.read_keys():
+                        if self._stop_event.is_set():
+                            break
+                        if key_press.key == Keys.ControlP:
+                            with _print_lock:
+                                print_formatted_text(HTML(""))
+                                print_formatted_text(
+                                    HTML("<gold>Pausing the agent...</gold>")
+                                )
+                            try:
+                                self.on_pause()
+                            except Exception:
+                                # Best-effort; swallow pause errors to not crash UI
+                                pass
+        finally:
+            try:
+                self._input.close()
+            except Exception:
+                pass
+
+    def stop(self) -> None:
+        self._stop_event.set()
 
 
 def setup_agent() -> tuple[LLM, Agent, Conversation]:
@@ -81,16 +118,11 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
                 "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
             )
 
-        # Configure LLM
-        llm_config = LLMConfig(
+        llm = LLM(
             model=model,
             api_key=SecretStr(api_key) if api_key else None,
+            base_url=base_url,
         )
-
-        if base_url:
-            llm_config.base_url = base_url
-
-        llm = LLM(config=llm_config)
 
         # Setup tools
         cwd = os.getcwd()
@@ -194,8 +226,9 @@ def ask_user_confirmation(pending_actions: list) -> bool:
 class ConversationRunner:
     """Handles the conversation state machine logic cleanly."""
 
-    def __init__(self, conversation: Conversation):
+    def __init__(self, conversation: Conversation, agent: Agent | None = None):
         self.conversation = conversation
+        self.agent = agent
 
     def process_message(self, message: Message) -> None:
         """Process a user message through the conversation.
@@ -209,20 +242,50 @@ class ConversationRunner:
         # Run conversation until completion or confirmation needed
         self._run_until_completion_or_confirmation()
 
+    def _conditions_to_run_loop_are_met(self, resume: bool) -> bool:
+        if resume:
+            return True
+
+        if not self.conversation.state.agent_finished:
+            return True
+
+        if not self.conversation.state.agent_paused:
+            return True
+
+        return False
+
     def _run_until_completion_or_confirmation(self) -> None:
         """Run conversation until agent finishes or needs confirmation."""
-        while not self.conversation.state.agent_finished:
-            self.conversation.run()
+        resume = True  # invoking this method always reumes conversation
+        listener: PauseListener | None = None
+        try:
+            while self._conditions_to_run_loop_are_met(resume):
+                resume = False  # loop has been resumed, can reset
 
-            # Check if agent is waiting for confirmation
-            if self.conversation.state.agent_waiting_for_confirmation:
-                if not self._handle_confirmation_request():
-                    # User rejected - continue the loop as agent may produce new actions or finish
-                    continue
-                # If approved, continue to run() which will execute the actions
-            else:
-                # Agent finished normally
-                break
+                # ensure listener is active during run cycles so Ctrl-P can pause
+                if listener is None or not listener.is_alive():
+                    listener = PauseListener(on_pause=self.conversation.pause)
+                    listener.start()
+
+                self.conversation.run()
+
+                # Check if agent is waiting for confirmation: stop listener before prompting
+                if self.conversation.state.agent_waiting_for_confirmation:
+                    if listener is not None:
+                        listener.stop()
+                        listener = None
+                    if not self._handle_confirmation_request():
+                        # User rejected - continue the loop as agent may produce new actions or finish
+                        continue
+                    # If approved, continue to run() which will execute the actions
+                else:
+                    break
+
+        except Exception:
+            pass
+        finally:
+            if listener is not None:
+                listener.stop()
 
     def _handle_confirmation_request(self) -> bool:
         """Handle confirmation request from user.
@@ -237,6 +300,18 @@ class ConversationRunner:
             if not approved:
                 self.conversation.reject_pending_actions("User rejected the actions")
                 return False
+        return True
+
+    def resume_conversation(self) -> bool:
+        """Resume a paused conversation.
+
+        Returns:
+            True if conversation was resumed, False if not paused or failed to resume
+        """
+        if not self.conversation.state.agent_paused:
+            return False
+
+        self._run_until_completion_or_confirmation()
         return True
 
 
@@ -275,7 +350,7 @@ def run_agent_chat() -> None:
     session = PromptSession(completer=CommandCompleter())
 
     # Create conversation runner to handle state machine logic
-    runner = ConversationRunner(conversation)
+    runner = ConversationRunner(conversation, agent)
 
     # Main chat loop
     while True:
@@ -325,6 +400,24 @@ def run_agent_chat() -> None:
                 session_id = str(uuid.uuid4())[:8]
                 display_welcome(session_id)
                 continue
+            elif command == "/resume":
+                if conversation.state.agent_paused:
+                    print_formatted_text(
+                        HTML("<yellow>Resuming paused conversation...</yellow>")
+                    )
+                    if runner.resume_conversation():
+                        print_formatted_text(
+                            HTML("<green>✓ Conversation resumed successfully.</green>")
+                        )
+                    else:
+                        print_formatted_text(
+                            HTML("<red>Failed to resume conversation.</red>")
+                        )
+                else:
+                    print_formatted_text(
+                        HTML("<yellow>No paused conversation to resume.</yellow>")
+                    )
+                continue
 
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
@@ -335,6 +428,12 @@ def run_agent_chat() -> None:
                     role="user",
                     content=[TextContent(text=user_input)],
                 )
+
+                # Check if conversation is paused and resume it for any user input
+                if conversation.state.agent_paused:
+                    print_formatted_text(
+                        HTML("<yellow>Resuming paused conversation...</yellow>")
+                    )
 
                 runner.process_message(message)
                 print_formatted_text(

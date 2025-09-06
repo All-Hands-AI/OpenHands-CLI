@@ -18,6 +18,7 @@ COMMANDS = {
     "/status": "Display conversation details",
     "/confirm": "Toggle confirmation mode on/off",
     "/new": "Create a new conversation",
+    "/resume": "Resume a paused conversation",
 }
 
 

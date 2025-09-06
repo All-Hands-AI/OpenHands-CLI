@@ -74,7 +74,15 @@ class TestCommandCompleter:
 
 def test_commands_dict() -> None:
     """Test that COMMANDS dictionary contains expected commands."""
-    expected_commands = {"/exit", "/help", "/clear", "/status", "/confirm", "/new"}
+    expected_commands = {
+        "/exit",
+        "/help",
+        "/clear",
+        "/status",
+        "/confirm",
+        "/new",
+        "/resume",
+    }
     assert set(COMMANDS.keys()) == expected_commands
 
     # Check that all commands have descriptions
