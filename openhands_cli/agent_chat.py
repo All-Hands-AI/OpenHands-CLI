@@ -272,11 +272,6 @@ class ConversationRunner:
         except Exception:
             pass
         finally:
-            print(
-                "stopping",
-                self.conversation.state.agent_paused,
-                len(self.conversation.state.events),
-            )
             if listener is not None:
                 listener.stop()
 
@@ -294,6 +289,25 @@ class ConversationRunner:
                 self.conversation.reject_pending_actions("User rejected the actions")
                 return False
         return True
+
+    def resume_conversation(self) -> bool:
+        """Resume a paused conversation.
+
+        Returns:
+            True if conversation was resumed, False if not paused or failed to resume
+        """
+        if not self.conversation.state.agent_paused:
+            return False
+
+        try:
+            # Resume the conversation by running until completion or confirmation
+            self._run_until_completion_or_confirmation()
+            return True
+        except Exception as e:
+            print_formatted_text(
+                HTML(f"<red>Error resuming conversation: {str(e)}</red>")
+            )
+            return False
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -380,6 +394,24 @@ def run_agent_chat() -> None:
                 )
                 session_id = str(uuid.uuid4())[:8]
                 display_welcome(session_id)
+                continue
+            elif command == "/resume":
+                if conversation.state.agent_paused:
+                    print_formatted_text(
+                        HTML("<yellow>Resuming paused conversation...</yellow>")
+                    )
+                    if runner.resume_conversation():
+                        print_formatted_text(
+                            HTML("<green>✓ Conversation resumed successfully.</green>")
+                        )
+                    else:
+                        print_formatted_text(
+                            HTML("<red>Failed to resume conversation.</red>")
+                        )
+                else:
+                    print_formatted_text(
+                        HTML("<yellow>No paused conversation to resume.</yellow>")
+                    )
                 continue
 
             # Send message to agent
