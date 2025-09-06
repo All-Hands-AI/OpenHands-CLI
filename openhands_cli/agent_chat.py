@@ -254,8 +254,9 @@ class ConversationRunner:
 
         return False
 
-    def _run_until_completion_or_confirmation(self, resume: bool = False) -> None:
+    def _run_until_completion_or_confirmation(self) -> None:
         """Run conversation until agent finishes or needs confirmation."""
+        resume = True  # invoking this method always reumes conversation
         listener: PauseListener | None = None
         try:
             while self._conditions_to_run_loop_are_met(resume):
@@ -310,15 +311,8 @@ class ConversationRunner:
         if not self.conversation.state.agent_paused:
             return False
 
-        try:
-            # Resume the conversation by running until completion or confirmation
-            self._run_until_completion_or_confirmation(resume=True)
-            return True
-        except Exception as e:
-            print_formatted_text(
-                HTML(f"<red>Error resuming conversation: {str(e)}</red>")
-            )
-            return False
+        self._run_until_completion_or_confirmation()
+        return True
 
 
 def display_welcome(session_id: str = "chat") -> None:
@@ -425,20 +419,6 @@ def run_agent_chat() -> None:
                     )
                 continue
 
-            # Check if conversation is paused and resume it for any user input
-            if conversation.state.agent_paused:
-                print_formatted_text(
-                    HTML("<yellow>Resuming paused conversation...</yellow>")
-                )
-                if runner.resume_conversation():
-                    print_formatted_text(
-                        HTML("<green>✓ Conversation resumed successfully.</green>")
-                    )
-                else:
-                    print_formatted_text(
-                        HTML("<red>Failed to resume conversation.</red>")
-                    )
-
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
@@ -448,6 +428,12 @@ def run_agent_chat() -> None:
                     role="user",
                     content=[TextContent(text=user_input)],
                 )
+
+                # Check if conversation is paused and resume it for any user input
+                if conversation.state.agent_paused:
+                    print_formatted_text(
+                        HTML("<yellow>Resuming paused conversation...</yellow>")
+                    )
 
                 runner.process_message(message)
                 print_formatted_text(
