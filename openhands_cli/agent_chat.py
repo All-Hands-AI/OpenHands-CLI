@@ -242,14 +242,25 @@ class ConversationRunner:
         # Run conversation until completion or confirmation needed
         self._run_until_completion_or_confirmation()
 
-    def _run_until_completion_or_confirmation(self) -> None:
+    def _conditions_to_run_loop_are_met(self, resume: bool) -> bool:
+        if resume:
+            return True
+
+        if not self.conversation.state.agent_finished:
+            return True
+
+        if not self.conversation.state.agent_paused:
+            return True
+
+        return False
+
+    def _run_until_completion_or_confirmation(self, resume: bool = False) -> None:
         """Run conversation until agent finishes or needs confirmation."""
         listener: PauseListener | None = None
         try:
-            while not (
-                self.conversation.state.agent_finished
-                or self.conversation.state.agent_paused
-            ):
+            while self._conditions_to_run_loop_are_met(resume):
+                resume = False  # loop has been resumed, can reset
+
                 # ensure listener is active during run cycles so Ctrl-P can pause
                 if listener is None or not listener.is_alive():
                     listener = PauseListener(on_pause=self.conversation.pause)
@@ -301,7 +312,7 @@ class ConversationRunner:
 
         try:
             # Resume the conversation by running until completion or confirmation
-            self._run_until_completion_or_confirmation()
+            self._run_until_completion_or_confirmation(resume=True)
             return True
         except Exception as e:
             print_formatted_text(
