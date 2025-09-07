@@ -61,9 +61,6 @@ a = Analysis(
         'mcp.client',
         'mcp.server',
         'mcp.shared',
-        # Additional dependencies that might be needed
-        *collect_submodules('pydantic'),
-        *collect_submodules('httpx'),
     ],
     hookspath=[],
     hooksconfig={},
