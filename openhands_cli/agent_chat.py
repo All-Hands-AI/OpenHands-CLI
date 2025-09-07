@@ -6,13 +6,7 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
-import sys
 import traceback
-
-# Ensure we use the agent-sdk openhands package, not the main OpenHands package
-# Remove the main OpenHands code path if it exists
-if "/openhands/code" in sys.path:
-    sys.path.remove("/openhands/code")
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
@@ -27,7 +21,6 @@ try:
         Agent,
         Conversation,
         EventType,
-        LLMConfig,
         Message,
         TextContent,
         Tool,
@@ -82,15 +75,11 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
             )
 
         # Configure LLM
-        llm_config = LLMConfig(
+        llm = LLM(
             model=model,
             api_key=SecretStr(api_key) if api_key else None,
+            base_url=base_url if base_url else None,
         )
-
-        if base_url:
-            llm_config.base_url = base_url
-
-        llm = LLM(config=llm_config)
 
         # Setup tools
         cwd = os.getcwd()
