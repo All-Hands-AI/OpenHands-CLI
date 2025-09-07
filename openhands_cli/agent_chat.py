@@ -6,7 +6,6 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
-import traceback
 
 from openhands.sdk import (
     LLM,
@@ -48,68 +47,59 @@ def setup_agent() -> Conversation:
     """
     Setup the agent with environment variables.
     """
-    try:
-        # Get API configuration from environment
-        api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-        model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
-        base_url = os.getenv("LITELLM_BASE_URL")
+    # Get API configuration from environment
+    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+    base_url = os.getenv("LITELLM_BASE_URL")
 
-        if not api_key:
-            print_formatted_text(
-                HTML(
-                    "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
-                )
-            )
-            raise AgentSetupError(
-                "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
-            )
-
-        llm = LLM(
-            model=model,
-            api_key=SecretStr(api_key) if api_key else None,
-            base_url=base_url,
-        )
-
-        # Setup tools
-        cwd = os.getcwd()
-        bash = BashExecutor(working_dir=cwd)
-        file_editor = FileEditorExecutor()
-        tools: list[Tool] = [
-            execute_bash_tool.set_executor(executor=bash),
-            str_replace_editor_tool.set_executor(executor=file_editor),
-        ]
-
-        # Create agent
-        agent = Agent(llm=llm, tools=tools)
-
-        # Setup conversation with callback
-        def conversation_callback(event: EventType) -> None:
-            logger.debug(f"Conversation event: {str(event)[:200]}...")
-
-        conversation = Conversation(agent=agent, callbacks=[conversation_callback])
-
-        # Check for confirmation mode
-        confirmation_mode = os.getenv("CONFIRMATION_MODE", "").lower() in ("true", "1")
-        if confirmation_mode:
-            conversation.set_confirmation_mode(True)
-            print_formatted_text(
-                HTML(
-                    "<yellow>⚠️  Confirmation mode enabled - you will be asked to approve actions</yellow>"
-                )
-            )
-
+    if not api_key:
         print_formatted_text(
-            HTML(f"<green>✓ Agent initialized with model: {model}</green>")
+            HTML(
+                "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
+            )
         )
-        return conversation
+        raise AgentSetupError(
+            "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
+        )
 
-    except AgentSetupError:
-        # Re-raise AgentSetupError as-is
-        raise
-    except Exception as e:
-        print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
-        traceback.print_exc()
-        raise AgentSetupError(f"Error setting up agent: {str(e)}") from e
+    llm = LLM(
+        model=model,
+        api_key=SecretStr(api_key) if api_key else None,
+        base_url=base_url,
+    )
+
+    # Setup tools
+    cwd = os.getcwd()
+    bash = BashExecutor(working_dir=cwd)
+    file_editor = FileEditorExecutor()
+    tools: list[Tool] = [
+        execute_bash_tool.set_executor(executor=bash),
+        str_replace_editor_tool.set_executor(executor=file_editor),
+    ]
+
+    # Create agent
+    agent = Agent(llm=llm, tools=tools)
+
+    # Setup conversation with callback
+    def conversation_callback(event: EventType) -> None:
+        logger.debug(f"Conversation event: {str(event)[:200]}...")
+
+    conversation = Conversation(agent=agent, callbacks=[conversation_callback])
+
+    # Check for confirmation mode
+    confirmation_mode = os.getenv("CONFIRMATION_MODE", "").lower() in ("true", "1")
+    if confirmation_mode:
+        conversation.set_confirmation_mode(True)
+        print_formatted_text(
+            HTML(
+                "<yellow>⚠️  Confirmation mode enabled - you will be asked to approve actions</yellow>"
+            )
+        )
+
+    print_formatted_text(
+        HTML(f"<green>✓ Agent initialized with model: {model}</green>")
+    )
+    return conversation
 
 
 def ask_user_confirmation(pending_actions: list) -> bool:
@@ -379,10 +369,6 @@ def main() -> None:
         run_agent_chat()
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-    except AgentSetupError as e:
-        # Agent setup errors are already printed in setup_agent()
-        logger.error(f"Agent setup failed: {e}")
-        raise
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
