@@ -6,6 +6,7 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
+from enum import Enum
 
 from openhands.sdk import (
     LLM,
@@ -41,6 +42,12 @@ class AgentSetupError(Exception):
     """Exception raised when agent setup fails."""
 
     pass
+
+
+class UserConfirmation(Enum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+    DEFER = "defer"
 
 
 def setup_agent() -> Conversation:
@@ -102,7 +109,7 @@ def setup_agent() -> Conversation:
     return conversation
 
 
-def ask_user_confirmation(pending_actions: list) -> bool:
+def ask_user_confirmation(pending_actions: list) -> UserConfirmation:
     """Ask user to confirm pending actions.
 
     Args:
@@ -112,7 +119,7 @@ def ask_user_confirmation(pending_actions: list) -> bool:
         True if user approves, False if user rejects
     """
     if not pending_actions:
-        return True
+        return UserConfirmation.ACCEPT
 
     print_formatted_text(
         HTML(
@@ -144,19 +151,17 @@ def ask_user_confirmation(pending_actions: list) -> bool:
                 print_formatted_text(
                     HTML("<green>✅ Approved — executing actions…</green>")
                 )
-                return True
+                return UserConfirmation.ACCEPT
             elif user_input in ("no", "n"):
                 print_formatted_text(HTML("<red>❌ Rejected — skipping actions…</red>"))
-                return False
+                return UserConfirmation.REJECT
             else:
                 print_formatted_text(
                     HTML("<yellow>Please enter 'yes' or 'no'.</yellow>")
                 )
         except (EOFError, KeyboardInterrupt):
-            print_formatted_text(
-                HTML("\n<red>❌ No input received; rejecting by default.</red>")
-            )
-            return False
+            print_formatted_text(HTML("\n<red>No input received; pausing agent.</red>"))
+            return UserConfirmation.DEFER
 
 
 class ConversationRunner:
@@ -189,25 +194,17 @@ class ConversationRunner:
         else:
             self._run_without_confirmation()
 
-    def _conditions_to_run_loop_are_met(self, resume: bool) -> bool:
-        if resume:
-            return True
-
-        if self.listener.is_paused():
-            return False
-
-        if not self.conversation.state.agent_finished:
-            return True
-
-        return False
-
     def _run_without_confirmation(self) -> None:
         with pause_listener(self.conversation):
             self.conversation.run()
 
     def _run_with_confirmation(self) -> None:
         # If agent was paused, resume with confirmation request
+        print(
+            "should be waiting", self.conversation.state.agent_waiting_for_confirmation
+        )
         if self.conversation.state.agent_waiting_for_confirmation:
+            print("showing options")
             self._handle_confirmation_request()
 
         while True:
@@ -222,12 +219,13 @@ class ConversationRunner:
                 break
 
             elif self.conversation.state.agent_waiting_for_confirmation:
-                self._handle_confirmation_request()
-
+                user_confirmation = self._handle_confirmation_request()
+                if user_confirmation == UserConfirmation.DEFER:
+                    return
             else:
                 raise Exception("Infinite loop")
 
-    def _handle_confirmation_request(self) -> bool:
+    def _handle_confirmation_request(self) -> UserConfirmation:
         """Handle confirmation request from user.
 
         Returns:
@@ -236,11 +234,15 @@ class ConversationRunner:
         pending_actions = get_unmatched_actions(self.conversation.state.events)
 
         if pending_actions:
-            approved = ask_user_confirmation(pending_actions)
-            if not approved:
+            user_confirmation = ask_user_confirmation(pending_actions)
+            if user_confirmation == UserConfirmation.REJECT:
                 self.conversation.reject_pending_actions("User rejected the actions")
-                return False
-        return True
+            elif user_confirmation == UserConfirmation.DEFER:
+                self.conversation.pause()
+
+            return user_confirmation
+
+        return UserConfirmation.ACCEPT
 
 
 def run_agent_chat() -> None:
@@ -324,7 +326,7 @@ def run_agent_chat() -> None:
             elif command == "/resume":
                 if not conversation.state.agent_paused:
                     print_formatted_text(
-                        HTML("<yellow>Resuming paused conversation...</yellow>")
+                        HTML("<red>No paused conversation to resume...</red>")
                     )
 
                     continue
