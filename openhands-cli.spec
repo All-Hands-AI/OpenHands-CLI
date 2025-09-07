@@ -9,7 +9,11 @@ for the OpenHands CLI application.
 from pathlib import Path
 import os
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import (
+    collect_submodules,
+    collect_data_files,
+    copy_metadata
+)
 
 # Ensure build-time import resolution prefers the packaged SDK over the monorepo path
 # Needed when running build inside OpenHands conversation (due to nested runtimes)
@@ -33,13 +37,16 @@ a = Analysis(
         *collect_data_files('tiktoken'),
         *collect_data_files('tiktoken_ext'),
         *collect_data_files('litellm'),
+        *collect_data_files('fastmcp'),
+        *collect_data_files('mcp'),
         # Include Jinja prompt templates required by the agent SDK
         *collect_data_files('openhands.sdk.agent.agent', includes=['prompts/*.j2']),
+        # Include package metadata for importlib.metadata
+        *copy_metadata('fastmcp'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
-        'openhands_cli.tui',
-        'openhands_cli.pt_style',
+        *collect_submodules('openhands_cli'),
         *collect_submodules('prompt_toolkit'),
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.sdk'),
@@ -48,6 +55,12 @@ a = Analysis(
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
+        *collect_submodules('fastmcp'),
+        # Include mcp but exclude CLI parts that require typer
+        'mcp.types',
+        'mcp.client',
+        'mcp.server',
+        'mcp.shared',
     ],
     hookspath=[],
     hooksconfig={},
@@ -63,6 +76,9 @@ a = Analysis(
         'IPython',
         'jupyter',
         'notebook',
+        # Exclude mcp CLI parts that cause issues
+        'mcp.cli',
+        'mcp.cli.cli',
     ],
     noarchive=False,
     # IMPORTANT: do not use optimize=2 (-OO) because it strips docstrings used by PLY/bashlex grammar

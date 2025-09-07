@@ -6,13 +6,7 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
-import sys
 import traceback
-
-# Ensure we use the agent-sdk openhands package, not the main OpenHands package
-# Remove the main OpenHands code path if it exists
-if "/openhands/code" in sys.path:
-    sys.path.remove("/openhands/code")
 
 from openhands.sdk import (
     LLM,
