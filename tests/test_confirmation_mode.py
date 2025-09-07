@@ -7,7 +7,11 @@ import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from openhands_cli.agent_chat import ask_user_confirmation, setup_agent, UserConfirmation
+from openhands_cli.agent_chat import (
+    UserConfirmation,
+    ask_user_confirmation,
+    setup_agent,
+)
 
 
 class TestConfirmationMode:
