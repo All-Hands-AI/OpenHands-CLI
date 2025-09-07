@@ -35,7 +35,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
-from openhands_cli.listeners import PauseListener
+from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 from openhands_cli.tui import CommandCompleter, display_banner, display_help
 
 logger = logging.getLogger(__name__)
@@ -47,14 +47,9 @@ class AgentSetupError(Exception):
     pass
 
 
-def setup_agent() -> tuple[LLM, Agent, Conversation]:
-    """Setup the agent with environment variables.
-
-    Returns:
-        tuple: (llm, agent, conversation)
-
-    Raises:
-        AgentSetupError: If agent setup fails
+def setup_agent() -> Conversation:
+    """
+    Setup the agent with environment variables.
     """
     try:
         # Get API configuration from environment
@@ -109,7 +104,7 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
         print_formatted_text(
             HTML(f"<green>✓ Agent initialized with model: {model}</green>")
         )
-        return llm, agent, conversation
+        return conversation
 
     except AgentSetupError:
         # Re-raise AgentSetupError as-is
@@ -180,27 +175,33 @@ def ask_user_confirmation(pending_actions: list) -> bool:
 class ConversationRunner:
     """Handles the conversation state machine logic cleanly."""
 
-    def __init__(self, conversation: Conversation, agent: Agent | None = None):
+    def __init__(self, conversation: Conversation):
         self.conversation = conversation
-        self.agent = agent
-        self.awaiting_confirmation = False
         self.listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
+        self.confirmation_mode = False
+
+    def set_confirmation_mode(self, confirmation_mode: bool) -> None:
+        self.confirmation_mode = confirmation_mode
+        self.conversation.set_confirmation_mode(confirmation_mode)
 
     def _start_listener(self) -> None:
         self.listener = PauseListener(on_pause=self.conversation.pause)
         self.listener.start()
 
-    def process_message(self, message: Message) -> None:
+    def process_message(self, message: Message | None) -> None:
         """Process a user message through the conversation.
 
         Args:
             message: The user message to process
         """
         # Send message to conversation
-        self.conversation.send_message(message)
+        if message:
+            self.conversation.send_message(message)
 
-        # Run conversation until completion or confirmation needed
-        self._run_until_completion_or_confirmation()
+        if self.confirmation_mode:
+            self._run_with_confirmation()
+        else:
+            self._run_without_confirmation()
 
     def _conditions_to_run_loop_are_met(self, resume: bool) -> bool:
         if resume:
@@ -214,35 +215,35 @@ class ConversationRunner:
 
         return False
 
-    def _run_until_completion_or_confirmation(self) -> None:
-        """Run conversation until agent finishes or needs confirmation."""
-        resume = True  # invoking this method always resumes conversation
+    def _run_without_confirmation(self) -> None:
+        with pause_listener(self.conversation):
+            self.conversation.run()
 
-        if self.awaiting_confirmation:
+    def _run_with_confirmation(self) -> None:
+        # If agent was paused, resume with confirmation request
+        print(
+            "is waiting for confirmation",
+            self.conversation.state.agent_waiting_for_confirmation,
+        )
+        if self.conversation.state.agent_waiting_for_confirmation:
             self._handle_confirmation_request()
 
-        self._start_listener()
-
-        try:
-            while self._conditions_to_run_loop_are_met(resume):
-                resume = False  # loop has been resumed, can reset
-                if not self.listener.is_alive():
-                    self._start_listener()
-
+        while True:
+            with pause_listener(self.conversation) as listener:
                 self.conversation.run()
-                self.awaiting_confirmation = (
-                    self.conversation.state.agent_waiting_for_confirmation
-                )
 
-                # Check if agent is waiting for confirmation: stop listener before prompting
-                if self.awaiting_confirmation and not self.listener.is_paused():
-                    self.listener.stop()
-                    self._handle_confirmation_request()
+                if listener.is_paused():
+                    break
 
-        except Exception as e:
-            print("exception", e)
-        finally:
-            self.listener.stop()
+            # In confirmation mode, agent either finishes or waits for user confirmation
+            if self.conversation.state.agent_finished:
+                break
+
+            elif self.conversation.state.agent_waiting_for_confirmation:
+                self._handle_confirmation_request()
+
+            else:
+                raise Exception("Infinite loop")
 
     def _handle_confirmation_request(self) -> bool:
         """Handle confirmation request from user.
@@ -257,18 +258,6 @@ class ConversationRunner:
             if not approved:
                 self.conversation.reject_pending_actions("User rejected the actions")
                 return False
-        return True
-
-    def resume_conversation(self) -> bool:
-        """Resume a paused conversation.
-
-        Returns:
-            True if conversation was resumed, False if not paused or failed to resume
-        """
-        if not self.conversation.state.agent_paused:
-            return False
-
-        self._run_until_completion_or_confirmation()
         return True
 
 
@@ -294,7 +283,7 @@ def run_agent_chat() -> None:
         EOFError: If EOF is encountered
     """
     # Setup agent - let exceptions bubble up
-    llm, agent, conversation = setup_agent()
+    conversation = setup_agent()
 
     # Generate session ID
     import uuid
@@ -307,7 +296,7 @@ def run_agent_chat() -> None:
     session = PromptSession(completer=CommandCompleter())
 
     # Create conversation runner to handle state machine logic
-    runner = ConversationRunner(conversation, agent)
+    runner = ConversationRunner(conversation)
 
     # Main chat loop
     while True:
@@ -323,6 +312,12 @@ def run_agent_chat() -> None:
 
             # Handle commands
             command = user_input.strip().lower()
+
+            message = Message(
+                role="user",
+                content=[TextContent(text=user_input)],
+            )
+
             if command == "/exit":
                 print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
                 break
@@ -343,8 +338,8 @@ def run_agent_chat() -> None:
                 )
                 continue
             elif command == "/confirm":
-                current_mode = conversation.state.confirmation_mode
-                conversation.set_confirmation_mode(not current_mode)
+                current_mode = runner.confirmation_mode
+                runner.set_confirmation_mode(not current_mode)
                 new_status = "enabled" if not current_mode else "disabled"
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
@@ -358,47 +353,29 @@ def run_agent_chat() -> None:
                 display_welcome(session_id)
                 continue
             elif command == "/resume":
-                if conversation.state.agent_paused:
+                if not conversation.state.agent_paused:
                     print_formatted_text(
                         HTML("<yellow>Resuming paused conversation...</yellow>")
                     )
-                    if runner.resume_conversation():
-                        print_formatted_text(
-                            HTML("<green>✓ Conversation resumed successfully.</green>")
-                        )
-                    else:
-                        print_formatted_text(
-                            HTML("<red>Failed to resume conversation.</red>")
-                        )
-                else:
-                    print_formatted_text(
-                        HTML("<yellow>No paused conversation to resume.</yellow>")
-                    )
-                continue
+
+                    continue
+
+                # Resume without new message
+                message = None
 
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
-            try:
-                # Create message and process through conversation runner
-                message = Message(
-                    role="user",
-                    content=[TextContent(text=user_input)],
-                )
-
-                # Check if conversation is paused and resume it for any user input
-                if conversation.state.agent_paused:
-                    print_formatted_text(
-                        HTML("<yellow>Resuming paused conversation...</yellow>")
-                    )
-
-                runner.process_message(message)
+            # Check if conversation is paused and resume it for any user input
+            if conversation.state.agent_paused:
                 print_formatted_text(
-                    HTML("<green>✓ Agent has processed your request.</green>")
+                    HTML("<yellow>Resuming paused conversation...</yellow>")
                 )
 
-            except Exception as e:
-                print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
+            runner.process_message(message)
+            print_formatted_text(
+                HTML("<green>✓ Agent has processed your request.</green>")
+            )
 
             print()  # Add spacing
 

@@ -1,6 +1,8 @@
 import threading
-import typing
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
+from openhands.sdk import Conversation
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.input import create_input
 from prompt_toolkit.keys import Keys
@@ -12,7 +14,7 @@ class PauseListener(threading.Thread):
     Starts and stops around agent run() loops to avoid interfering with user prompts.
     """
 
-    def __init__(self, on_pause: typing.Callable, confirmation_mode: bool = False):
+    def __init__(self, on_pause: Callable, confirmation_mode: bool = False):
         super().__init__(daemon=True)
         self.on_pause = on_pause
         self._stop_event = threading.Event()
@@ -57,3 +59,15 @@ class PauseListener(threading.Thread):
 
     def is_paused(self) -> bool:
         return self._stop_event.is_set()
+
+
+@contextmanager
+def pause_listener(conversation: Conversation) -> Iterator[PauseListener]:
+    """Ensure PauseListener always starts/stops cleanly."""
+    listener = PauseListener(on_pause=conversation.pause)
+    listener.start()
+    try:
+        yield listener
+    finally:
+        print("stopping listener")
+        listener.stop()
