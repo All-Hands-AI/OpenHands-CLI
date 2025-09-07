@@ -14,12 +14,12 @@ class PauseListener(threading.Thread):
     Starts and stops around agent run() loops to avoid interfering with user prompts.
     """
 
-    def __init__(self, on_pause: Callable, confirmation_mode: bool = False):
+    def __init__(self, on_pause: Callable):
         super().__init__(daemon=True)
         self.on_pause = on_pause
         self._stop_event = threading.Event()
+        self._pause_event = threading.Event()
         self._input = create_input()
-        self.confirmation_mode = confirmation_mode
 
     def _detect_pause_key_presses(self) -> bool:
         pause_detected = False
@@ -32,7 +32,7 @@ class PauseListener(threading.Thread):
         return pause_detected
 
     def _execute_pause(self) -> None:
-        self._stop_event.set()
+        self._stop_event.set()  # Mark pause event occurred
         print_formatted_text(HTML(""))
         print_formatted_text(
             HTML("<gold>Pausing agent once step is completed...</gold>")
@@ -45,7 +45,8 @@ class PauseListener(threading.Thread):
     def run(self) -> None:
         try:
             with self._input.raw_mode():
-                while not self.is_paused():
+                # User hasn't paused and pause listener hasn't been shut down
+                while not (self.is_paused() or self.is_stopped()):
                     if self._detect_pause_key_presses():
                         self._execute_pause()
         finally:
@@ -57,8 +58,11 @@ class PauseListener(threading.Thread):
     def stop(self) -> None:
         self._stop_event.set()
 
-    def is_paused(self) -> bool:
+    def is_stopped(self) -> bool:
         return self._stop_event.is_set()
+
+    def is_paused(self) -> bool:
+        return self._pause_event.is_set()
 
 
 @contextmanager
