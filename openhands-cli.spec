@@ -9,7 +9,11 @@ for the OpenHands CLI application.
 from pathlib import Path
 import os
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import (
+    collect_submodules,
+    collect_data_files,
+    copy_metadata
+)
 
 # Ensure build-time import resolution prefers the packaged SDK over the monorepo path
 # Needed when running build inside OpenHands conversation (due to nested runtimes)
@@ -38,15 +42,11 @@ a = Analysis(
         # Include Jinja prompt templates required by the agent SDK
         *collect_data_files('openhands.sdk.agent.agent', includes=['prompts/*.j2']),
         # Include package metadata for importlib.metadata
-        ('.venv/lib/python3.12/site-packages/fastmcp-2.12.2.dist-info', 'fastmcp-2.12.2.dist-info'),
-        ('.venv/lib/python3.12/site-packages/mcp-1.13.1.dist-info', 'mcp-1.13.1.dist-info'),
-        ('.venv/lib/python3.12/site-packages/openhands_sdk-1.0.0.dist-info', 'openhands_sdk-1.0.0.dist-info'),
-        ('.venv/lib/python3.12/site-packages/openhands_tools-1.0.0.dist-info', 'openhands_tools-1.0.0.dist-info'),
+        *copy_metadata('fastmcp'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
-        'openhands_cli.tui',
-        'openhands_cli.pt_style',
+        *collect_submodules('openhands_cli'),
         *collect_submodules('prompt_toolkit'),
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.sdk'),

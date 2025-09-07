@@ -6,10 +6,7 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
-import sys
 import traceback
-
-
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
