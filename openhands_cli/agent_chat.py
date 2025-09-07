@@ -9,10 +9,7 @@ import os
 import sys
 import traceback
 
-# Ensure we use the agent-sdk openhands package, not the main OpenHands package
-# Remove the main OpenHands code path if it exists
-if "/openhands/code" in sys.path:
-    sys.path.remove("/openhands/code")
+
 
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
