@@ -28,7 +28,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
@@ -48,7 +48,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
@@ -68,7 +68,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
@@ -86,7 +86,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
