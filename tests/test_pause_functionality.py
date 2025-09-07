@@ -10,9 +10,11 @@ This test suite covers the pause/resume behavior in different modes:
 5. Resume with confirmation mode after pausing before seeing confirmation options
 """
 
+import time
 from unittest.mock import MagicMock, patch
 
 from openhands.sdk import Conversation, Message, TextContent
+from prompt_toolkit.input.defaults import create_pipe_input
 
 from openhands_cli.agent_chat import (
     ConversationRunner,
@@ -25,15 +27,7 @@ from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 class TestPauseListener:
     """Test suite for PauseListener class."""
 
-    def test_pause_listener_initialization(self):
-        """Test PauseListener can be initialized properly."""
-        mock_callback = MagicMock()
-        listener = PauseListener(on_pause=mock_callback)
-
-        assert listener.on_pause == mock_callback
-        assert not listener.is_paused()
-
-    def test_pause_listener_stop(self):
+    def test_pause_listener_stop(self) -> None:
         """Test PauseListener stop functionality."""
         mock_callback = MagicMock()
         listener = PauseListener(on_pause=mock_callback)
@@ -42,6 +36,7 @@ class TestPauseListener:
 
         # Initially not paused
         assert not listener.is_paused()
+        assert listener.is_alive()
 
         # Stop the listener
         listener.stop()
@@ -50,25 +45,29 @@ class TestPauseListener:
         assert not listener.is_paused()
         assert listener.is_stopped()
 
-    def test_pause_listener_context_manager(self):
+    def test_pause_listener_context_manager(self) -> None:
         """Test pause_listener context manager."""
         mock_conversation = MagicMock(spec=Conversation)
 
-        with pause_listener(mock_conversation) as listener:
-            assert isinstance(listener, PauseListener)
-            assert listener.on_pause == mock_conversation.pause
-            # Listener should be started (daemon thread)
-            assert listener.is_alive()
-            assert not listener.is_paused()
+        with create_pipe_input() as pipe:
+            with pause_listener(mock_conversation, pipe) as listener:
+                assert isinstance(listener, PauseListener)
+                assert listener.on_pause == mock_conversation.pause
+                # Listener should be started (daemon thread)
+                assert listener.is_alive()
+                assert not listener.is_paused()
+                pipe.send_text("\x10")  # Ctrl-P
+                time.sleep(0.1)
+                assert listener.is_paused()
 
-        # After context exit, listener should be stopped
-        assert listener.is_paused()
+            assert listener.is_stopped()
+            assert not listener.is_alive()
 
 
 class TestPauseFunctionality:
     """Test suite for pause functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         # Create mock conversation
         self.mock_conversation = MagicMock(spec=Conversation)

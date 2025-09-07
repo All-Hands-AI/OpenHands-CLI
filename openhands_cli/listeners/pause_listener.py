@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from openhands.sdk import Conversation
 from prompt_toolkit import HTML, print_formatted_text
-from prompt_toolkit.input import create_input
+from prompt_toolkit.input import Input, create_input
 from prompt_toolkit.keys import Keys
 
 
@@ -14,12 +14,16 @@ class PauseListener(threading.Thread):
     Starts and stops around agent run() loops to avoid interfering with user prompts.
     """
 
-    def __init__(self, on_pause: Callable):
+    def __init__(
+        self,
+        on_pause: Callable,
+        input_source: Input | None = None,  # used to pipe inputs for unit tests
+    ):
         super().__init__(daemon=True)
         self.on_pause = on_pause
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
-        self._input = create_input()
+        self._input = input_source or create_input()
 
     def _detect_pause_key_presses(self) -> bool:
         pause_detected = False
@@ -32,7 +36,8 @@ class PauseListener(threading.Thread):
         return pause_detected
 
     def _execute_pause(self) -> None:
-        self._stop_event.set()  # Mark pause event occurred
+        print("setting pause")
+        self._pause_event.set()  # Mark pause event occurred
         print_formatted_text(HTML(""))
         print_formatted_text(
             HTML("<gold>Pausing agent once step is completed...</gold>")
@@ -47,7 +52,9 @@ class PauseListener(threading.Thread):
             with self._input.raw_mode():
                 # User hasn't paused and pause listener hasn't been shut down
                 while not (self.is_paused() or self.is_stopped()):
+                    print("checking keys")
                     if self._detect_pause_key_presses():
+                        print("detected")
                         self._execute_pause()
         finally:
             try:
@@ -66,9 +73,11 @@ class PauseListener(threading.Thread):
 
 
 @contextmanager
-def pause_listener(conversation: Conversation) -> Iterator[PauseListener]:
+def pause_listener(
+    conversation: Conversation, input_source: Input | None = None
+) -> Iterator[PauseListener]:
     """Ensure PauseListener always starts/stops cleanly."""
-    listener = PauseListener(on_pause=conversation.pause)
+    listener = PauseListener(on_pause=conversation.pause, input_source=input_source)
     listener.start()
     try:
         yield listener
