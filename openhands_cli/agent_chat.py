@@ -32,11 +32,14 @@ from openhands.tools import (
 )
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
-from openhands_cli.tui import CommandCompleter, display_banner, display_help
+from openhands_cli.tui import (
+    CommandCompleter,
+    display_help,
+    display_welcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +180,6 @@ class ConversationRunner:
 
     def __init__(self, conversation: Conversation):
         self.conversation = conversation
-        self.listener: PauseListener = PauseListener(on_pause=self.conversation.pause)
         self.confirmation_mode = False
 
     def set_confirmation_mode(self, confirmation_mode: bool) -> None:
@@ -221,10 +223,6 @@ class ConversationRunner:
 
     def _run_with_confirmation(self) -> None:
         # If agent was paused, resume with confirmation request
-        print(
-            "is waiting for confirmation",
-            self.conversation.state.agent_waiting_for_confirmation,
-        )
         if self.conversation.state.agent_waiting_for_confirmation:
             self._handle_confirmation_request()
 
@@ -259,19 +257,6 @@ class ConversationRunner:
                 self.conversation.reject_pending_actions("User rejected the actions")
                 return False
         return True
-
-
-def display_welcome(session_id: str = "chat") -> None:
-    """Display welcome message."""
-    clear()
-    display_banner(session_id)
-    print_formatted_text(HTML("<gold>Let's start building!</gold>"))
-    print_formatted_text(
-        HTML(
-            "<green>What do you want to build? <grey>Type /help for help</grey></green>"
-        )
-    )
-    print()
 
 
 def run_agent_chat() -> None:

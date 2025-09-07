@@ -69,5 +69,4 @@ def pause_listener(conversation: Conversation) -> Iterator[PauseListener]:
     try:
         yield listener
     finally:
-        print("stopping listener")
         listener.stop()
