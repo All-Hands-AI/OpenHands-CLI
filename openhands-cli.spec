@@ -33,8 +33,15 @@ a = Analysis(
         *collect_data_files('tiktoken'),
         *collect_data_files('tiktoken_ext'),
         *collect_data_files('litellm'),
+        *collect_data_files('fastmcp'),
+        *collect_data_files('mcp'),
         # Include Jinja prompt templates required by the agent SDK
         *collect_data_files('openhands.sdk.agent.agent', includes=['prompts/*.j2']),
+        # Include package metadata for importlib.metadata
+        ('.venv/lib/python3.12/site-packages/fastmcp-2.12.2.dist-info', 'fastmcp-2.12.2.dist-info'),
+        ('.venv/lib/python3.12/site-packages/mcp-1.13.1.dist-info', 'mcp-1.13.1.dist-info'),
+        ('.venv/lib/python3.12/site-packages/openhands_sdk-1.0.0.dist-info', 'openhands_sdk-1.0.0.dist-info'),
+        ('.venv/lib/python3.12/site-packages/openhands_tools-1.0.0.dist-info', 'openhands_tools-1.0.0.dist-info'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
@@ -48,6 +55,15 @@ a = Analysis(
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
+        *collect_submodules('fastmcp'),
+        # Include mcp but exclude CLI parts that require typer
+        'mcp.types',
+        'mcp.client',
+        'mcp.server',
+        'mcp.shared',
+        # Additional dependencies that might be needed
+        *collect_submodules('pydantic'),
+        *collect_submodules('httpx'),
     ],
     hookspath=[],
     hooksconfig={},
@@ -63,6 +79,9 @@ a = Analysis(
         'IPython',
         'jupyter',
         'notebook',
+        # Exclude mcp CLI parts that cause issues
+        'mcp.cli',
+        'mcp.cli.cli',
     ],
     noarchive=False,
     # IMPORTANT: do not use optimize=2 (-OO) because it strips docstrings used by PLY/bashlex grammar

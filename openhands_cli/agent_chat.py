@@ -24,7 +24,6 @@ try:
         Agent,
         Conversation,
         EventType,
-        LLMConfig,
         Message,
         TextContent,
         Tool,
@@ -79,15 +78,11 @@ def setup_agent() -> tuple[LLM, Agent, Conversation]:
             )
 
         # Configure LLM
-        llm_config = LLMConfig(
+        llm = LLM(
             model=model,
             api_key=SecretStr(api_key) if api_key else None,
+            base_url=base_url if base_url else None,
         )
-
-        if base_url:
-            llm_config.base_url = base_url
-
-        llm = LLM(config=llm_config)
 
         # Setup tools
         cwd = os.getcwd()

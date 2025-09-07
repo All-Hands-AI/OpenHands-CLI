@@ -17,9 +17,10 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk @ git+https://github.com/All-Hands-AI/agent-sdk.git@6b3b5779d019c8915f5bf228a839b94aa1b26696#subdirectory=openhands/sdk",
+  "openhands-sdk",
   "openhands-tools @ git+https://github.com/All-Hands-AI/agent-sdk.git@6b3b5779d019c8915f5bf228a839b94aa1b26696#subdirectory=openhands/tools",
   "prompt-toolkit>=3",
+  "typer>=0.17.4",
 ]
 
 optional-dependencies.dev = [
@@ -112,3 +113,6 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/All-Hands-AI/agent-sdk.git", subdirectory = "openhands/sdk", rev = "6b3b5779d019c8915f5bf228a839b94aa1b26696" }
