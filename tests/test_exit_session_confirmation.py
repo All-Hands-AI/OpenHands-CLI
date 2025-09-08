@@ -3,13 +3,11 @@
 Tests for exit_session_confirmation functionality in OpenHands CLI.
 """
 
-import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
-from prompt_toolkit.input import PipeInput
 from prompt_toolkit.input.defaults import create_pipe_input
 from prompt_toolkit.output.defaults import DummyOutput
 
@@ -19,15 +17,10 @@ from openhands_cli.user_actions import (
     utils,
 )
 from openhands_cli.user_actions.types import UserConfirmation
+from tests.utils import _send_keys
 
 QUESTION = "Terminate session?"
 OPTIONS = ["Yes, proceed", "No, dismiss"]
-
-
-def _send_keys(pipe: PipeInput, text: str, delay: float = 0.05) -> None:
-    """Helper: small delay then send keys to avoid race with app.run()."""
-    time.sleep(delay)
-    pipe.send_text(text)
 
 
 @pytest.fixture()

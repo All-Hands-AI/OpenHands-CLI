@@ -14,6 +14,9 @@ def ask_user_confirmation(pending_actions: list) -> UserConfirmation:
         True if user approves, False if user rejects
     """
 
+    if not pending_actions:
+        return UserConfirmation.ACCEPT
+
     print_formatted_text(
         HTML(
             f"<yellow>🔍 Agent created {len(pending_actions)} action(s) and is waiting for confirmation:</yellow>"
@@ -21,8 +24,13 @@ def ask_user_confirmation(pending_actions: list) -> UserConfirmation:
     )
 
     for i, action in enumerate(pending_actions, 1):
-        tool_name = getattr(action, "tool_name", "<unknown tool>")
-        action_content = str(getattr(action, "action", ""))[:100].replace("\n", " ")
+        tool_name = getattr(action, "tool_name", "[unknown tool]")
+        print("tool name", tool_name)
+        action_content = (
+            str(getattr(action, "action", ""))[:100].replace("\n", " ")
+            or "[unknown action]"
+        )
+        print("action_content", action_content)
         print_formatted_text(
             HTML(f"<grey>  {i}. {tool_name}: {action_content}...</grey>")
         )
