@@ -190,6 +190,4 @@ class TestConfirmationMode:
             assert result == UserConfirmation.ACCEPT
 
             # Verify that both actions were displayed
-            assert (
-                mock_print.call_count >= 3
-            )  # Header + 2 actions
+            assert mock_print.call_count >= 3  # Header + 2 actions
