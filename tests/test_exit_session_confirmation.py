@@ -71,7 +71,7 @@ class TestExitSessionConfirmation:
         assert result == expected
         _assert_called_once_with_defaults(confirm_patch)
 
-    def test_cli_confirm_non_escapable_e2e(
+    def test_exit_session_confirmation_non_escapable_e2e(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """E2E: non-escapable should ignore Ctrl-C/Ctrl-P/Esc; only Enter returns."""
