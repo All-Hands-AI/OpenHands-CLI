@@ -99,17 +99,19 @@ def cli_confirm(
     return int(app.run(in_thread=True))
 
 
-def prompt_for_reason() -> str:
+def prompt_user(question: str) -> str:
     """Prompt user to enter a reason for rejecting actions.
-    
+
     Returns:
         The reason entered by the user, or empty string if cancelled.
     """
     try:
-        reason = prompt(
-            "Please enter your reason for rejecting these actions: ",
-            style=DEFAULT_STYLE,
+        reason = str(
+            prompt(
+                question,
+                style=DEFAULT_STYLE,
+            )
         )
         return reason.strip()
-    except (EOFError, KeyboardInterrupt):
+    except KeyboardInterrupt:
         return ""

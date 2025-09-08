@@ -226,7 +226,7 @@ class TestConfirmationMode:
         mock_action.action = "rm -rf /"
 
         result, reason = ask_user_confirmation([mock_action])
-        assert result == UserConfirmation.REJECT_WITH_REASON
+        assert result == UserConfirmation.REJECT
         assert reason == "This action is too risky"
         mock_prompt_for_reason.assert_called_once()
 
