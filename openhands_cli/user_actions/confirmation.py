@@ -13,6 +13,10 @@ def ask_user_confirmation(pending_actions: list) -> UserConfirmation:
     Returns:
         True if user approves, False if user rejects
     """
+    
+    # If there are no actions to confirm, automatically accept
+    if not pending_actions:
+        return UserConfirmation.ACCEPT
 
     print_formatted_text(
         HTML(
