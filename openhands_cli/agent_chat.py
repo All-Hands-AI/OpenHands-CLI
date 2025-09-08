@@ -20,6 +20,7 @@ from openhands_cli.tui import (
     display_help,
     display_welcome,
 )
+from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,10 @@ def run_cli_entry() -> None:
             )
 
             if command == "/exit":
-                print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
-                break
+                exit_confirmation = exit_session_confirmation()
+                if exit_confirmation == UserConfirmation.ACCEPT:
+                    print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+                    break
             elif command == "/clear":
                 display_welcome(session_id)
                 continue
@@ -130,10 +133,8 @@ def run_cli_entry() -> None:
             print()  # Add spacing
 
         except KeyboardInterrupt:
-            print_formatted_text(
-                HTML("\n<yellow>Chat interrupted. Type /exit to quit.</yellow>")
-            )
+            exit_confirmation = exit_session_confirmation()
+            if exit_confirmation == UserConfirmation.ACCEPT:
+                print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+                break
             continue
-        except EOFError:
-            print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-            break

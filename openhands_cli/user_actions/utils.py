@@ -13,6 +13,7 @@ def cli_confirm(
     question: str = "Are you sure?",
     choices: list[str] | None = None,
     initial_selection: int = 0,
+    escapable: bool = False,
 ) -> int:
     """Display a confirmation prompt with the given question and choices.
 
@@ -51,17 +52,19 @@ def cli_confirm(
     def _handle_enter(event: KeyPressEvent) -> None:
         event.app.exit(result=selected[0])
 
-    @kb.add("c-c")  # Ctrl+C
-    def _handle_hard_interrupt(event: KeyPressEvent) -> None:
-        event.app.exit(exception=KeyboardInterrupt())
+    if escapable:
 
-    @kb.add("c-p")  # Ctrl+P
-    def _handle_pause_interrupt(event: KeyPressEvent) -> None:
-        event.app.exit(exception=KeyboardInterrupt())
+        @kb.add("c-c")  # Ctrl+C
+        def _handle_hard_interrupt(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
 
-    @kb.add("escape")  # Escape key
-    def _handle_escape(event: KeyPressEvent) -> None:
-        event.app.exit(exception=KeyboardInterrupt())
+        @kb.add("c-p")  # Ctrl+P
+        def _handle_pause_interrupt(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
+
+        @kb.add("escape")  # Escape key
+        def _handle_escape(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
 
     # Create layout with risk-based styling - full width but limited height
     content_window = Window(
