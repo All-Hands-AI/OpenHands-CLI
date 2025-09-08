@@ -3,176 +3,112 @@
 Tests for exit_session_confirmation functionality in OpenHands CLI.
 """
 
-import sys
-from typing import Any
+import time
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
+from prompt_toolkit.input import PipeInput
+from prompt_toolkit.input.defaults import create_pipe_input
+from prompt_toolkit.output.defaults import DummyOutput
 
-from openhands_cli.user_actions.exit_session_confirmation import exit_session_confirmation
+from openhands_cli.user_actions import (
+    exit_session,
+    exit_session_confirmation,
+    utils,
+)
 from openhands_cli.user_actions.types import UserConfirmation
+
+QUESTION = "Terminate session?"
+OPTIONS = ["Yes, proceed", "No, dismiss"]
+
+
+def _send_keys(pipe: PipeInput, text: str, delay: float = 0.05) -> None:
+    """Helper: small delay then send keys to avoid race with app.run()."""
+    time.sleep(delay)
+    pipe.send_text(text)
+
+
+@pytest.fixture()
+def confirm_patch() -> Iterator[MagicMock]:
+    """Patch cli_confirm once per test and yield the mock."""
+    with patch("openhands_cli.user_actions.exit_session.cli_confirm") as m:
+        yield m
+
+
+def _assert_called_once_with_defaults(mock_cli_confirm: MagicMock) -> None:
+    """Ensure the question/options are correct and 'escapable' is not enabled."""
+    mock_cli_confirm.assert_called_once()
+    args, kwargs = mock_cli_confirm.call_args
+    # Positional args
+    assert args == (QUESTION, OPTIONS)
+    # Should not opt into escapable mode
+    assert "escapable" not in kwargs or kwargs["escapable"] is False
 
 
 class TestExitSessionConfirmation:
     """Test suite for exit_session_confirmation functionality."""
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_accept(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation returns ACCEPT when user selects 'Yes, proceed'."""
-        mock_cli_confirm.return_value = 0  # First option (Yes, proceed)
+    @pytest.mark.parametrize(
+        "index,expected",
+        [
+            (0, UserConfirmation.ACCEPT),  # Yes
+            (1, UserConfirmation.REJECT),  # No
+            (999, UserConfirmation.REJECT),  # Invalid => default reject
+            (-1, UserConfirmation.REJECT),  # Negative => default reject
+        ],
+    )
+    def test_index_mapping(
+        self, confirm_patch: MagicMock, index: int, expected: UserConfirmation
+    ) -> None:
+        """All index-to-result mappings, including invalid/negative, in one place."""
+        confirm_patch.return_value = index
 
         result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.ACCEPT
-        mock_cli_confirm.assert_called_once_with(
-            "Terminate session?", 
-            ["Yes, proceed", "No, dismiss"]
-        )
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_reject(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation returns REJECT when user selects 'No, dismiss'."""
-        mock_cli_confirm.return_value = 1  # Second option (No, dismiss)
+        assert isinstance(result, UserConfirmation)
+        assert result == expected
+        _assert_called_once_with_defaults(confirm_patch)
 
-        result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.REJECT
-        mock_cli_confirm.assert_called_once_with(
-            "Terminate session?", 
-            ["Yes, proceed", "No, dismiss"]
-        )
+    def test_cli_confirm_non_escapable_e2e(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """E2E: non-escapable should ignore Ctrl-C/Ctrl-P/Esc; only Enter returns."""
+        real_cli_confirm = utils.cli_confirm
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_invalid_index_defaults_to_reject(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation returns REJECT for invalid index."""
-        mock_cli_confirm.return_value = 999  # Invalid index
+        with create_pipe_input() as pipe:
+            output = DummyOutput()
 
-        result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.REJECT
-        mock_cli_confirm.assert_called_once_with(
-            "Terminate session?", 
-            ["Yes, proceed", "No, dismiss"]
-        )
+            def wrapper(
+                question: str,
+                choices: list[str] | None = None,
+                initial_selection: int = 0,
+                escapable: bool = False,
+                **extra: object,
+            ) -> int:
+                # keep original params; inject test IO
+                return real_cli_confirm(
+                    question=question,
+                    choices=choices,
+                    initial_selection=initial_selection,
+                    escapable=escapable,
+                    input=pipe,
+                    output=output,
+                )
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_negative_index_defaults_to_reject(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation returns REJECT for negative index."""
-        mock_cli_confirm.return_value = -1  # Negative index
+            # Patch the symbol the caller uses
+            monkeypatch.setattr(exit_session, "cli_confirm", wrapper, raising=True)
 
-        result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.REJECT
-        mock_cli_confirm.assert_called_once_with(
-            "Terminate session?", 
-            ["Yes, proceed", "No, dismiss"]
-        )
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(exit_session_confirmation)
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_keyboard_interrupt_handled(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation handles KeyboardInterrupt gracefully."""
-        mock_cli_confirm.side_effect = KeyboardInterrupt()
+                _send_keys(pipe, "\x03")  # Ctrl-C (ignored)
+                _send_keys(pipe, "\x10")  # Ctrl-P (ignored)
+                _send_keys(pipe, "\x1b")  # Esc   (ignored)
 
-        # KeyboardInterrupt should be raised since cli_confirm is not escapable
-        with pytest.raises(KeyboardInterrupt):
-            exit_session_confirmation()
+                _send_keys(pipe, "\x1b[B")  # Arrow Down to "No, dismiss"
+                _send_keys(pipe, "\r")  # Enter
 
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_eof_error_handled(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation handles EOFError gracefully."""
-        mock_cli_confirm.side_effect = EOFError()
-
-        # EOFError should be raised since cli_confirm is not escapable
-        with pytest.raises(EOFError):
-            exit_session_confirmation()
-
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_uses_non_escapable_mode(self, mock_cli_confirm: Any) -> None:
-        """Test that exit_session_confirmation calls cli_confirm in non-escapable mode."""
-        mock_cli_confirm.return_value = 0
-
-        exit_session_confirmation()
-        
-        # Verify cli_confirm is called without escapable=True parameter
-        # This means Control+C and Control+P should not be handled by cli_confirm
-        mock_cli_confirm.assert_called_once_with(
-            "Terminate session?", 
-            ["Yes, proceed", "No, dismiss"]
-        )
-        
-        # Verify that escapable parameter is not passed (defaults to False)
-        call_args = mock_cli_confirm.call_args
-        assert call_args is not None
-        args, kwargs = call_args
-        assert "escapable" not in kwargs or kwargs.get("escapable") is False
-
-    def test_exit_session_confirmation_options_mapping(self) -> None:
-        """Test that the options mapping is correct."""
-        with patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm") as mock_cli_confirm:
-            # Test index 0 maps to ACCEPT
-            mock_cli_confirm.return_value = 0
-            result = exit_session_confirmation()
-            assert result == UserConfirmation.ACCEPT
-
-            # Test index 1 maps to REJECT
-            mock_cli_confirm.return_value = 1
-            result = exit_session_confirmation()
-            assert result == UserConfirmation.REJECT
-
-    def test_exit_session_confirmation_question_and_options(self) -> None:
-        """Test that the correct question and options are passed to cli_confirm."""
-        with patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm") as mock_cli_confirm:
-            mock_cli_confirm.return_value = 0
-            
-            exit_session_confirmation()
-            
-            # Verify the exact question and options
-            mock_cli_confirm.assert_called_once_with(
-                "Terminate session?",
-                ["Yes, proceed", "No, dismiss"]
-            )
-
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_control_c_not_handled_by_default(self, mock_cli_confirm: Any) -> None:
-        """Test that Control+C is not handled by cli_confirm when escapable=False (default)."""
-        # Since exit_session_confirmation calls cli_confirm without escapable=True,
-        # Control+C should not be handled by the key bindings in cli_confirm
-        mock_cli_confirm.return_value = 0
-        
-        result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.ACCEPT
-        
-        # Verify cli_confirm was called without escapable=True
-        call_args = mock_cli_confirm.call_args
-        assert call_args is not None
-        args, kwargs = call_args
-        assert kwargs.get("escapable", False) is False
-
-    @patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm")
-    def test_exit_session_confirmation_control_p_not_handled_by_default(self, mock_cli_confirm: Any) -> None:
-        """Test that Control+P is not handled by cli_confirm when escapable=False (default)."""
-        # Since exit_session_confirmation calls cli_confirm without escapable=True,
-        # Control+P should not be handled by the key bindings in cli_confirm
-        mock_cli_confirm.return_value = 1
-        
-        result = exit_session_confirmation()
-        
-        assert result == UserConfirmation.REJECT
-        
-        # Verify cli_confirm was called without escapable=True
-        call_args = mock_cli_confirm.call_args
-        assert call_args is not None
-        args, kwargs = call_args
-        assert kwargs.get("escapable", False) is False
-
-    def test_exit_session_confirmation_return_type(self) -> None:
-        """Test that exit_session_confirmation returns UserConfirmation enum."""
-        with patch("openhands_cli.user_actions.exit_session_confirmation.cli_confirm") as mock_cli_confirm:
-            mock_cli_confirm.return_value = 0
-            result = exit_session_confirmation()
-            assert isinstance(result, UserConfirmation)
-            
-            mock_cli_confirm.return_value = 1
-            result = exit_session_confirmation()
-            assert isinstance(result, UserConfirmation)
+                result = fut.result(timeout=2.0)
+                assert result == UserConfirmation.REJECT
