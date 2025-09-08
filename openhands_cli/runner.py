@@ -1,16 +1,9 @@
-from enum import Enum
-
 from openhands.sdk import Conversation, Message
 from openhands.sdk.event.utils import get_unmatched_actions
 
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 from openhands_cli.user_actions.confirmation import ask_user_confirmation
-
-
-class UserConfirmation(Enum):
-    ACCEPT = "accept"
-    REJECT = "reject"
-    DEFER = "defer"
+from openhands_cli.user_actions.types import UserConfirmation
 
 
 class ConversationRunner:

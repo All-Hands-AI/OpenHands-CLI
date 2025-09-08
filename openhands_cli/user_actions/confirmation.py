@@ -1,6 +1,6 @@
 from prompt_toolkit import HTML, PromptSession, print_formatted_text
 
-from openhands_cli.runner import UserConfirmation
+from openhands_cli.user_actions.types import UserConfirmation
 
 
 def ask_user_confirmation(pending_actions: list) -> UserConfirmation:

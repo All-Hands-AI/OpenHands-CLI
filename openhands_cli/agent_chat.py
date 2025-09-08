@@ -139,22 +139,22 @@ def run_cli_entry() -> None:
             break
 
 
-def main() -> None:
-    """Main entry point for agent chat.
+# def main() -> None:
+#     """Main entry point for agent chat.
 
-    Raises:
-        AgentSetupError: If agent setup fails
-        Exception: On unexpected errors
-    """
-    try:
-        run_cli_entry()
-    except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-    except Exception as e:
-        print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
-        logger.error(f"Main error: {e}")
-        raise
+#     Raises:
+#         AgentSetupError: If agent setup fails
+#         Exception: On unexpected errors
+#     """
+#     try:
+#         run_cli_entry()
+#     except KeyboardInterrupt:
+#         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+#     except Exception as e:
+#         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
+#         logger.error(f"Main error: {e}")
+#         raise
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

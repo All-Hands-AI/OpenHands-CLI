@@ -19,9 +19,9 @@ def main() -> None:
     """
     try:
         # Start agent chat directly by default
-        from openhands_cli.agent_chat import main as run_agent_chat
+        from openhands_cli.agent_chat import run_cli_entry
 
-        run_agent_chat()
+        run_cli_entry()
 
     except ImportError as e:
         print_formatted_text(
