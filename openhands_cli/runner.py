@@ -93,9 +93,11 @@ class ConversationRunner:
         pending_actions = get_unmatched_actions(self.conversation.state.events)
 
         if pending_actions:
-            user_confirmation = ask_user_confirmation(pending_actions)
+            user_confirmation, reason = ask_user_confirmation(pending_actions)
             if user_confirmation == UserConfirmation.REJECT:
                 self.conversation.reject_pending_actions("User rejected the actions")
+            elif user_confirmation == UserConfirmation.REJECT_WITH_REASON:
+                self.conversation.reject_pending_actions(f"User rejected the actions: {reason}")
             elif user_confirmation == UserConfirmation.DEFER:
                 self.conversation.pause()
 

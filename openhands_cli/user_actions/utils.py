@@ -7,6 +7,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.output.base import Output
+from prompt_toolkit.shortcuts import prompt
 
 from openhands_cli.tui import DEFAULT_STYLE
 
@@ -96,3 +97,19 @@ def cli_confirm(
     )
 
     return int(app.run(in_thread=True))
+
+
+def prompt_for_reason() -> str:
+    """Prompt user to enter a reason for rejecting actions.
+    
+    Returns:
+        The reason entered by the user, or empty string if cancelled.
+    """
+    try:
+        reason = prompt(
+            "Please enter your reason for rejecting these actions: ",
+            style=DEFAULT_STYLE,
+        )
+        return reason.strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
