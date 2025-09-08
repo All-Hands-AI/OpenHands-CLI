@@ -39,15 +39,15 @@ class TestConfirmationMode:
     def test_conversation_runner_set_confirmation_mode(self) -> None:
         """Test that ConversationRunner can set confirmation mode."""
         from openhands_cli.runner import ConversationRunner
-        
+
         mock_conversation = MagicMock()
         runner = ConversationRunner(mock_conversation)
-        
+
         # Test enabling confirmation mode
         runner.set_confirmation_mode(True)
         assert runner.confirmation_mode is True
         mock_conversation.set_confirmation_mode.assert_called_with(True)
-        
+
         # Test disabling confirmation mode
         runner.set_confirmation_mode(False)
         assert runner.confirmation_mode is False
@@ -56,10 +56,10 @@ class TestConfirmationMode:
     def test_conversation_runner_initial_state(self) -> None:
         """Test that ConversationRunner starts with confirmation mode disabled."""
         from openhands_cli.runner import ConversationRunner
-        
+
         mock_conversation = MagicMock()
         runner = ConversationRunner(mock_conversation)
-        
+
         # Verify initial state
         assert runner.confirmation_mode is False
 
@@ -183,8 +183,12 @@ class TestConfirmationMode:
     def test_ask_user_confirmation_multiple_actions(self) -> None:
         """Test that ask_user_confirmation displays multiple actions correctly."""
         with (
-            patch("openhands_cli.user_actions.confirmation.PromptSession") as mock_prompt_session,
-            patch("openhands_cli.user_actions.confirmation.print_formatted_text") as mock_print,
+            patch(
+                "openhands_cli.user_actions.confirmation.PromptSession"
+            ) as mock_prompt_session,
+            patch(
+                "openhands_cli.user_actions.confirmation.print_formatted_text"
+            ) as mock_print,
         ):
             mock_session = MagicMock()
             mock_session.prompt.return_value = "yes"
