@@ -22,13 +22,8 @@ class ConversationRunner:
         self.listener = PauseListener(on_pause=self.conversation.pause)
         self.listener.start()
 
-    def process_message(self, message: Message | None) -> None:
-        """Process a user message through the conversation.
-
-        Args:
-            message: The user message to process
-        """
-
+    def _print_run_status(self) -> None:
+        print_formatted_text("")
         if self.conversation.state.agent_paused:
             print_formatted_text(
                 HTML(
@@ -42,6 +37,16 @@ class ConversationRunner:
                     "<yellow>Agent running...</yellow><grey> (Press Ctrl-P to pause)</grey>"
                 )
             )
+        print_formatted_text("")
+
+    def process_message(self, message: Message | None) -> None:
+        """Process a user message through the conversation.
+
+        Args:
+            message: The user message to process
+        """
+
+        self._print_run_status()
 
         # Send message to conversation
         if message:
