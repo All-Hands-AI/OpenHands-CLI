@@ -1,8 +1,9 @@
 from openhands.sdk import Conversation, Message
 from openhands.sdk.event.utils import get_unmatched_actions
+from prompt_toolkit import HTML, print_formatted_text
 
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
-from openhands_cli.user_actions.confirmation import ask_user_confirmation
+from openhands_cli.user_actions import ask_user_confirmation
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -21,12 +22,32 @@ class ConversationRunner:
         self.listener = PauseListener(on_pause=self.conversation.pause)
         self.listener.start()
 
+    def _print_run_status(self) -> None:
+        print_formatted_text("")
+        if self.conversation.state.agent_paused:
+            print_formatted_text(
+                HTML(
+                    "<yellow>Resuming paused conversation...</yellow><grey> (Press Ctrl-P to pause)</grey>"
+                )
+            )
+
+        else:
+            print_formatted_text(
+                HTML(
+                    "<yellow>Agent running...</yellow><grey> (Press Ctrl-P to pause)</grey>"
+                )
+            )
+        print_formatted_text("")
+
     def process_message(self, message: Message | None) -> None:
         """Process a user message through the conversation.
 
         Args:
             message: The user message to process
         """
+
+        self._print_run_status()
+
         # Send message to conversation
         if message:
             self.conversation.send_message(message)
