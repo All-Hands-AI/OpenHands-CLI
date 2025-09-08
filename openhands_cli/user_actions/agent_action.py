@@ -38,7 +38,12 @@ def ask_user_confirmation(pending_actions: list) -> tuple[UserConfirmation, str]
         )
 
     question = "Choose an option:"
-    options = ["Yes, proceed", "No, reject (w/o reason)", "No, reject with reason"]
+    options = [
+        "Yes, proceed", 
+        "No, reject (w/o reason)", 
+        "No, reject with reason",
+        "Always proceed (don't ask again)"
+    ]
 
     try:
         index = cli_confirm(question, options, escapable=True)
@@ -58,5 +63,9 @@ def ask_user_confirmation(pending_actions: list) -> tuple[UserConfirmation, str]
         # If user pressed Ctrl+C or Ctrl+P during reason input, defer the action
         if should_defer:
             return UserConfirmation.DEFER, ""
+        
+        return UserConfirmation.REJECT, reason
+    elif index == 3:
+        return UserConfirmation.ALWAYS_ACCEPT, reason
 
     return UserConfirmation.REJECT, reason

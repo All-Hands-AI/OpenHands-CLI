@@ -285,3 +285,82 @@ class TestConfirmationMode:
                 result, reason = fut.result(timeout=2.0)
                 assert result == UserConfirmation.DEFER  # escaped confirmation view
                 assert reason == ""
+
+    @patch("openhands_cli.user_actions.agent_action.cli_confirm")
+    def test_ask_user_confirmation_always_accept(self, mock_cli_confirm: Any) -> None:
+        """Test that ask_user_confirmation returns ALWAYS_ACCEPT when user selects fourth option."""
+        mock_cli_confirm.return_value = 3  # Fourth option (Always proceed)
+
+        mock_action = MagicMock()
+        mock_action.tool_name = "bash"
+        mock_action.action = "echo test"
+
+        result, reason = ask_user_confirmation([mock_action])
+        assert result == UserConfirmation.ALWAYS_ACCEPT
+        assert reason == ""
+
+    def test_conversation_runner_handles_always_accept(self) -> None:
+        """Test that ConversationRunner disables confirmation mode when ALWAYS_ACCEPT is returned."""
+        mock_conversation = MagicMock()
+        runner = ConversationRunner(mock_conversation)
+        
+        # Enable confirmation mode first
+        runner.set_confirmation_mode(True)
+        assert runner.confirmation_mode is True
+        
+        # Mock the conversation state to simulate waiting for confirmation
+        mock_conversation.state.agent_waiting_for_confirmation = True
+        mock_conversation.state.agent_finished = False
+        
+        # Mock get_unmatched_actions to return some actions
+        with patch("openhands_cli.runner.get_unmatched_actions") as mock_get_actions:
+            mock_action = MagicMock()
+            mock_action.tool_name = "bash"
+            mock_action.action = "echo test"
+            mock_get_actions.return_value = [mock_action]
+            
+            # Mock ask_user_confirmation to return ALWAYS_ACCEPT
+            with patch("openhands_cli.runner.ask_user_confirmation") as mock_ask:
+                mock_ask.return_value = (UserConfirmation.ALWAYS_ACCEPT, "")
+                
+                # Mock print_formatted_text to avoid output during test
+                with patch("openhands_cli.runner.print_formatted_text"):
+                    result = runner._handle_confirmation_request()
+                    
+                    # Verify that confirmation mode was disabled
+                    assert result == UserConfirmation.ALWAYS_ACCEPT
+                    assert runner.confirmation_mode is False
+                    mock_conversation.set_confirmation_mode.assert_called_with(False)
+
+    def test_conversation_runner_switches_to_non_confirmation_mode(self) -> None:
+        """Test that ConversationRunner switches to non-confirmation mode when ALWAYS_ACCEPT is selected."""
+        mock_conversation = MagicMock()
+        runner = ConversationRunner(mock_conversation)
+        
+        # Enable confirmation mode
+        runner.set_confirmation_mode(True)
+        
+        # Mock the conversation state
+        mock_conversation.state.agent_waiting_for_confirmation = True
+        mock_conversation.state.agent_finished = False
+        
+        # Mock get_unmatched_actions
+        with patch("openhands_cli.runner.get_unmatched_actions") as mock_get_actions:
+            mock_action = MagicMock()
+            mock_get_actions.return_value = [mock_action]
+            
+            # Mock ask_user_confirmation to return ALWAYS_ACCEPT
+            with patch("openhands_cli.runner.ask_user_confirmation") as mock_ask:
+                mock_ask.return_value = (UserConfirmation.ALWAYS_ACCEPT, "")
+                
+                # Mock print_formatted_text and _run_without_confirmation
+                with (
+                    patch("openhands_cli.runner.print_formatted_text"),
+                    patch.object(runner, "_run_without_confirmation") as mock_run_without,
+                ):
+                    runner._run_with_confirmation()
+                    
+                    # Verify that _run_without_confirmation was called
+                    mock_run_without.assert_called_once()
+                    # Verify that confirmation mode was disabled
+                    assert runner.confirmation_mode is False
