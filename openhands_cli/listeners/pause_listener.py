@@ -36,7 +36,6 @@ class PauseListener(threading.Thread):
         return pause_detected
 
     def _execute_pause(self) -> None:
-        print("setting pause")
         self._pause_event.set()  # Mark pause event occurred
         print_formatted_text(HTML(""))
         print_formatted_text(
@@ -52,9 +51,7 @@ class PauseListener(threading.Thread):
             with self._input.raw_mode():
                 # User hasn't paused and pause listener hasn't been shut down
                 while not (self.is_paused() or self.is_stopped()):
-                    print("checking keys")
                     if self._detect_pause_key_presses():
-                        print("detected")
                         self._execute_pause()
         finally:
             try:
