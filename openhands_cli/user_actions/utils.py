@@ -105,10 +105,9 @@ def prompt_user(question: str) -> tuple[str, bool]:
     Returns:
         Tuple of (reason, should_defer) where:
         - reason: The reason entered by the user
-        - should_defer: True if user pressed Ctrl+C or Ctrl+P (indicating defer), False otherwise
+        - should_defer: True if user pressed Ctrl+C or Ctrl+P, False otherwise
     """
 
-    # Create custom key bindings to distinguish between Ctrl+C and Ctrl+P
     kb = KeyBindings()
 
     @kb.add("c-c")

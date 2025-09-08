@@ -38,7 +38,7 @@ def ask_user_confirmation(pending_actions: list) -> tuple[UserConfirmation, str]
         )
 
     question = "Choose an option:"
-    options = ["Yes, proceed", "No, reject", "No, reject with reason"]
+    options = ["Yes, proceed", "No, reject (w/o reason)", "No, reject with reason"]
 
     try:
         index = cli_confirm(question, options, escapable=True)
