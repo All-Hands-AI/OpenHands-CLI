@@ -42,11 +42,7 @@ class ConversationRunner:
 
     def _run_with_confirmation(self) -> None:
         # If agent was paused, resume with confirmation request
-        print(
-            "should be waiting", self.conversation.state.agent_waiting_for_confirmation
-        )
         if self.conversation.state.agent_waiting_for_confirmation:
-            print("showing options")
             self._handle_confirmation_request()
 
         while True:
