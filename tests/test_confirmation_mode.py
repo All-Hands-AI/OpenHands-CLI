@@ -13,6 +13,7 @@ from openhands.sdk import ActionBase
 from prompt_toolkit.input.defaults import create_pipe_input
 from prompt_toolkit.output.defaults import DummyOutput
 
+from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import setup_agent
 from openhands_cli.user_actions import agent_action, ask_user_confirmation, utils
 from openhands_cli.user_actions.types import UserConfirmation
@@ -49,7 +50,6 @@ class TestConfirmationMode:
 
     def test_conversation_runner_set_confirmation_mode(self) -> None:
         """Test that ConversationRunner can set confirmation mode."""
-        from openhands_cli.runner import ConversationRunner
 
         mock_conversation = MagicMock()
         runner = ConversationRunner(mock_conversation)
@@ -66,7 +66,6 @@ class TestConfirmationMode:
 
     def test_conversation_runner_initial_state(self) -> None:
         """Test that ConversationRunner starts with confirmation mode disabled."""
-        from openhands_cli.runner import ConversationRunner
 
         mock_conversation = MagicMock()
         runner = ConversationRunner(mock_conversation)

@@ -64,7 +64,9 @@ class ConversationRunner:
     def _run_with_confirmation(self) -> None:
         # If agent was paused, resume with confirmation request
         if self.conversation.state.agent_waiting_for_confirmation:
-            self._handle_confirmation_request()
+            user_confirmation = self._handle_confirmation_request()
+            if user_confirmation == UserConfirmation.DEFER:
+                return
 
         while True:
             with pause_listener(self.conversation) as listener:
