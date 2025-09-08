@@ -7,7 +7,11 @@ import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from openhands_cli.agent_chat import ask_user_confirmation, setup_agent
+from openhands_cli.agent_chat import (
+    UserConfirmation,
+    ask_user_confirmation,
+    setup_agent,
+)
 
 
 class TestConfirmationMode:
@@ -28,7 +32,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
@@ -48,7 +52,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was enabled
                 mock_conv_instance.set_confirmation_mode.assert_called_once_with(True)
@@ -68,7 +72,7 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
@@ -86,19 +90,19 @@ class TestConfirmationMode:
                 mock_conv_instance = MagicMock()
                 mock_conversation.return_value = mock_conv_instance
 
-                llm, agent, conversation = setup_agent()
+                setup_agent()
 
                 # Verify confirmation mode was not enabled
                 mock_conv_instance.set_confirmation_mode.assert_not_called()
 
     def test_ask_user_confirmation_empty_actions(self) -> None:
-        """Test that ask_user_confirmation returns True for empty actions list."""
+        """Test that ask_user_confirmation returns ACCEPT for empty actions list."""
         result = ask_user_confirmation([])
-        assert result is True
+        assert result == UserConfirmation.ACCEPT
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_yes(self, mock_prompt_session: Any) -> None:
-        """Test that ask_user_confirmation returns True when user says yes."""
+        """Test that ask_user_confirmation returns ACCEPT when user says yes."""
         mock_session = MagicMock()
         mock_session.prompt.return_value = "yes"
         mock_prompt_session.return_value = mock_session
@@ -108,11 +112,11 @@ class TestConfirmationMode:
         mock_action.action = "ls -la"
 
         result = ask_user_confirmation([mock_action])
-        assert result is True
+        assert result == UserConfirmation.ACCEPT
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_no(self, mock_prompt_session: Any) -> None:
-        """Test that ask_user_confirmation returns False when user says no."""
+        """Test that ask_user_confirmation returns REJECT when user says no."""
         mock_session = MagicMock()
         mock_session.prompt.return_value = "no"
         mock_prompt_session.return_value = mock_session
@@ -122,7 +126,7 @@ class TestConfirmationMode:
         mock_action.action = "rm -rf /"
 
         result = ask_user_confirmation([mock_action])
-        assert result is False
+        assert result == UserConfirmation.REJECT
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_y_shorthand(self, mock_prompt_session: Any) -> None:
@@ -136,7 +140,7 @@ class TestConfirmationMode:
         mock_action.action = "echo hello"
 
         result = ask_user_confirmation([mock_action])
-        assert result is True
+        assert result == UserConfirmation.ACCEPT
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_n_shorthand(self, mock_prompt_session: Any) -> None:
@@ -150,7 +154,7 @@ class TestConfirmationMode:
         mock_action.action = "dangerous command"
 
         result = ask_user_confirmation([mock_action])
-        assert result is False
+        assert result == UserConfirmation.REJECT
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_invalid_then_yes(
@@ -166,7 +170,7 @@ class TestConfirmationMode:
         mock_action.action = "echo test"
 
         result = ask_user_confirmation([mock_action])
-        assert result is True
+        assert result == UserConfirmation.ACCEPT
         assert mock_session.prompt.call_count == 3
 
     @patch("openhands_cli.agent_chat.PromptSession")
@@ -183,7 +187,7 @@ class TestConfirmationMode:
         mock_action.action = "echo test"
 
         result = ask_user_confirmation([mock_action])
-        assert result is False
+        assert result == UserConfirmation.DEFER
 
     @patch("openhands_cli.agent_chat.PromptSession")
     def test_ask_user_confirmation_eof_error(self, mock_prompt_session: Any) -> None:
@@ -197,7 +201,7 @@ class TestConfirmationMode:
         mock_action.action = "echo test"
 
         result = ask_user_confirmation([mock_action])
-        assert result is False
+        assert result == UserConfirmation.DEFER
 
     def test_ask_user_confirmation_multiple_actions(self) -> None:
         """Test that ask_user_confirmation displays multiple actions correctly."""
@@ -218,7 +222,7 @@ class TestConfirmationMode:
             mock_action2.action = "create file.txt"
 
             result = ask_user_confirmation([mock_action1, mock_action2])
-            assert result is True
+            assert result == UserConfirmation.ACCEPT
 
             # Verify that both actions were displayed
             assert (

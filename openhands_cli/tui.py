@@ -4,6 +4,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.shortcuts import clear
 
 from openhands_cli import __version__
 from openhands_cli.pt_style import get_cli_style
@@ -18,6 +19,7 @@ COMMANDS = {
     "/status": "Display conversation details",
     "/confirm": "Toggle confirmation mode on/off",
     "/new": "Create a new conversation",
+    "/resume": "Resume a paused conversation",
 }
 
 
@@ -75,3 +77,16 @@ def display_help() -> None:
     print_formatted_text("  • Use arrow keys to navigate through suggestions")
     print_formatted_text("  • Press Enter to select a command")
     print_formatted_text("")
+
+
+def display_welcome(session_id: str = "chat") -> None:
+    """Display welcome message."""
+    clear()
+    display_banner(session_id)
+    print_formatted_text(HTML("<gold>Let's start building!</gold>"))
+    print_formatted_text(
+        HTML(
+            "<green>What do you want to build? <grey>Type /help for help</grey></green>"
+        )
+    )
+    print()

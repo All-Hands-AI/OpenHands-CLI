@@ -17,7 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk",
+  "openhands-sdk @ git+https://github.com/All-Hands-AI/agent-sdk.git@6b3b5779d019c8915f5bf228a839b94aa1b26696#subdirectory=openhands/sdk",
   "openhands-tools @ git+https://github.com/All-Hands-AI/agent-sdk.git@6b3b5779d019c8915f5bf228a839b94aa1b26696#subdirectory=openhands/tools",
   "prompt-toolkit>=3",
   "typer>=0.17.4",

@@ -6,39 +6,34 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import logging
 import os
-import traceback
+from enum import Enum
 
+from openhands.sdk import (
+    LLM,
+    Agent,
+    Conversation,
+    EventType,
+    Message,
+    TextContent,
+    Tool,
+)
+from openhands.sdk.event.utils import get_unmatched_actions
+from openhands.tools import (
+    BashExecutor,
+    FileEditorExecutor,
+    execute_bash_tool,
+    str_replace_editor_tool,
+)
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts import clear
 from pydantic import SecretStr
 
-from openhands_cli.tui import CommandCompleter, display_banner, display_help
-
-try:
-    from openhands.sdk import (
-        LLM,
-        Agent,
-        Conversation,
-        EventType,
-        Message,
-        TextContent,
-        Tool,
-    )
-    from openhands.sdk.event.utils import get_unmatched_actions
-    from openhands.tools import (
-        BashExecutor,
-        FileEditorExecutor,
-        execute_bash_tool,
-        str_replace_editor_tool,
-    )
-except ImportError as e:
-    print_formatted_text(HTML(f"<red>Error importing OpenHands SDK: {e}</red>"))
-    print_formatted_text(
-        HTML("<yellow>Please ensure the openhands-sdk is properly installed.</yellow>")
-    )
-    raise
-
+from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
+from openhands_cli.tui import (
+    CommandCompleter,
+    display_help,
+    display_welcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,81 +44,72 @@ class AgentSetupError(Exception):
     pass
 
 
-def setup_agent() -> tuple[LLM, Agent, Conversation]:
-    """Setup the agent with environment variables.
+class UserConfirmation(Enum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+    DEFER = "defer"
 
-    Returns:
-        tuple: (llm, agent, conversation)
 
-    Raises:
-        AgentSetupError: If agent setup fails
+def setup_agent() -> Conversation:
     """
-    try:
-        # Get API configuration from environment
-        api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-        model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
-        base_url = os.getenv("LITELLM_BASE_URL")
+    Setup the agent with environment variables.
+    """
+    # Get API configuration from environment
+    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+    base_url = os.getenv("LITELLM_BASE_URL")
 
-        if not api_key:
-            print_formatted_text(
-                HTML(
-                    "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
-                )
-            )
-            raise AgentSetupError(
-                "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
-            )
-
-        # Configure LLM
-        llm = LLM(
-            model=model,
-            api_key=SecretStr(api_key) if api_key else None,
-            base_url=base_url if base_url else None,
-        )
-
-        # Setup tools
-        cwd = os.getcwd()
-        bash = BashExecutor(working_dir=cwd)
-        file_editor = FileEditorExecutor()
-        tools: list[Tool] = [
-            execute_bash_tool.set_executor(executor=bash),
-            str_replace_editor_tool.set_executor(executor=file_editor),
-        ]
-
-        # Create agent
-        agent = Agent(llm=llm, tools=tools)
-
-        # Setup conversation with callback
-        def conversation_callback(event: EventType) -> None:
-            logger.debug(f"Conversation event: {str(event)[:200]}...")
-
-        conversation = Conversation(agent=agent, callbacks=[conversation_callback])
-
-        # Check for confirmation mode
-        confirmation_mode = os.getenv("CONFIRMATION_MODE", "").lower() in ("true", "1")
-        if confirmation_mode:
-            conversation.set_confirmation_mode(True)
-            print_formatted_text(
-                HTML(
-                    "<yellow>⚠️  Confirmation mode enabled - you will be asked to approve actions</yellow>"
-                )
-            )
-
+    if not api_key:
         print_formatted_text(
-            HTML(f"<green>✓ Agent initialized with model: {model}</green>")
+            HTML(
+                "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
+            )
         )
-        return llm, agent, conversation
+        raise AgentSetupError(
+            "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
+        )
 
-    except AgentSetupError:
-        # Re-raise AgentSetupError as-is
-        raise
-    except Exception as e:
-        print_formatted_text(HTML(f"<red>Error setting up agent: {str(e)}</red>"))
-        traceback.print_exc()
-        raise AgentSetupError(f"Error setting up agent: {str(e)}") from e
+    llm = LLM(
+        model=model,
+        api_key=SecretStr(api_key) if api_key else None,
+        base_url=base_url,
+    )
+
+    # Setup tools
+    cwd = os.getcwd()
+    bash = BashExecutor(working_dir=cwd)
+    file_editor = FileEditorExecutor()
+    tools: list[Tool] = [
+        execute_bash_tool.set_executor(executor=bash),
+        str_replace_editor_tool.set_executor(executor=file_editor),
+    ]
+
+    # Create agent
+    agent = Agent(llm=llm, tools=tools)
+
+    # Setup conversation with callback
+    def conversation_callback(event: EventType) -> None:
+        logger.debug(f"Conversation event: {str(event)[:200]}...")
+
+    conversation = Conversation(agent=agent, callbacks=[conversation_callback])
+
+    # Check for confirmation mode
+    confirmation_mode = os.getenv("CONFIRMATION_MODE", "").lower() in ("true", "1")
+    if confirmation_mode:
+        conversation.set_confirmation_mode(True)
+        print_formatted_text(
+            HTML(
+                "<yellow>⚠️  Confirmation mode enabled - you will be asked to approve actions</yellow>"
+            )
+        )
+
+    print_formatted_text(
+        HTML(f"<green>✓ Agent initialized with model: {model}</green>")
+    )
+    return conversation
 
 
-def ask_user_confirmation(pending_actions: list) -> bool:
+def ask_user_confirmation(pending_actions: list) -> UserConfirmation:
     """Ask user to confirm pending actions.
 
     Args:
@@ -133,7 +119,7 @@ def ask_user_confirmation(pending_actions: list) -> bool:
         True if user approves, False if user rejects
     """
     if not pending_actions:
-        return True
+        return UserConfirmation.ACCEPT
 
     print_formatted_text(
         HTML(
@@ -165,19 +151,17 @@ def ask_user_confirmation(pending_actions: list) -> bool:
                 print_formatted_text(
                     HTML("<green>✅ Approved — executing actions…</green>")
                 )
-                return True
+                return UserConfirmation.ACCEPT
             elif user_input in ("no", "n"):
                 print_formatted_text(HTML("<red>❌ Rejected — skipping actions…</red>"))
-                return False
+                return UserConfirmation.REJECT
             else:
                 print_formatted_text(
                     HTML("<yellow>Please enter 'yes' or 'no'.</yellow>")
                 )
         except (EOFError, KeyboardInterrupt):
-            print_formatted_text(
-                HTML("\n<red>❌ No input received; rejecting by default.</red>")
-            )
-            return False
+            print_formatted_text(HTML("\n<red>No input received; pausing agent.</red>"))
+            return UserConfirmation.DEFER
 
 
 class ConversationRunner:
@@ -185,35 +169,63 @@ class ConversationRunner:
 
     def __init__(self, conversation: Conversation):
         self.conversation = conversation
+        self.confirmation_mode = False
 
-    def process_message(self, message: Message) -> None:
+    def set_confirmation_mode(self, confirmation_mode: bool) -> None:
+        self.confirmation_mode = confirmation_mode
+        self.conversation.set_confirmation_mode(confirmation_mode)
+
+    def _start_listener(self) -> None:
+        self.listener = PauseListener(on_pause=self.conversation.pause)
+        self.listener.start()
+
+    def process_message(self, message: Message | None) -> None:
         """Process a user message through the conversation.
 
         Args:
             message: The user message to process
         """
         # Send message to conversation
-        self.conversation.send_message(message)
+        if message:
+            self.conversation.send_message(message)
 
-        # Run conversation until completion or confirmation needed
-        self._run_until_completion_or_confirmation()
+        if self.confirmation_mode:
+            self._run_with_confirmation()
+        else:
+            self._run_without_confirmation()
 
-    def _run_until_completion_or_confirmation(self) -> None:
-        """Run conversation until agent finishes or needs confirmation."""
-        while not self.conversation.state.agent_finished:
+    def _run_without_confirmation(self) -> None:
+        with pause_listener(self.conversation):
             self.conversation.run()
 
-            # Check if agent is waiting for confirmation
-            if self.conversation.state.agent_waiting_for_confirmation:
-                if not self._handle_confirmation_request():
-                    # User rejected - continue the loop as agent may produce new actions or finish
-                    continue
-                # If approved, continue to run() which will execute the actions
-            else:
-                # Agent finished normally
+    def _run_with_confirmation(self) -> None:
+        # If agent was paused, resume with confirmation request
+        print(
+            "should be waiting", self.conversation.state.agent_waiting_for_confirmation
+        )
+        if self.conversation.state.agent_waiting_for_confirmation:
+            print("showing options")
+            self._handle_confirmation_request()
+
+        while True:
+            with pause_listener(self.conversation) as listener:
+                self.conversation.run()
+
+                if listener.is_paused():
+                    break
+
+            # In confirmation mode, agent either finishes or waits for user confirmation
+            if self.conversation.state.agent_finished:
                 break
 
-    def _handle_confirmation_request(self) -> bool:
+            elif self.conversation.state.agent_waiting_for_confirmation:
+                user_confirmation = self._handle_confirmation_request()
+                if user_confirmation == UserConfirmation.DEFER:
+                    return
+            else:
+                raise Exception("Infinite loop")
+
+    def _handle_confirmation_request(self) -> UserConfirmation:
         """Handle confirmation request from user.
 
         Returns:
@@ -222,24 +234,15 @@ class ConversationRunner:
         pending_actions = get_unmatched_actions(self.conversation.state.events)
 
         if pending_actions:
-            approved = ask_user_confirmation(pending_actions)
-            if not approved:
+            user_confirmation = ask_user_confirmation(pending_actions)
+            if user_confirmation == UserConfirmation.REJECT:
                 self.conversation.reject_pending_actions("User rejected the actions")
-                return False
-        return True
+            elif user_confirmation == UserConfirmation.DEFER:
+                self.conversation.pause()
 
+            return user_confirmation
 
-def display_welcome(session_id: str = "chat") -> None:
-    """Display welcome message."""
-    clear()
-    display_banner(session_id)
-    print_formatted_text(HTML("<gold>Let's start building!</gold>"))
-    print_formatted_text(
-        HTML(
-            "<green>What do you want to build? <grey>Type /help for help</grey></green>"
-        )
-    )
-    print()
+        return UserConfirmation.ACCEPT
 
 
 def run_agent_chat() -> None:
@@ -251,7 +254,7 @@ def run_agent_chat() -> None:
         EOFError: If EOF is encountered
     """
     # Setup agent - let exceptions bubble up
-    llm, agent, conversation = setup_agent()
+    conversation = setup_agent()
 
     # Generate session ID
     import uuid
@@ -280,6 +283,12 @@ def run_agent_chat() -> None:
 
             # Handle commands
             command = user_input.strip().lower()
+
+            message = Message(
+                role="user",
+                content=[TextContent(text=user_input)],
+            )
+
             if command == "/exit":
                 print_formatted_text(HTML("<yellow>Goodbye! 👋</yellow>"))
                 break
@@ -300,8 +309,8 @@ def run_agent_chat() -> None:
                 )
                 continue
             elif command == "/confirm":
-                current_mode = conversation.state.confirmation_mode
-                conversation.set_confirmation_mode(not current_mode)
+                current_mode = runner.confirmation_mode
+                runner.set_confirmation_mode(not current_mode)
                 new_status = "enabled" if not current_mode else "disabled"
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
@@ -314,24 +323,30 @@ def run_agent_chat() -> None:
                 session_id = str(uuid.uuid4())[:8]
                 display_welcome(session_id)
                 continue
+            elif command == "/resume":
+                if not conversation.state.agent_paused:
+                    print_formatted_text(
+                        HTML("<red>No paused conversation to resume...</red>")
+                    )
+
+                    continue
+
+                # Resume without new message
+                message = None
 
             # Send message to agent
             print_formatted_text(HTML("<green>Agent: </green>"), end="")
 
-            try:
-                # Create message and process through conversation runner
-                message = Message(
-                    role="user",
-                    content=[TextContent(text=user_input)],
-                )
-
-                runner.process_message(message)
+            # Check if conversation is paused and resume it for any user input
+            if conversation.state.agent_paused:
                 print_formatted_text(
-                    HTML("<green>✓ Agent has processed your request.</green>")
+                    HTML("<yellow>Resuming paused conversation...</yellow>")
                 )
 
-            except Exception as e:
-                print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
+            runner.process_message(message)
+            print_formatted_text(
+                HTML("<green>✓ Agent has processed your request.</green>")
+            )
 
             print()  # Add spacing
 
@@ -356,10 +371,6 @@ def main() -> None:
         run_agent_chat()
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-    except AgentSetupError as e:
-        # Agent setup errors are already printed in setup_agent()
-        logger.error(f"Agent setup failed: {e}")
-        raise
     except Exception as e:
         print_formatted_text(HTML(f"<red>Unexpected error: {str(e)}</red>"))
         logger.error(f"Main error: {e}")
