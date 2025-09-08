@@ -85,8 +85,9 @@ class TestConfirmationMode:
 
     def test_ask_user_confirmation_empty_actions(self) -> None:
         """Test that ask_user_confirmation returns ACCEPT for empty actions list."""
-        result = ask_user_confirmation([])
+        result, reason = ask_user_confirmation([])
         assert result == UserConfirmation.ACCEPT
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_yes(self, mock_cli_confirm: Any) -> None:
@@ -97,8 +98,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "ls -la"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.ACCEPT
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_no(self, mock_cli_confirm: Any) -> None:
@@ -109,8 +111,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "rm -rf /"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.REJECT
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_y_shorthand(self, mock_cli_confirm: Any) -> None:
@@ -121,8 +124,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "echo hello"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.ACCEPT
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_n_shorthand(self, mock_cli_confirm: Any) -> None:
@@ -133,8 +137,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "dangerous command"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.REJECT
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_invalid_then_yes(
@@ -147,8 +152,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.ACCEPT
+        assert reason == ""
         assert mock_cli_confirm.call_count == 1
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
@@ -162,8 +168,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.DEFER
+        assert reason == ""
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_eof_error(self, mock_cli_confirm: Any) -> None:
@@ -174,8 +181,9 @@ class TestConfirmationMode:
         mock_action.tool_name = "bash"
         mock_action.action = "echo test"
 
-        result = ask_user_confirmation([mock_action])
+        result, reason = ask_user_confirmation([mock_action])
         assert result == UserConfirmation.DEFER
+        assert reason == ""
 
     def test_ask_user_confirmation_multiple_actions(self) -> None:
         """Test that ask_user_confirmation displays multiple actions correctly."""
@@ -197,11 +205,48 @@ class TestConfirmationMode:
             mock_action2.tool_name = "str_replace_editor"
             mock_action2.action = "create file.txt"
 
-            result = ask_user_confirmation([mock_action1, mock_action2])
+            result, reason = ask_user_confirmation([mock_action1, mock_action2])
             assert result == UserConfirmation.ACCEPT
+            assert reason == ""
 
             # Verify that both actions were displayed
             assert mock_print.call_count >= 3  # Header + 2 actions
+
+    @patch("openhands_cli.user_actions.agent_action.prompt_user")
+    @patch("openhands_cli.user_actions.agent_action.cli_confirm")
+    def test_ask_user_confirmation_no_with_reason(
+        self, mock_cli_confirm: Any, mock_prompt_user: Any
+    ) -> None:
+        """Test that ask_user_confirmation returns REJECT when user selects 'No (with reason)'."""
+        mock_cli_confirm.return_value = 2  # Third option (No, with reason)
+        mock_prompt_user.return_value = ("This action is too risky", False)
+
+        mock_action = MagicMock()
+        mock_action.tool_name = "bash"
+        mock_action.action = "rm -rf /"
+
+        result, reason = ask_user_confirmation([mock_action])
+        assert result == UserConfirmation.REJECT
+        assert reason == "This action is too risky"
+        mock_prompt_user.assert_called_once()
+
+    @patch("openhands_cli.user_actions.agent_action.prompt_user")
+    @patch("openhands_cli.user_actions.agent_action.cli_confirm")
+    def test_ask_user_confirmation_no_with_reason_cancelled(
+        self, mock_cli_confirm: Any, mock_prompt_user: Any
+    ) -> None:
+        """Test that ask_user_confirmation falls back to DEFER when reason input is cancelled."""
+        mock_cli_confirm.return_value = 2  # Third option (No, with reason)
+        mock_prompt_user.return_value = ("", True)  # User cancelled reason input
+
+        mock_action = MagicMock()
+        mock_action.tool_name = "bash"
+        mock_action.action = "dangerous command"
+
+        result, reason = ask_user_confirmation([mock_action])
+        assert result == UserConfirmation.DEFER
+        assert reason == ""
+        mock_prompt_user.assert_called_once()
 
     def test_user_confirmation_is_escapable_e2e(
         self, monkeypatch: pytest.MonkeyPatch
@@ -238,5 +283,6 @@ class TestConfirmationMode:
                 )
 
                 _send_keys(pipe, "\x03")  # Ctrl-C (ignored)
-                result = fut.result(timeout=2.0)
+                result, reason = fut.result(timeout=2.0)
                 assert result == UserConfirmation.DEFER  # escaped confirmation view
+                assert reason == ""

@@ -7,6 +7,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.output.base import Output
+from prompt_toolkit.shortcuts import prompt
 
 from openhands_cli.tui import DEFAULT_STYLE
 
@@ -96,3 +97,35 @@ def cli_confirm(
     )
 
     return int(app.run(in_thread=True))
+
+
+def prompt_user(question: str) -> tuple[str, bool]:
+    """Prompt user to enter a reason for rejecting actions.
+
+    Returns:
+        Tuple of (reason, should_defer) where:
+        - reason: The reason entered by the user
+        - should_defer: True if user pressed Ctrl+C or Ctrl+P, False otherwise
+    """
+
+    kb = KeyBindings()
+
+    @kb.add("c-c")
+    def _(event: KeyPressEvent) -> None:
+        raise KeyboardInterrupt()
+
+    @kb.add("c-p")
+    def _(event: KeyPressEvent) -> None:
+        raise KeyboardInterrupt()
+
+    try:
+        reason = str(
+            prompt(
+                question,
+                style=DEFAULT_STYLE,
+                key_bindings=kb,
+            )
+        )
+        return reason.strip(), False
+    except KeyboardInterrupt:
+        return "", True
