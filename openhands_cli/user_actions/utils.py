@@ -99,19 +99,42 @@ def cli_confirm(
     return int(app.run(in_thread=True))
 
 
-def prompt_user(question: str) -> str:
+def prompt_user(question: str) -> tuple[str, bool]:
     """Prompt user to enter a reason for rejecting actions.
 
     Returns:
-        The reason entered by the user, or empty string if cancelled.
+        Tuple of (reason, should_defer) where:
+        - reason: The reason entered by the user
+        - should_defer: True if user pressed Ctrl+C or Ctrl+P (indicating defer), False otherwise
     """
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.application import get_app
+    
+    # Create custom key bindings to distinguish between Ctrl+C and Ctrl+P
+    kb = KeyBindings()
+    
+    @kb.add('c-c')
+    def _(event):
+        """Handle Ctrl+C - should defer"""
+        event.app.exit(exception=KeyboardInterrupt("defer"))
+    
+    @kb.add('c-p') 
+    def _(event):
+        """Handle Ctrl+P - should defer"""
+        event.app.exit(exception=KeyboardInterrupt("defer"))
+    
     try:
         reason = str(
             prompt(
                 question,
                 style=DEFAULT_STYLE,
+                key_bindings=kb,
             )
         )
-        return reason.strip()
-    except KeyboardInterrupt:
-        return ""
+        return reason.strip(), False
+    except KeyboardInterrupt as e:
+        # Check if this is a defer signal (Ctrl+C or Ctrl+P)
+        if str(e) == "defer":
+            return "", True
+        # For any other KeyboardInterrupt, treat as empty reason (rejection)
+        return "", False
