@@ -116,19 +116,7 @@ def run_cli_entry() -> None:
                 # Resume without new message
                 message = None
 
-            # Send message to agent
-            print_formatted_text(HTML("<green>Agent: </green>"), end="")
-
-            # Check if conversation is paused and resume it for any user input
-            if conversation.state.agent_paused:
-                print_formatted_text(
-                    HTML("<yellow>Resuming paused conversation...</yellow>")
-                )
-
             runner.process_message(message)
-            print_formatted_text(
-                HTML("<green>✓ Agent has processed your request.</green>")
-            )
 
             print()  # Add spacing
 
