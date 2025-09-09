@@ -15,14 +15,7 @@ from PyInstaller.utils.hooks import (
     copy_metadata
 )
 
-# Ensure build-time import resolution prefers the packaged SDK over the monorepo path
-# Needed when running build inside OpenHands conversation (due to nested runtimes)
-_sys_paths_to_remove = [p for p in list(sys.path) if p.startswith('/openhands/code')]
-for _p in _sys_paths_to_remove:
-    try:
-        sys.path.remove(_p)
-    except ValueError:
-        pass
+
 
 # Get the project root directory (current working directory when running PyInstaller)
 project_root = Path.cwd()
