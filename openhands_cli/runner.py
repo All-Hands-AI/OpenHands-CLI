@@ -83,6 +83,7 @@ class ConversationRunner:
                 user_confirmation = self._handle_confirmation_request()
                 if user_confirmation == UserConfirmation.DEFER:
                     return
+
             else:
                 raise Exception("Infinite loop")
 
@@ -90,7 +91,7 @@ class ConversationRunner:
         """Handle confirmation request from user.
 
         Returns:
-            True if user approved actions, False if rejected
+            UserConfirmation indicating the user's choice
         """
         pending_actions = get_unmatched_actions(self.conversation.state.events)
 
@@ -102,6 +103,14 @@ class ConversationRunner:
                 )
             elif user_confirmation == UserConfirmation.DEFER:
                 self.conversation.pause()
+            elif user_confirmation == UserConfirmation.ALWAYS_ACCEPT:
+                # Disable confirmation mode when user selects "Always proceed"
+                print_formatted_text(
+                    HTML(
+                        "<yellow>Confirmation mode disabled. Agent will proceed without asking.</yellow>"
+                    )
+                )
+                self.set_confirmation_mode(False)
 
             return user_confirmation
 
