@@ -3,15 +3,13 @@ MCP (Model Context Protocol) UI functionality for OpenHands CLI.
 Provides interactive configuration and management of MCP settings.
 """
 
-from collections.abc import Generator
-
 from prompt_toolkit import PromptSession, print_formatted_text
-from prompt_toolkit.completion import CompleteEvent, Completer, Completion
-from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
 from openhands_cli.pt_style import get_cli_style
+
+from ..completers import BaseCompleter
 
 DEFAULT_STYLE = get_cli_style()
 
@@ -27,21 +25,16 @@ MCP_OPTIONS = {
 }
 
 
-class MCPOptionCompleter(Completer):
+class MCPOptionCompleter(BaseCompleter):
     """Custom completer for MCP configuration options."""
 
-    def get_completions(
-        self, document: Document, complete_event: CompleteEvent
-    ) -> Generator[Completion, None, None]:
-        text = document.text_before_cursor.strip()
-        for option, description in MCP_OPTIONS.items():
-            if option.startswith(text):
-                yield Completion(
-                    option,
-                    start_position=-len(text),
-                    display_meta=description,
-                    style="bg:ansidarkgray fg:gold",
-                )
+    def __init__(self) -> None:
+        """Initialize with MCP options."""
+        super().__init__(
+            options=MCP_OPTIONS,
+            prefix_filter=None,
+            text_preprocessor=str.strip,
+        )
 
 
 def display_mcp_banner() -> None:

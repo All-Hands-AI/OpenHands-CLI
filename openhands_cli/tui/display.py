@@ -1,48 +1,19 @@
-from collections.abc import Generator
+"""Display functions for the OpenHands CLI TUI."""
 
 from prompt_toolkit import print_formatted_text
-from prompt_toolkit.completion import CompleteEvent, Completer, Completion
-from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
 from openhands_cli import __version__
 from openhands_cli.pt_style import get_cli_style
 
+from .commands import COMMANDS
+
 DEFAULT_STYLE = get_cli_style()
-
-# Available commands with descriptions
-COMMANDS = {
-    "/exit": "Exit the application",
-    "/help": "Display available commands",
-    "/clear": "Clear the screen",
-    "/status": "Display conversation details",
-    "/confirm": "Toggle confirmation mode on/off",
-    "/new": "Create a new conversation",
-    "/resume": "Resume a paused conversation",
-    "/mcp": "Configure MCP (Model Context Protocol) settings",
-}
-
-
-class CommandCompleter(Completer):
-    """Custom completer for commands with interactive dropdown."""
-
-    def get_completions(
-        self, document: Document, complete_event: CompleteEvent
-    ) -> Generator[Completion, None, None]:
-        text = document.text_before_cursor.lstrip()
-        if text.startswith("/"):
-            for command, description in COMMANDS.items():
-                if command.startswith(text):
-                    yield Completion(
-                        command,
-                        start_position=-len(text),
-                        display_meta=description,
-                        style="bg:ansidarkgray fg:gold",
-                    )
 
 
 def display_banner(session_id: str) -> None:
+    """Display the OpenHands CLI banner."""
     print_formatted_text(
         HTML(r"""<gold>
      ___                    _   _                 _
