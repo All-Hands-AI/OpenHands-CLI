@@ -13,6 +13,6 @@ def exit_session_confirmation() -> UserConfirmation:
 
     options_mapping = {
         0: UserConfirmation.ACCEPT,  # User accepts termination session
-        1: UserConfirmation.REJECT,
+        1: UserConfirmation.REJECT,  # User does not terminate session
     }
     return options_mapping.get(index, UserConfirmation.REJECT)
