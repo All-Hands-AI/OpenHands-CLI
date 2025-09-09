@@ -13,6 +13,7 @@ from openhands.sdk import (
 from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
+from openhands_cli.mcp_ui import run_mcp_configuration
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import setup_agent
 from openhands_cli.tui import (
@@ -103,6 +104,10 @@ def run_cli_entry() -> None:
                     HTML("<yellow>Starting new conversation...</yellow>")
                 )
                 session_id = str(uuid.uuid4())[:8]
+                display_welcome(session_id)
+                continue
+            elif command == "/mcp":
+                run_mcp_configuration()
                 display_welcome(session_id)
                 continue
             elif command == "/resume":

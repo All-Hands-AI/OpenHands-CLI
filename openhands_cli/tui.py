@@ -20,6 +20,7 @@ COMMANDS = {
     "/confirm": "Toggle confirmation mode on/off",
     "/new": "Create a new conversation",
     "/resume": "Resume a paused conversation",
+    "/mcp": "Configure MCP (Model Context Protocol) settings",
 }
 
 
