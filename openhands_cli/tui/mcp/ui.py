@@ -3,7 +3,9 @@ MCP (Model Context Protocol) UI functionality for OpenHands CLI.
 Provides interactive configuration and management of MCP settings.
 """
 
-from prompt_toolkit import print_formatted_text
+from typing import cast
+
+from prompt_toolkit import print_formatted_text, prompt
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
@@ -55,18 +57,146 @@ def display_mcp_menu() -> None:
     print_formatted_text("")
 
 
+def _display_server_config_header() -> None:
+    """Display the server configuration header."""
+    print_formatted_text("")
+    print_formatted_text(HTML("<gold>🔧 Add MCP Server</gold>"))
+    print_formatted_text(
+        HTML("<grey>Configure a new Model Context Protocol server</grey>")
+    )
+    print_formatted_text("")
+
+
+def _display_error(message: str) -> None:
+    """Display an error message."""
+    print_formatted_text(HTML(f"<red>✗ {message}</red>"))
+
+
+def _display_warning(message: str) -> None:
+    """Display a warning message."""
+    print_formatted_text(HTML(f"<yellow>⚠ Warning: {message}</yellow>"))
+
+
+def _display_success_message(
+    server_name: str, command: str, args: list[str], env: dict[str, str]
+) -> None:
+    """Display success message with server configuration details."""
+    print_formatted_text("")
+    print_formatted_text(
+        HTML(f"<green>✓ Successfully added MCP server '{server_name}'</green>")
+    )
+    print_formatted_text("")
+    print_formatted_text(HTML("<white>Server configuration:</white>"))
+    print_formatted_text(f"  Name: {server_name}")
+    print_formatted_text(f"  Command: {command}")
+    if args:
+        print_formatted_text(f"  Arguments: {', '.join(args)}")
+    if env:
+        print_formatted_text(
+            f"  Environment: {', '.join(f'{k}={v}' for k, v in env.items())}"
+        )
+    print_formatted_text("")
+    print_formatted_text(
+        HTML("<grey>Note: Restart the agent to load tools from this server</grey>")
+    )
+
+
+def _prompt_server_name() -> str:
+    """Prompt for server name with instructions."""
+    print_formatted_text(HTML("<white>Server name (unique identifier):</white>"))
+    return cast(str, prompt("Name: ", style=DEFAULT_STYLE)).strip()
+
+
+def _prompt_command() -> str:
+    """Prompt for server command with examples."""
+    print_formatted_text("")
+    print_formatted_text(HTML("<white>Command to run the server:</white>"))
+    print_formatted_text(
+        HTML("<grey>Examples: 'uvx', 'python', 'node', '/path/to/executable'</grey>")
+    )
+    return cast(str, prompt("Command: ", style=DEFAULT_STYLE)).strip()
+
+
+def _prompt_arguments() -> list[str]:
+    """Prompt for server arguments and parse them."""
+    print_formatted_text("")
+    print_formatted_text(HTML("<white>Arguments (optional, comma-separated):</white>"))
+    print_formatted_text(
+        HTML("<grey>Examples: 'mcp-server-fetch', '--port 8080', 'server.js'</grey>")
+    )
+    args_input = cast(str, prompt("Arguments: ", style=DEFAULT_STYLE)).strip()
+
+    if not args_input:
+        return []
+
+    return [arg.strip() for arg in args_input.split(",") if arg.strip()]
+
+
+def _prompt_environment() -> dict[str, str]:
+    """Prompt for environment variables and parse them."""
+    print_formatted_text("")
+    print_formatted_text(
+        HTML(
+            "<white>Environment variables (optional, KEY=VALUE format, comma-separated):</white>"
+        )
+    )
+    print_formatted_text(HTML("<grey>Examples: 'API_KEY=secret', 'PORT=8080'</grey>"))
+    env_input = cast(str, prompt("Environment: ", style=DEFAULT_STYLE)).strip()
+
+    if not env_input:
+        return {}
+
+    env = {}
+    try:
+        for env_pair in env_input.split(","):
+            env_pair = env_pair.strip()
+            if "=" in env_pair:
+                key, value = env_pair.split("=", 1)
+                env[key.strip()] = value.strip()
+    except Exception as e:
+        _display_warning(f"Could not parse environment variables: {e}")
+        return {}
+
+    return env
+
+
 def handle_mcp_server_config() -> None:
-    """Handle MCP server configuration (no-op placeholder)."""
-    print_formatted_text("")
-    print_formatted_text(HTML("<yellow>🚧 MCP Server Configuration</yellow>"))
-    print_formatted_text(HTML("<grey>This feature is coming soon...</grey>"))
-    print_formatted_text("")
-    print_formatted_text(HTML("<grey>Future functionality will include:</grey>"))
-    print_formatted_text("  • Add new MCP servers")
-    print_formatted_text("  • Configure server endpoints")
-    print_formatted_text("  • Set authentication credentials")
-    print_formatted_text("  • Define server capabilities")
-    print_formatted_text("")
+    """Handle MCP server configuration - add new MCP servers."""
+    from openhands_cli.mcp import mcp_session
+
+    _display_server_config_header()
+
+    try:
+        # Get server configuration from user
+        server_name = _prompt_server_name()
+        if not server_name:
+            _display_error("Server name cannot be empty")
+            return
+
+        if mcp_session.get_server(server_name):
+            _display_error(f"Server '{server_name}' already exists")
+            return
+
+        command = _prompt_command()
+        if not command:
+            _display_error("Command cannot be empty")
+            return
+
+        args = _prompt_arguments()
+        env = _prompt_environment()
+
+        # Add the server
+        success = mcp_session.add_server(server_name, command, args, env)
+
+        if success:
+            _display_success_message(server_name, command, args, env)
+        else:
+            _display_error(f"Failed to add server '{server_name}'")
+
+    except KeyboardInterrupt:
+        print_formatted_text(HTML("\n<grey>Server configuration cancelled</grey>"))
+    except Exception as e:
+        _display_error(f"Error configuring server: {e}")
 
 
 def handle_server_connections() -> None:
