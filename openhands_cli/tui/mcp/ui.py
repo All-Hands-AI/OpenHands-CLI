@@ -3,17 +3,17 @@ MCP (Model Context Protocol) UI functionality for OpenHands CLI.
 Provides interactive configuration and management of MCP settings.
 """
 
-from prompt_toolkit import PromptSession, print_formatted_text
+from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
 from openhands_cli.pt_style import get_cli_style
-
-from ..completers import BaseCompleter
+from openhands_cli.user_actions import UserConfirmation, ask_mcp_configuration_choice
+from openhands_cli.user_actions.utils import cli_confirm
 
 DEFAULT_STYLE = get_cli_style()
 
-# MCP configuration options
+# MCP configuration options (for display purposes)
 MCP_OPTIONS = {
     "1": "Configure MCP Server",
     "2": "Manage Server Connections",
@@ -23,18 +23,6 @@ MCP_OPTIONS = {
     "6": "Advanced Settings",
     "back": "Return to main menu",
 }
-
-
-class MCPOptionCompleter(BaseCompleter):
-    """Custom completer for MCP configuration options."""
-
-    def __init__(self) -> None:
-        """Initialize with MCP options."""
-        super().__init__(
-            options=MCP_OPTIONS,
-            prefix_filter=None,
-            text_preprocessor=str.strip,
-        )
 
 
 def display_mcp_banner() -> None:
@@ -153,52 +141,47 @@ def handle_advanced_settings() -> None:
 
 def run_mcp_configuration() -> None:
     """Run the interactive MCP configuration interface."""
-    session = PromptSession(completer=MCPOptionCompleter())
-
     while True:
         try:
             display_mcp_menu()
 
-            # Get user choice
-            choice = session.prompt(
-                HTML("<gold>Select option> </gold>"),
-                multiline=False,
-            ).strip()
+            # Get user choice using standardized action pattern
+            confirmation, option_number = ask_mcp_configuration_choice()
 
-            if not choice:
-                continue
+            # Handle user choice based on confirmation result
+            if confirmation == UserConfirmation.DEFER:
+                # User chose to go back or cancelled
+                break
+            elif confirmation == UserConfirmation.ACCEPT:
+                # Handle the selected option (1-based indexing)
+                if option_number == 1:
+                    handle_mcp_server_config()
+                elif option_number == 2:
+                    handle_server_connections()
+                elif option_number == 3:
+                    handle_server_status()
+                elif option_number == 4:
+                    handle_test_connection()
+                elif option_number == 5:
+                    handle_import_export()
+                elif option_number == 6:
+                    handle_advanced_settings()
 
-            # Handle user choice
-            if choice == "1":
-                handle_mcp_server_config()
-            elif choice == "2":
-                handle_server_connections()
-            elif choice == "3":
-                handle_server_status()
-            elif choice == "4":
-                handle_test_connection()
-            elif choice == "5":
-                handle_import_export()
-            elif choice == "6":
-                handle_advanced_settings()
-            elif choice.lower() == "back":
+            # Wait for user to continue using standardized pattern
+            continue_options = ["Continue"]
+            try:
+                cli_confirm(
+                    question="Press Enter to continue...",
+                    choices=continue_options,
+                    initial_selection=0,
+                    escapable=False,
+                )
+            except KeyboardInterrupt:
+                # User pressed Ctrl+C during continue prompt, exit gracefully
                 print_formatted_text(HTML("<grey>Returning to main menu...</grey>"))
                 break
-            else:
-                print_formatted_text("")
-                print_formatted_text(HTML(f"<red>Unknown option: {choice}</red>"))
-                print_formatted_text(
-                    HTML("<grey>Please select a valid option (1-6) or 'back'</grey>")
-                )
-                print_formatted_text("")
-
-            # Wait for user to continue
-            input("\nPress Enter to continue...")
             clear()
 
-        except KeyboardInterrupt:
-            print_formatted_text(HTML("\n<grey>Returning to main menu...</grey>"))
-            break
-        except EOFError:
+        except (KeyboardInterrupt, EOFError):
             print_formatted_text(HTML("\n<grey>Returning to main menu...</grey>"))
             break
