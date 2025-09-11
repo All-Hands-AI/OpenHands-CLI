@@ -20,6 +20,8 @@ from openhands_cli.tui import (
     display_help,
     display_welcome,
 )
+from openhands_cli.tui.commands import COMMANDS
+from openhands_cli.tui.mcp import run_mcp_configuration
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,7 @@ def run_cli_entry() -> None:
     display_welcome(session_id)
 
     # Create prompt session with command completer
-    session = PromptSession(completer=CommandCompleter())
+    session = PromptSession(completer=CommandCompleter(commands=COMMANDS))
 
     # Create conversation runner to handle state machine logic
     runner = ConversationRunner(conversation)
@@ -103,6 +105,10 @@ def run_cli_entry() -> None:
                     HTML("<yellow>Starting new conversation...</yellow>")
                 )
                 session_id = str(uuid.uuid4())[:8]
+                display_welcome(session_id)
+                continue
+            elif command == "/mcp":
+                run_mcp_configuration()
                 display_welcome(session_id)
                 continue
             elif command == "/resume":

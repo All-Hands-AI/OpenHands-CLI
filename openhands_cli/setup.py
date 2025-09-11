@@ -5,6 +5,7 @@ from openhands.sdk import (
     Agent,
     Conversation,
     Tool,
+    create_mcp_tools,
 )
 from openhands.tools import (
     BashExecutor,
@@ -49,6 +50,29 @@ def setup_agent() -> Conversation:
         execute_bash_tool.set_executor(executor=bash),
         str_replace_editor_tool.set_executor(executor=file_editor),
     ]
+
+    # Add MCP tools if configured
+    try:
+        from openhands_cli.mcp import mcp_session
+
+        mcp_config = mcp_session.get_config()
+
+        if mcp_config.get("mcpServers"):
+            mcp_tools = create_mcp_tools(mcp_config, timeout=30)
+            tools.extend(mcp_tools)
+            print_formatted_text(
+                HTML(
+                    f"<green>✓ Loaded {len(mcp_tools)} MCP tools from {mcp_session.server_count()} servers</green>"
+                )
+            )
+            for tool in mcp_tools:
+                print_formatted_text(
+                    HTML(f"  • <cyan>{tool.name}</cyan>: {tool.description}")
+                )
+    except Exception as e:
+        print_formatted_text(
+            HTML(f"<yellow>⚠ Warning: Failed to load MCP tools: {e}</yellow>")
+        )
 
     # Create agent
     agent = Agent(llm=llm, tools=tools)
