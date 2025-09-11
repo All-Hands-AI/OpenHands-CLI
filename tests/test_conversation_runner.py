@@ -46,16 +46,22 @@ class FakeAgent(AgentBase):
             state.agent_finished = True
 
 
+@pytest.fixture()
+def agent() -> FakeAgent:
+    llm = LLM(**default_config(), service_id="test-service")
+    return FakeAgent(llm=llm, tools=[])
+
+
 class TestConversationRunner:
     @pytest.mark.parametrize("paused", [False, True])
-    def test_non_confirmation_mode_runs_once(self, paused: bool) -> None:
+    def test_non_confirmation_mode_runs_once(
+        self, agent: FakeAgent, paused: bool
+    ) -> None:
         """
         1. Confirmation mode is not on
         2. Process message resumes paused conversation or continues running conversation
         """
-        llm = LLM(**default_config(), service_id="test-service")
 
-        agent = FakeAgent(llm=llm, tools=[])
         convo = Conversation(agent)
         convo.max_iteration_per_run = 1
         convo.state.agent_paused = paused
@@ -77,6 +83,7 @@ class TestConversationRunner:
     )
     def test_confirmation_mode_waiting_and_user_decision_controls_run(
         self,
+        agent: FakeAgent,
         confirmation: UserConfirmation,
         agent_paused: bool,
         agent_finished: bool,
@@ -91,9 +98,6 @@ class TestConversationRunner:
 
         """
 
-        llm = LLM(**default_config(), service_id="test-service")
-
-        agent = FakeAgent(llm=llm, tools=[])
         if agent_finished:
             agent.finish_on_step = 1
         convo = Conversation(agent)
@@ -110,15 +114,15 @@ class TestConversationRunner:
         assert agent.step_count == expected_run_calls
         assert convo.state.agent_finished == agent_finished
 
-    def test_confirmation_mode_not_waiting__runs_once_when_finished_true(self) -> None:
+    def test_confirmation_mode_not_waiting__runs_once_when_finished_true(
+        self, agent: FakeAgent
+    ) -> None:
         """
         1. Agent was not waiting
         2. Agent finished without any actions
         3. Conversation should finished without asking user for instructions
         """
-        llm = LLM(**default_config(), service_id="test-service")
-
-        agent = FakeAgent(llm=llm, tools=[], finish_on_step=1)
+        agent.finish_on_step = 1
         convo = Conversation(agent)
         convo.state.agent_paused = True
         convo.state.agent_waiting_for_confirmation = False
