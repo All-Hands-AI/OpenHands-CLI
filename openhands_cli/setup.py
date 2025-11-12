@@ -54,7 +54,8 @@ def setup_conversation(
     Setup the conversation with agent.
 
     Args:
-        conversation_id: conversation ID to use. If not provided, a random UUID will be generated.
+        conversation_id: conversation ID to use. If not provided, a random UUID
+            will be generated.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.

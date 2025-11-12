@@ -149,7 +149,8 @@ def test_resume_command_successful_resume(agent_status):
     # Verify runner was created and process_message was called
     assert mock_runner_cls.call_count == 1
 
-    # Verify process_message was called twice: once with the initial message, once with None for resume
+    # Verify process_message was called twice: once with the initial message,
+    # once with None for resume
     assert runner.process_message.call_count == 2
 
     # Check the calls to process_message

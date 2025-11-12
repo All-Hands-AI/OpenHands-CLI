@@ -1,4 +1,5 @@
-"""Test that first-time settings screen usage creates a default agent and conversation with security analyzer."""
+"""Test that first-time settings screen usage creates a default agent and
+conversation with security analyzer."""
 
 from unittest.mock import patch
 
@@ -10,8 +11,9 @@ from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.user_actions.settings_action import SettingsType
 
 
-def test_first_time_settings_creates_default_agent_and_conversation_with_security_analyzer():
-    """Test that using the settings screen for the first time creates a default agent and conversation with security analyzer."""
+def test_first_time_settings_creates_default_agent_and_conversation_with_security_analyzer():  # noqa: E501
+    """Test that using the settings screen for the first time creates a default
+    agent and conversation with security analyzer."""
 
     # Create a settings screen instance (no conversation initially)
     screen = SettingsScreen(conversation=None)
@@ -60,7 +62,8 @@ def test_first_time_settings_creates_default_agent_and_conversation_with_securit
     api_key_value = saved_agent.llm.api_key.get_secret_value()
     assert api_key_value == "sk-test-key-123", "API key should match the provided value"
 
-    # Test that a conversation can be created with the agent and security analyzer can be set
+    # Test that a conversation can be created with the agent and security
+    # analyzer can be set
     conversation = Conversation(
         agent=saved_agent, workspace=Workspace(working_dir="/tmp")
     )
@@ -74,12 +77,14 @@ def test_first_time_settings_creates_default_agent_and_conversation_with_securit
         "Conversation should have a security analyzer"
     )
     assert conversation.state.security_analyzer.kind == "LLMSecurityAnalyzer", (
-        f"Expected security analyzer kind 'LLMSecurityAnalyzer', got '{conversation.state.security_analyzer.kind}'"
+        f"Expected security analyzer kind 'LLMSecurityAnalyzer', got "
+        f"'{conversation.state.security_analyzer.kind}'"
     )
 
 
 def test_first_time_settings_with_advanced_configuration():
-    """Test that advanced settings also create a default agent and conversation with security analyzer."""
+    """Test that advanced settings also create a default agent and conversation
+    with security analyzer."""
 
     screen = SettingsScreen(conversation=None)
 
@@ -124,7 +129,8 @@ def test_first_time_settings_with_advanced_configuration():
         "Base URL should be set"
     )
 
-    # Test that a conversation can be created with the agent and security analyzer can be set
+    # Test that a conversation can be created with the agent and security
+    # analyzer can be set
     conversation = Conversation(
         agent=saved_agent, workspace=Workspace(working_dir="/tmp")
     )

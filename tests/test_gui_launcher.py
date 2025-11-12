@@ -27,7 +27,8 @@ class TestFormatDockerCommand:
             ),
             (
                 ["docker", "run", "-it", "--rm", "-p", "3000:3000", "openhands:latest"],
-                "<grey>Running Docker command: docker run -it --rm -p 3000:3000 openhands:latest</grey>",
+                "<grey>Running Docker command: docker run -it --rm -p 3000:3000 "
+                "openhands:latest</grey>",
             ),
             ([], "<grey>Running Docker command: </grey>"),
         ],

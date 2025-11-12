@@ -80,13 +80,15 @@ class TestConversationRunner:
     @pytest.mark.parametrize(
         "confirmation, final_status, expected_run_calls",
         [
-            # Case 1: Agent waiting for confirmation; user DEFERS -> early return, no run()
+            # Case 1: Agent waiting for confirmation; user DEFERS -> early return,
+            # no run()
             (
                 UserConfirmation.DEFER,
                 ConversationExecutionStatus.WAITING_FOR_CONFIRMATION,
                 0,
             ),
-            # Case 2: Agent waiting for confirmation; user ACCEPTS -> run() once, break (finished=True)
+            # Case 2: Agent waiting for confirmation; user ACCEPTS -> run() once,
+            # break (finished=True)
             (
                 UserConfirmation.ACCEPT,
                 ConversationExecutionStatus.FINISHED,

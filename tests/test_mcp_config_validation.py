@@ -107,7 +107,8 @@ CASES = [
         ],
         "unexpected": [],
     },
-    # Overriding/updating servers present in both agent and mcp.json (but different config)
+    # Overriding/updating servers present in both agent and mcp.json (but
+    # different config)
     {
         "id": "overriding_servers_on_restart",
         "agent_mcp": {
