@@ -40,7 +40,8 @@ class AgentStore:
 
             # Temporary to remove security analyzer from agent specs
             # Security analyzer is set via conversation API now
-            # Doing this so that deprecation warning is thrown only the first time running CLI
+            # Doing this so that deprecation warning is thrown only the first
+            # time running CLI
             if agent.security_analyzer:
                 agent = agent.model_copy(update={"security_analyzer": None})
                 self.save(agent)

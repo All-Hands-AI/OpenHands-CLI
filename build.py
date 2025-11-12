@@ -53,7 +53,8 @@ def check_pyinstaller() -> bool:
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         print(
-            "❌ PyInstaller is not available. Use --install-pyinstaller flag or install manually with:"
+            "❌ PyInstaller is not available. Use --install-pyinstaller flag or "
+            "install manually with:"
         )
         print("   uv add --dev pyinstaller")
         return False

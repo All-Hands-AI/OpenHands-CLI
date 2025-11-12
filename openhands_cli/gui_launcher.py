@@ -89,7 +89,8 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     Args:
         mount_cwd: If True, mount the current working directory into the container.
-        gpu: If True, enable GPU support by mounting all GPUs into the container via nvidia-docker.
+        gpu: If True, enable GPU support by mounting all GPUs into the
+            container via nvidia-docker.
     """
     print_formatted_text(
         HTML("<ansiblue>🚀 Launching OpenHands GUI server...</ansiblue>")
