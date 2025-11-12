@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from uuid import UUID
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
@@ -6,7 +7,6 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
-from openhands_cli import __version__
 from openhands_cli.pt_style import get_cli_style
 
 DEFAULT_STYLE = get_cli_style()
@@ -16,10 +16,12 @@ COMMANDS = {
     "/exit": "Exit the application",
     "/help": "Display available commands",
     "/clear": "Clear the screen",
+    "/new": "Start a fresh conversation",
     "/status": "Display conversation details",
     "/confirm": "Toggle confirmation mode on/off",
-    "/new": "Create a new conversation",
     "/resume": "Resume a paused conversation",
+    "/settings": "Display and modify current settings",
+    "/mcp": "View MCP (Model Context Protocol) server configuration",
 }
 
 
@@ -41,7 +43,7 @@ class CommandCompleter(Completer):
                     )
 
 
-def display_banner(session_id: str) -> None:
+def display_banner(conversation_id: str, resume: bool = False) -> None:
     print_formatted_text(
         HTML(r"""<gold>
      ___                    _   _                 _
@@ -54,10 +56,15 @@ def display_banner(session_id: str) -> None:
         style=DEFAULT_STYLE,
     )
 
-    print_formatted_text(HTML(f"<grey>OpenHands CLI v{__version__}</grey>"))
-
     print_formatted_text("")
-    print_formatted_text(HTML(f"<grey>Initialized conversation {session_id}</grey>"))
+    if not resume:
+        print_formatted_text(
+            HTML(f"<grey>Initialized conversation {conversation_id}</grey>")
+        )
+    else:
+        print_formatted_text(
+            HTML(f"<grey>Resumed conversation {conversation_id}</grey>")
+        )
     print_formatted_text("")
 
 
@@ -79,10 +86,10 @@ def display_help() -> None:
     print_formatted_text("")
 
 
-def display_welcome(session_id: str = "chat") -> None:
+def display_welcome(conversation_id: UUID, resume: bool = False) -> None:
     """Display welcome message."""
     clear()
-    display_banner(session_id)
+    display_banner(str(conversation_id), resume)
     print_formatted_text(HTML("<gold>Let's start building!</gold>"))
     print_formatted_text(
         HTML(

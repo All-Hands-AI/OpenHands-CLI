@@ -1,61 +1,87 @@
-import os
+import uuid
 
-from openhands.sdk import (
-    LLM,
-    Agent,
-    Conversation,
-    Tool,
+from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
 )
-from openhands.tools import (
-    BashExecutor,
-    FileEditorExecutor,
-    execute_bash_tool,
-    str_replace_editor_tool,
-)
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+
+# register tools
 from prompt_toolkit import HTML, print_formatted_text
-from pydantic import SecretStr
+
+from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.tui.settings.settings_screen import SettingsScreen
+from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.tui.visualizer import CLIVisualizer
 
 
-def setup_agent() -> Conversation:
-    """
-    Setup the agent with environment variables.
-    """
-    # Get API configuration from environment
-    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
-    base_url = os.getenv("LITELLM_BASE_URL")
+class MissingAgentSpec(Exception):
+    """Raised when agent specification is not found or invalid."""
 
-    if not api_key:
-        print_formatted_text(
-            HTML(
-                "<red>Error: No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable.</red>"
-            )
+    pass
+
+
+def load_agent_specs(
+    conversation_id: str | None = None,
+) -> Agent:
+    agent_store = AgentStore()
+    agent = agent_store.load(session_id=conversation_id)
+    if not agent:
+        raise MissingAgentSpec(
+            "Agent specification not found. Please configure your agent settings."
         )
-        raise Exception(
-            "No API key found. Please set LITELLM_API_KEY or OPENAI_API_KEY environment variable."
-        )
+    return agent
 
-    llm = LLM(
-        model=model,
-        api_key=SecretStr(api_key) if api_key else None,
-        base_url=base_url,
+
+def verify_agent_exists_or_setup_agent() -> Agent:
+    """Verify agent specs exists by attempting to load it."""
+    settings_screen = SettingsScreen()
+    try:
+        agent = load_agent_specs()
+        return agent
+    except MissingAgentSpec:
+        # For first-time users, show the full settings flow with choice between basic/advanced
+        settings_screen.configure_settings(first_time=True)
+
+    # Try once again after settings setup attempt
+    return load_agent_specs()
+
+
+def setup_conversation(
+    conversation_id: uuid, include_security_analyzer: bool = True
+) -> BaseConversation:
+    """
+    Setup the conversation with agent.
+
+    Args:
+        conversation_id: conversation ID to use. If not provided, a random UUID will be generated.
+
+    Raises:
+        MissingAgentSpec: If agent specification is not found or invalid.
+    """
+
+    print_formatted_text(HTML("<white>Initializing agent...</white>"))
+
+    agent = load_agent_specs(str(conversation_id))
+
+    # Create conversation - agent context is now set in AgentStore.load()
+    conversation: BaseConversation = Conversation(
+        agent=agent,
+        workspace=Workspace(working_dir=WORK_DIR),
+        # Conversation will add /<conversation_id> to this path
+        persistence_dir=CONVERSATIONS_DIR,
+        conversation_id=conversation_id,
+        visualizer=CLIVisualizer,
     )
 
-    # Setup tools
-    cwd = os.getcwd()
-    bash = BashExecutor(working_dir=cwd)
-    file_editor = FileEditorExecutor()
-    tools: list[Tool] = [
-        execute_bash_tool.set_executor(executor=bash),
-        str_replace_editor_tool.set_executor(executor=file_editor),
-    ]
-
-    # Create agent
-    agent = Agent(llm=llm, tools=tools)
-
-    conversation = Conversation(agent=agent)
+    # Security analyzer is set though conversation API now
+    if not include_security_analyzer:
+        conversation.set_security_analyzer(None)
+    else:
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(AlwaysConfirm())
 
     print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {model}</green>")
+        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
     )
     return conversation
