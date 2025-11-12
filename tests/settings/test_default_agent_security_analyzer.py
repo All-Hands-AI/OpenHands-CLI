@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from openhands.sdk import Conversation, Workspace
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from pydantic import SecretStr
 
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.user_actions.settings_action import SettingsType
@@ -53,11 +54,10 @@ def test_first_time_settings_creates_default_agent_and_conversation_with_securit
     assert saved_agent.llm.model == "openai/gpt-4o-mini", (
         f"Expected model 'openai/gpt-4o-mini', got '{saved_agent.llm.model}'"
     )
-    api_key_value = (
-        saved_agent.llm.api_key.get_secret_value()
-        if hasattr(saved_agent.llm.api_key, "get_secret_value")
-        else saved_agent.llm.api_key
-    )
+
+    assert isinstance(saved_agent.llm.api_key, SecretStr)
+
+    api_key_value = saved_agent.llm.api_key.get_secret_value()
     assert api_key_value == "sk-test-key-123", "API key should match the provided value"
 
     # Test that a conversation can be created with the agent and security analyzer can be set

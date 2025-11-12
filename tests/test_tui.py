@@ -35,11 +35,7 @@ class TestCommandCompleter:
         # display_meta is a FormattedText object, so we need to check its content
         # Extract the text from FormattedText
         meta_text = completions[0].display_meta
-        if hasattr(meta_text, "_formatted_text"):
-            # Extract text from FormattedText
-            text_content = "".join([item[1] for item in meta_text._formatted_text])
-        else:
-            text_content = str(meta_text)
+        text_content = str(meta_text)
         assert COMMANDS["/exit"] in text_content
 
     def test_command_completion_no_slash(self) -> None:

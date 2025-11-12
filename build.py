@@ -138,6 +138,7 @@ def test_executable(dummy_agent) -> bool:
             print("❌ Executable not found!")
             return False
 
+    proc = None
     try:
         if os.name != "nt":
             os.chmod(exe_path, 0o755)
@@ -210,17 +211,19 @@ def test_executable(dummy_agent) -> bool:
 
     except subprocess.TimeoutExpired:
         print("❌ Executable test timed out")
-        try:
-            proc.kill()
-        except Exception:
-            pass
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
         return False
     except Exception as e:
         print(f"❌ Error testing executable: {e}")
-        try:
-            proc.kill()
-        except Exception:
-            pass
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
         return False
 
 

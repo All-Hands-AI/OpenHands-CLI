@@ -223,7 +223,9 @@ def test_event_base_fallback_visualize():
     conv_viz = CLIVisualizer()
     panel = conv_viz._create_event_panel(event)
 
-    assert panel.title is not None and "UNKNOWN Event" in str(panel.title)
+    assert panel
+    assert panel.title is not None
+    assert "UNKNOWN Event" in str(panel.title)
 
 
 def test_visualizer_does_not_render_system_prompt():

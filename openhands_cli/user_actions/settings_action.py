@@ -98,9 +98,14 @@ def choose_llm_model(step_counter: StepCounter, provider: str, escapable=True) -
 def prompt_api_key(
     step_counter: StepCounter,
     provider: str,
-    existing_api_key: SecretStr | None = None,
+    existing_api_key: str | SecretStr | None = None,
     escapable=True,
 ) -> str:
+    api_key: str | None = (
+        existing_api_key.get_secret_value()
+        if isinstance(existing_api_key, SecretStr)
+        else existing_api_key
+    )
     helper_text = (
         "\nYou can find your OpenHands LLM API Key in the API Keys tab of OpenHands Cloud: "
         "https://app.all-hands.dev/settings/api-keys\n"
@@ -108,8 +113,8 @@ def prompt_api_key(
         else ""
     )
 
-    if existing_api_key:
-        masked_key = existing_api_key.get_secret_value()[:3] + "***"
+    if api_key:
+        masked_key = api_key[:3] + "***"
         question = f"Enter API Key [{masked_key}] (CTRL-c to cancel, ENTER to keep current, type new to change): "
         # For existing keys, allow empty input to keep current key
         validator = None
@@ -124,8 +129,8 @@ def prompt_api_key(
     )
 
     # If user pressed ENTER with existing key (empty input), return the existing key
-    if existing_api_key and not user_input.strip():
-        return existing_api_key.get_secret_value()
+    if api_key and not user_input.strip():
+        return api_key
 
     return user_input
 
@@ -164,4 +169,4 @@ def save_settings_confirmation() -> bool:
     if options[index] == discard:
         raise KeyboardInterrupt
 
-    return options[index]
+    return True
