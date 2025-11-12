@@ -60,7 +60,7 @@ def check_pyinstaller() -> bool:
 
 
 def build_executable(
-    spec_file: str = "openhands.spec",
+    spec_file: str = "openhands-cli.spec",
     clean: bool = True,
 ) -> bool:
     """Build the executable using PyInstaller."""
@@ -231,7 +231,7 @@ def main() -> int:
     """Main function."""
     parser = argparse.ArgumentParser(description="Build OpenHands CLI executable")
     parser.add_argument(
-        "--spec", default="openhands.spec", help="PyInstaller spec file to use"
+        "--spec", default="openhands-cli.spec", help="PyInstaller spec file to use"
     )
     parser.add_argument(
         "--no-clean", action="store_true", help="Skip cleaning build directories"
