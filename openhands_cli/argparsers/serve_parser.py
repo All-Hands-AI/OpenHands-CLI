@@ -23,7 +23,8 @@ def add_serve_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
     )
     serve_parser.add_argument(
         "--gpu",
-        help="Enable GPU support by mounting all GPUs into the Docker container via nvidia-docker",
+        help="Enable GPU support by mounting all GPUs into the Docker "
+        "container via nvidia-docker",
         action="store_true",
         default=False,
     )

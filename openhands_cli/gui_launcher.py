@@ -187,7 +187,9 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
         # Print the folder that will be mounted to inform the user
         print_formatted_text(
             HTML(
-                f"<ansigreen>📂 Mounting current directory:</ansigreen> <ansiyellow>{cwd}</ansiyellow> <ansigreen>to</ansigreen> <ansiyellow>/workspace</ansiyellow>"
+                f"<ansigreen>📂 Mounting current directory:</ansigreen> "
+                f"<ansiyellow>{cwd}</ansiyellow> <ansigreen>to</ansigreen> "
+                f"<ansiyellow>/workspace</ansiyellow>"
             )
         )
 

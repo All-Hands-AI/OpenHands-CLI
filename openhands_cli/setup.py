@@ -39,7 +39,8 @@ def verify_agent_exists_or_setup_agent() -> Agent:
         agent = load_agent_specs()
         return agent
     except MissingAgentSpec:
-        # For first-time users, show the full settings flow with choice between basic/advanced
+        # For first-time users, show the full settings flow with choice
+        # between basic/advanced
         settings_screen.configure_settings(first_time=True)
 
     # Try once again after settings setup attempt
