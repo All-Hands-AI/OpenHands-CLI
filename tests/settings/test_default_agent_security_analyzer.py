@@ -53,9 +53,12 @@ def test_first_time_settings_creates_default_agent_and_conversation_with_securit
     assert saved_agent.llm.model == "openai/gpt-4o-mini", (
         f"Expected model 'openai/gpt-4o-mini', got '{saved_agent.llm.model}'"
     )
-    assert saved_agent.llm.api_key.get_secret_value() == "sk-test-key-123", (
-        "API key should match the provided value"
+    api_key_value = (
+        saved_agent.llm.api_key.get_secret_value()
+        if hasattr(saved_agent.llm.api_key, "get_secret_value")
+        else saved_agent.llm.api_key
     )
+    assert api_key_value == "sk-test-key-123", "API key should match the provided value"
 
     # Test that a conversation can be created with the agent and security analyzer can be set
     conversation = Conversation(

@@ -161,6 +161,8 @@ def test_executable(dummy_agent) -> bool:
         while time.time() < deadline:
             if proc.poll() is not None:
                 break
+            if proc.stdout is None:
+                break
             rlist, _, _ = select.select([proc.stdout], [], [], 0.2)
             if not rlist:
                 continue

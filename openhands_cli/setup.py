@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.security.confirmation_policy import (
@@ -48,7 +48,7 @@ def verify_agent_exists_or_setup_agent() -> Agent:
 
 
 def setup_conversation(
-    conversation_id: uuid, include_security_analyzer: bool = True
+    conversation_id: UUID, include_security_analyzer: bool = True
 ) -> BaseConversation:
     """
     Setup the conversation with agent.

@@ -15,10 +15,10 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
     NeverConfirm,
-    SecurityRisk,
 )
+from openhands.sdk.security.risk import SecurityRisk
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import MissingAgentSpec, setup_conversation

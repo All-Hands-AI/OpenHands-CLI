@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands_cli.user_actions.utils import get_session_prompter
 from tests.utils import _send_keys

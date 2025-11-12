@@ -123,7 +123,7 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
                 exit_confirmation = exit_session_confirmation()
                 if exit_confirmation == UserConfirmation.ACCEPT:
                     print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-                    _print_exit_hint(conversation_id)
+                    _print_exit_hint(str(conversation_id))
                     break
 
             elif command == "/settings":
@@ -164,14 +164,22 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
                 continue
 
             elif command == "/status":
-                display_status(conversation, session_start_time=session_start_time)
+                if conversation is not None:
+                    display_status(conversation, session_start_time=session_start_time)
+                else:
+                    print_formatted_text(
+                        HTML("<yellow>No active conversation</yellow>")
+                    )
                 continue
 
             elif command == "/confirm":
-                runner.toggle_confirmation_mode()
-                new_status = (
-                    "enabled" if runner.is_confirmation_mode_active else "disabled"
-                )
+                if runner is not None:
+                    runner.toggle_confirmation_mode()
+                    new_status = (
+                        "enabled" if runner.is_confirmation_mode_active else "disabled"
+                    )
+                else:
+                    new_status = "disabled (no active conversation)"
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                 )
@@ -210,7 +218,7 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
             exit_confirmation = exit_session_confirmation()
             if exit_confirmation == UserConfirmation.ACCEPT:
                 print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-                _print_exit_hint(conversation_id)
+                _print_exit_hint(str(conversation_id))
                 break
 
     # Clean up terminal state

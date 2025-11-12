@@ -34,7 +34,7 @@ def settings_type_confirmation(first_time: bool = False) -> SettingsType:
 
     options_map = {0: SettingsType.BASIC, 1: SettingsType.ADVANCED}
 
-    return options_map.get(index)
+    return options_map.get(index, SettingsType.BASIC)
 
 
 def choose_llm_provider(step_counter: StepCounter, escapable=True) -> str:

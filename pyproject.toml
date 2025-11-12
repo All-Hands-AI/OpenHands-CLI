@@ -102,6 +102,18 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 
+[tool.pyright]
+include = [
+    "openhands_cli",
+    "tests",
+    "hooks"
+]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+useLibraryCodeForTypes = true
+typeCheckingMode = "standard"
+
 # UNCOMMENT TO USE EXACT COMMIT FROM AGENT-SDK
 
 # [tool.uv.sources]

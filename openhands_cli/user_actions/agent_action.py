@@ -3,8 +3,8 @@ import html
 from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
-    SecurityRisk,
 )
+from openhands.sdk.security.risk import SecurityRisk
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation

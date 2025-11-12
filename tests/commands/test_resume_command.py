@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands_cli.user_actions import UserConfirmation
 
