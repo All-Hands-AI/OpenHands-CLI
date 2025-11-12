@@ -1,39 +1,40 @@
+---
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-        args: ["--allow-multiple-documents"]
-      - id: debug-statements
-
-  - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.5.1
-    hooks:
-      - id: pyproject-fmt
-
-  - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
-    hooks:
-      - id: validate-pyproject
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.11.8
-    hooks:
-      # Run the linter.
-      - id: ruff
-        types_or: [python, pyi, jupyter]
-        args: [--fix, --unsafe-fixes]
-      # Run the formatter.
-      - id: ruff-format
-        types_or: [python, pyi, jupyter]
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          [types-requests, types-setuptools, types-pyyaml, types-toml, pydantic]
-        args: [--ignore-missing-imports]
+    - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+      rev: 0.2.1 # or other specific tag
+      hooks:
+          - id: yamlfmt
+    - repo: local
+      hooks:
+          - id: ruff-format
+            name: Ruff format
+            entry: uv
+            args: [run, ruff, format]
+            language: system
+            types: [python]
+            pass_filenames: true
+            always_run: false
+          - id: ruff-check
+            name: Ruff lint
+            entry: uv
+            args: [run, ruff, check, --fix, --exit-non-zero-on-fix]
+            language: system
+            types: [python]
+            pass_filenames: true
+            always_run: false
+          - id: pycodestyle
+            name: PEP8 style check (pycodestyle)
+            entry: uv
+            args: [run, pycodestyle, --max-line-length=88, '--ignore=E203,E501,W503,E704']
+            language: system
+            types: [python]
+            pass_filenames: true
+            always_run: false
+          - id: pyright
+            name: Type check with pyright
+            entry: uv
+            args: [run, pyright]
+            language: system
+            types: [python]
+            pass_filenames: true
+            always_run: false
