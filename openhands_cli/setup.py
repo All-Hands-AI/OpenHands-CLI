@@ -1,6 +1,16 @@
 from uuid import UUID
 
-# register tools
+# Register tools on import
+from openhands.tools.file_editor import FileEditorTool
+from openhands.tools.task_tracker import TaskTrackerTool
+from openhands.tools.terminal import TerminalTool
+
+
+# Hack to prevent lint complaints for unused imports
+FileEditorTool.name
+TerminalTool.name
+TaskTrackerTool.name
+
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
