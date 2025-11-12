@@ -97,6 +97,7 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
 
     # Create conversation runner to handle state machine logic
     runner = None
+    conversation = None
     session = get_session_prompter()
 
     # Main chat loop

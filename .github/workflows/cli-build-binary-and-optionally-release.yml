@@ -6,12 +6,11 @@ name: CLI - Build binary and optionally release
 on:
     push:
         branches:
-            - main
+            branches: [main]
         tags:
             - '*-cli'
     pull_request:
-        paths:
-            - openhands-cli/**
+        branches: ['**']
 
 permissions:
     contents: write     # needed to create releases or upload assets
