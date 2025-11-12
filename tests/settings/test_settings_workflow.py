@@ -82,7 +82,8 @@ def test_first_time_setup_workflow(tmp_path: Path):
         # The workflow should complete without errors
         screen.configure_settings()
 
-    # Since the current implementation doesn't save to file, we just verify the workflow completed  # noqa: E501
+    # Since the current implementation doesn't save to file, we just verify the
+    # workflow completed
     assert True  # If we get here, the workflow completed successfully
 
 
@@ -117,7 +118,8 @@ def test_update_existing_settings_workflow(tmp_path: Path):
         # The workflow should complete without errors
         screen.configure_settings()
 
-    # Since the current implementation doesn't save to file, we just verify the workflow completed  # noqa: E501
+    # Since the current implementation doesn't save to file, we just verify the
+    # workflow completed
     assert True  # If we get here, the workflow completed successfully
 
 

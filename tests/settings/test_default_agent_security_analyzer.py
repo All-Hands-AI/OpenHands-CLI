@@ -11,7 +11,7 @@ from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.user_actions.settings_action import SettingsType
 
 
-def test_first_time_settings_creates_default_agent_and_conversation_with_security_analyzer():  # noqa: E501
+def test_first_time_settings_creates_default_agent_with_security_analyzer():
     """Test that using the settings screen for the first time creates a default
     agent and conversation with security analyzer."""
 
