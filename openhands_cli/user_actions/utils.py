@@ -23,11 +23,11 @@ def build_keybindings(
     kb = KeyBindings()
 
     @kb.add("up")
-    def _handle_up(event: KeyPressEvent) -> None:
+    def _handle_up(event: KeyPressEvent) -> None:  # noqa: ARG001
         selected[0] = (selected[0] - 1) % len(choices)
 
     @kb.add("down")
-    def _handle_down(event: KeyPressEvent) -> None:
+    def _handle_down(event: KeyPressEvent) -> None:  # noqa: ARG001
         selected[0] = (selected[0] + 1) % len(choices)
 
     @kb.add("enter")
@@ -175,14 +175,15 @@ def get_session_prompter(
     session = PromptSession(
         completer=CommandCompleter(),
         key_bindings=bindings,
-        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",
+        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",  # noqa: ARG005
         multiline=True,
         input=input,
         output=output,
         style=DEFAULT_STYLE,
         placeholder=HTML(
             "<placeholder>"
-            "Type your message… (tip: press <b>\\</b> + <b>Enter</b> to insert a newline)"
+            "Type your message… (tip: press <b>\\</b> + <b>Enter</b> to insert "
+            "a newline)"
             "</placeholder>"
         ),
     )

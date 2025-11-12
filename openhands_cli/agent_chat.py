@@ -8,14 +8,14 @@ import sys
 import uuid
 from datetime import datetime
 
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import HTML
+
 from openhands.sdk import (
     Message,
     TextContent,
 )
 from openhands.sdk.conversation.state import ConversationExecutionStatus
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import (
     MissingAgentSpec,
@@ -76,7 +76,8 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
         except ValueError:
             print_formatted_text(
                 HTML(
-                    f"<yellow>Warning: '{resume_conversation_id}' is not a valid UUID.</yellow>"
+                    f"<yellow>Warning: '{resume_conversation_id}' is not a valid "
+                    f"UUID.</yellow>"
                 )
             )
             return

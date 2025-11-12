@@ -1,3 +1,5 @@
+from prompt_toolkit import HTML, print_formatted_text
+
 from openhands.sdk import BaseConversation, Message
 from openhands.sdk.conversation.state import (
     ConversationExecutionStatus,
@@ -9,8 +11,6 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
-from prompt_toolkit import HTML, print_formatted_text
-
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 from openhands_cli.setup import setup_conversation
 from openhands_cli.user_actions import ask_user_confirmation
@@ -38,7 +38,8 @@ class ConversationRunner:
             # Enable confirmation mode: set AlwaysConfirm policy
             self.set_confirmation_policy(AlwaysConfirm())
         else:
-            # Disable confirmation mode: set NeverConfirm policy and remove security analyzer
+            # Disable confirmation mode: set NeverConfirm policy and remove
+            # security analyzer
             self.set_confirmation_policy(NeverConfirm())
 
     def set_confirmation_policy(
@@ -58,14 +59,16 @@ class ConversationRunner:
         ):
             print_formatted_text(
                 HTML(
-                    "<yellow>Resuming paused conversation...</yellow><grey> (Press Ctrl-P to pause)</grey>"
+                    "<yellow>Resuming paused conversation...</yellow>"
+                    "<grey> (Press Ctrl-P to pause)</grey>"
                 )
             )
 
         else:
             print_formatted_text(
                 HTML(
-                    "<yellow>Agent running...</yellow><grey> (Press Ctrl-P to pause)</grey>"
+                    "<yellow>Agent running...</yellow>"
+                    "<grey> (Press Ctrl-P to pause)</grey>"
                 )
             )
         print_formatted_text("")
@@ -160,7 +163,8 @@ class ConversationRunner:
         if isinstance(policy_change, NeverConfirm):
             print_formatted_text(
                 HTML(
-                    "<yellow>Confirmation mode disabled. Agent will proceed without asking.</yellow>"
+                    "<yellow>Confirmation mode disabled. Agent will proceed "
+                    "without asking.</yellow>"
                 )
             )
 
@@ -172,7 +176,8 @@ class ConversationRunner:
             print_formatted_text(
                 HTML(
                     "<yellow>Security-based confirmation enabled. "
-                    "LOW/MEDIUM risk actions will auto-confirm, HIGH risk actions will ask for confirmation.</yellow>"
+                    "LOW/MEDIUM risk actions will auto-confirm, HIGH risk actions "
+                    "will ask for confirmation.</yellow>"
                 )
             )
 

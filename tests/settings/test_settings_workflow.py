@@ -3,9 +3,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openhands.sdk import LLM, Conversation, LocalFileStore
 from pydantic import SecretStr
 
+from openhands.sdk import LLM, Conversation, LocalFileStore
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.user_actions.settings_action import SettingsType
@@ -82,7 +82,8 @@ def test_first_time_setup_workflow(tmp_path: Path):
         # The workflow should complete without errors
         screen.configure_settings()
 
-    # Since the current implementation doesn't save to file, we just verify the workflow completed
+    # Since the current implementation doesn't save to file, we just verify the
+    # workflow completed
     assert True  # If we get here, the workflow completed successfully
 
 
@@ -117,12 +118,14 @@ def test_update_existing_settings_workflow(tmp_path: Path):
         # The workflow should complete without errors
         screen.configure_settings()
 
-    # Since the current implementation doesn't save to file, we just verify the workflow completed
+    # Since the current implementation doesn't save to file, we just verify the
+    # workflow completed
     assert True  # If we get here, the workflow completed successfully
 
 
 def test_all_llms_in_agent_are_updated():
-    """Test that modifying LLM settings creates multiple LLMs with same API key but different usage_ids."""
+    """Test that modifying LLM settings creates multiple LLMs with same API key
+    but different usage_ids."""
     # Create a screen with existing agent settings
     screen = SettingsScreen(conversation=None)
     initial_llm = LLM(

@@ -5,9 +5,10 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import pytest
-from openhands.sdk.llm.utils.metrics import Metrics, TokenUsage
 
+from openhands.sdk.llm.utils.metrics import Metrics, TokenUsage
 from openhands_cli.tui.status import display_status
+
 
 # ---------- Fixtures & helpers ----------
 

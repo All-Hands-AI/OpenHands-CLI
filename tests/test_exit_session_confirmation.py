@@ -19,6 +19,7 @@ from openhands_cli.user_actions import (
 from openhands_cli.user_actions.types import UserConfirmation
 from tests.utils import _send_keys
 
+
 QUESTION = "Terminate session?"
 OPTIONS = ["Yes, proceed", "No, dismiss"]
 

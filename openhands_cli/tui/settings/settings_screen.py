@@ -1,10 +1,10 @@
 import os
 
-from openhands.sdk import LLM, BaseConversation, LLMSummarizingCondenser, LocalFileStore
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import print_container
 from prompt_toolkit.widgets import Frame, TextArea
 
+from openhands.sdk import LLM, BaseConversation, LLMSummarizingCondenser, LocalFileStore
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.pt_style import COLOR_GREY
 from openhands_cli.tui.settings.store import AgentStore
@@ -100,7 +100,8 @@ class SettingsScreen:
 
         # Construct the summary text with aligned columns
         settings_lines = [
-            f"{label + ':':<{max_label_width + 1}} {value:<}"  # Changed value alignment to left (<)
+            f"{label + ':':<{max_label_width + 1}} {value:<}"  # Changed value
+            # alignment to left (<)
             for label, value in str_labels_and_values
         ]
         settings_text = "\n".join(settings_lines)

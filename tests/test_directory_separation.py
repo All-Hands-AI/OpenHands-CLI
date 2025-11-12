@@ -4,7 +4,6 @@ import os
 from unittest.mock import MagicMock, patch
 
 from openhands.sdk import LLM, Agent, Tool
-
 from openhands_cli.locations import PERSISTENCE_DIR, WORK_DIR
 from openhands_cli.tui.settings.store import AgentStore
 
@@ -34,7 +33,8 @@ class TestToolFix:
     """Test that tool specs are replaced with default tools using current directory."""
 
     def test_tools_replaced_with_default_tools_on_load(self):
-        """Test that entire tools list is replaced with default tools when loading agent."""
+        """Test that entire tools list is replaced with default tools when loading
+        agent."""
         # Create a mock agent with different tools and working directories
         mock_agent = Agent(
             llm=LLM(model="test/model", api_key="test-key", usage_id="test-service"),

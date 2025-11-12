@@ -13,6 +13,7 @@ from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 
+
 debug_env = os.getenv("DEBUG", "false").lower()
 if debug_env != "1" and debug_env != "true":
     logging.disable(logging.WARNING)

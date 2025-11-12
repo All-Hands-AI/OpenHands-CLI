@@ -10,6 +10,9 @@ from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from prompt_toolkit.input.defaults import create_pipe_input
+from prompt_toolkit.output.base import DummyOutput
+
 from openhands.sdk import Action
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -17,9 +20,6 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.base import DummyOutput
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import MissingAgentSpec, setup_conversation
 from openhands_cli.user_actions import agent_action, ask_user_confirmation, utils
@@ -75,7 +75,8 @@ class TestConfirmationMode:
                 )
 
     def test_setup_conversation_raises_missing_agent_spec(self) -> None:
-        """Test that setup_conversation raises MissingAgentSpec when agent is not found."""
+        """Test that setup_conversation raises MissingAgentSpec when agent is not
+        found."""
         with (
             patch("openhands_cli.setup.AgentStore") as mock_agent_store_class,
         ):
@@ -151,7 +152,8 @@ class TestConfirmationMode:
     def test_ask_user_confirmation_no(
         self, mock_cli_confirm: Any, mock_cli_text_input: Any
     ) -> None:
-        """Test that ask_user_confirmation returns REJECT when user selects reject without reason."""
+        """Test that ask_user_confirmation returns REJECT when user selects reject
+        without reason."""
         mock_cli_confirm.return_value = 1  # Second option (Reject)
         mock_cli_text_input.return_value = ""  # Empty reason (reject without reason)
 
@@ -291,7 +293,8 @@ class TestConfirmationMode:
     def test_ask_user_confirmation_no_with_reason(
         self, mock_cli_confirm: Any, mock_cli_text_input: Any
     ) -> None:
-        """Test that ask_user_confirmation returns REJECT when user selects 'Reject' and provides a reason."""
+        """Test that ask_user_confirmation returns REJECT when user selects 'Reject'
+        and provides a reason."""
         mock_cli_confirm.return_value = 1  # Second option (Reject)
         mock_cli_text_input.return_value = "This action is too risky"
 
@@ -313,7 +316,8 @@ class TestConfirmationMode:
     def test_ask_user_confirmation_no_with_reason_cancelled(
         self, mock_cli_confirm: Any, mock_cli_text_input: Any
     ) -> None:
-        """Test that ask_user_confirmation falls back to DEFER when reason input is cancelled."""
+        """Test that ask_user_confirmation falls back to DEFER when reason input is
+        cancelled."""
         mock_cli_confirm.return_value = 1  # Second option (Reject)
         mock_cli_text_input.side_effect = (
             KeyboardInterrupt()
@@ -401,7 +405,8 @@ class TestConfirmationMode:
 
     @patch("openhands_cli.user_actions.agent_action.cli_confirm")
     def test_ask_user_confirmation_always_accept(self, mock_cli_confirm: Any) -> None:
-        """Test that ask_user_confirmation returns ACCEPT with NeverConfirm policy when user selects third option."""
+        """Test that ask_user_confirmation returns ACCEPT with NeverConfirm policy
+        when user selects third option."""
         mock_cli_confirm.return_value = 2  # Third option (Always proceed)
 
         mock_action = MagicMock()
@@ -415,7 +420,8 @@ class TestConfirmationMode:
         assert isinstance(result.policy_change, NeverConfirm)
 
     def test_conversation_runner_handles_always_accept(self) -> None:
-        """Test that ConversationRunner disables confirmation mode when NeverConfirm policy is returned."""
+        """Test that ConversationRunner disables confirmation mode when NeverConfirm
+        policy is returned."""
         mock_conversation = MagicMock()
         mock_conversation.confirmation_policy_active = True
         mock_conversation.is_confirmation_mode_active = True
@@ -456,11 +462,13 @@ class TestConfirmationMode:
 
                         # Verify that confirmation mode was disabled
                         assert result == UserConfirmation.ACCEPT
-                        # Should have called setup_conversation to toggle confirmation mode
+                        # Should have called setup_conversation to toggle confirmation
+                        # mode
                         mock_setup.assert_called_once_with(
                             mock_conversation.id, include_security_analyzer=False
                         )
-                        # Should have called set_confirmation_policy with NeverConfirm on new conversation
+                        # Should have called set_confirmation_policy with NeverConfirm
+                        # on new conversation
                         new_mock_conversation.set_confirmation_policy.assert_called_with(
                             NeverConfirm()
                         )
@@ -469,7 +477,8 @@ class TestConfirmationMode:
     def test_ask_user_confirmation_auto_confirm_safe(
         self, mock_cli_confirm: Any
     ) -> None:
-        """Test that ask_user_confirmation returns ACCEPT with policy_change when user selects fourth option."""
+        """Test that ask_user_confirmation returns ACCEPT with policy_change when
+        user selects fourth option."""
         mock_cli_confirm.return_value = (
             3  # Fourth option (Auto-confirm LOW/MEDIUM, ask for HIGH)
         )
@@ -487,7 +496,8 @@ class TestConfirmationMode:
         assert result.policy_change.threshold == SecurityRisk.HIGH
 
     def test_conversation_runner_handles_auto_confirm_safe(self) -> None:
-        """Test that ConversationRunner sets ConfirmRisky policy when policy_change is provided."""
+        """Test that ConversationRunner sets ConfirmRisky policy when policy_change
+        is provided."""
         mock_conversation = MagicMock()
         mock_conversation.confirmation_policy_active = True
         mock_conversation.is_confirmation_mode_active = True

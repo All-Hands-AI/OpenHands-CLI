@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp.mcp_config import MCPConfig
-from openhands.sdk import Agent
 from prompt_toolkit import HTML, print_formatted_text
 
+from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
 
 
@@ -29,7 +29,8 @@ class MCPScreen:
         return first_stringified_server_spec == second_stringified_server_spec
 
     def _check_mcp_config_status(self) -> dict:
-        """Check the status of the MCP configuration file and return information about it."""
+        """Check the status of the MCP configuration file and return information
+        about it."""
         config_path = Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
 
         if not config_path.exists():
@@ -37,7 +38,10 @@ class MCPScreen:
                 "exists": False,
                 "valid": False,
                 "servers": {},
-                "message": f"MCP configuration file not found at ~/.openhands/{MCP_CONFIG_FILE}",
+                "message": (
+                    f"MCP configuration file not found at "
+                    f"~/.openhands/{MCP_CONFIG_FILE}"
+                ),
             }
 
         try:
@@ -47,7 +51,9 @@ class MCPScreen:
                 "exists": True,
                 "valid": True,
                 "servers": servers,
-                "message": f"Valid MCP configuration found with {len(servers)} server(s)",
+                "message": (
+                    f"Valid MCP configuration found with {len(servers)} server(s)"
+                ),
             }
         except Exception as e:
             return {
@@ -104,14 +110,16 @@ class MCPScreen:
         # Display incoming section header
         print_formatted_text(
             HTML(
-                "<white>Incoming Servers on Restart (from ~/.openhands/mcp.json):</white>"
+                "<white>Incoming Servers on Restart "
+                "(from ~/.openhands/mcp.json):</white>"
             )
         )
 
         if not new_servers and not overriden_servers:
             print_formatted_text(
                 HTML(
-                    "  <grey>All configured servers match the current agent configuration.</grey>"
+                    "  <grey>All configured servers match the current agent "
+                    "configuration.</grey>"
                 )
             )
             print_formatted_text("")

@@ -2,14 +2,14 @@ from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ConfigDict, SecretStr, model_validator
+
 from openhands.sdk import Conversation, ConversationCallbackType, LocalConversation
 from openhands.sdk.agent.base import AgentBase
 from openhands.sdk.conversation import ConversationState
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.llm import LLM
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
-from pydantic import ConfigDict, SecretStr, model_validator
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -80,13 +80,15 @@ class TestConversationRunner:
     @pytest.mark.parametrize(
         "confirmation, final_status, expected_run_calls",
         [
-            # Case 1: Agent waiting for confirmation; user DEFERS -> early return, no run()
+            # Case 1: Agent waiting for confirmation; user DEFERS -> early return,
+            # no run()
             (
                 UserConfirmation.DEFER,
                 ConversationExecutionStatus.WAITING_FOR_CONFIRMATION,
                 0,
             ),
-            # Case 2: Agent waiting for confirmation; user ACCEPTS -> run() once, break (finished=True)
+            # Case 2: Agent waiting for confirmation; user ACCEPTS -> run() once,
+            # break (finished=True)
             (
                 UserConfirmation.ACCEPT,
                 ConversationExecutionStatus.FINISHED,

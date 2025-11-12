@@ -1,9 +1,9 @@
 from enum import Enum
 
-from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
 from prompt_toolkit.completion import FuzzyWordCompleter
 from pydantic import SecretStr
 
+from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
 from openhands_cli.tui.utils import StepCounter
 from openhands_cli.user_actions.utils import (
     NonEmptyValueValidator,
@@ -107,7 +107,8 @@ def prompt_api_key(
         else existing_api_key
     )
     helper_text = (
-        "\nYou can find your OpenHands LLM API Key in the API Keys tab of OpenHands Cloud: "
+        "\nYou can find your OpenHands LLM API Key in the API Keys tab of "
+        "OpenHands Cloud: "
         "https://app.all-hands.dev/settings/api-keys\n"
         if provider == "openhands"
         else ""
@@ -115,7 +116,10 @@ def prompt_api_key(
 
     if api_key:
         masked_key = api_key[:3] + "***"
-        question = f"Enter API Key [{masked_key}] (CTRL-c to cancel, ENTER to keep current, type new to change): "
+        question = (
+            f"Enter API Key [{masked_key}] (CTRL-c to cancel, ENTER to keep "
+            f"current, type new to change): "
+        )
         # For existing keys, allow empty input to keep current key
         validator = None
     else:

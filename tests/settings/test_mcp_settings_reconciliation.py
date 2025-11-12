@@ -5,11 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from openhands.sdk import LLM, Agent
 from pydantic import SecretStr
 
+from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
 from openhands_cli.tui.settings.store import AgentStore
+
 
 # ---------------------- tiny helpers ----------------------
 
@@ -92,7 +93,8 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
 def test_load_when_mcp_file_missing_ignores_persisted_mcp(
     mock_meta, mock_tools, persistence_dir, agent_store
 ):
-    """If mcp.json is absent, loaded agent.mcp_config should be empty (persisted MCP ignored)."""
+    """If mcp.json is absent, loaded agent.mcp_config should be empty
+    (persisted MCP ignored)."""
     persisted_agent = Agent(
         llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
         tools=[],

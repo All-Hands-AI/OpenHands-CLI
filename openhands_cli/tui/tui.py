@@ -9,6 +9,7 @@ from prompt_toolkit.shortcuts import clear
 
 from openhands_cli.pt_style import get_cli_style
 
+
 DEFAULT_STYLE = get_cli_style()
 
 # Available commands with descriptions
@@ -29,7 +30,9 @@ class CommandCompleter(Completer):
     """Custom completer for commands with interactive dropdown."""
 
     def get_completions(
-        self, document: Document, complete_event: CompleteEvent
+        self,
+        document: Document,
+        complete_event: CompleteEvent,  # noqa: ARG002
     ) -> Generator[Completion, None, None]:
         text = document.text_before_cursor.lstrip()
         if text.startswith("/"):

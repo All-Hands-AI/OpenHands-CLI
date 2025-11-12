@@ -15,7 +15,7 @@ concurrency:
 jobs:
     test-python:
         name: Run unit tests (pytest)
-        runs-on: ubuntu-latest
+        runs-on: blacksmith-2vcpu-ubuntu-2404
 
         steps:
             - name: Checkout repository

@@ -1,7 +1,8 @@
 from enum import Enum
 
-from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from pydantic import BaseModel
+
+from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 
 
 class UserConfirmation(Enum):

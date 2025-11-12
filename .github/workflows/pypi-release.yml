@@ -19,7 +19,7 @@ on:
 jobs:
     release-cli:
         name: Publish CLI to PyPI
-        runs-on: ubuntu-latest
+        runs-on: blacksmith-2vcpu-ubuntu-2404
     # Run when manually dispatched for "cli" OR for tag pushes that contain '-cli'
         if: |
             (github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'cli')

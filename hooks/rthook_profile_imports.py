@@ -4,6 +4,7 @@ import sys
 import time
 from collections import defaultdict
 
+
 ENABLE = os.getenv("IMPORT_PROFILING", "0") not in ("", "0", "false", "False")
 OUT = "dist/import_profiler.csv"
 THRESHOLD_MS = float(os.getenv("IMPORT_PROFILING_THRESHOLD_MS", "0"))
@@ -61,7 +62,8 @@ if ENABLE:
                 sys.stderr.write(f"{'module'.ljust(w)}  count  total_ms   max_ms\n")
                 for name, cnt, tot_s, max_s in items[:25]:
                     sys.stderr.write(
-                        f"{name.ljust(w)}  {str(cnt).rjust(5)}  {ms(tot_s).rjust(8)}  {ms(max_s).rjust(7)}\n"
+                        f"{name.ljust(w)}  {str(cnt).rjust(5)}  "
+                        f"{ms(tot_s).rjust(8)}  {ms(max_s).rjust(7)}\n"
                     )
             sys.stderr.write(f"\nImport profile written to: {OUT}\n")
         except Exception as e:

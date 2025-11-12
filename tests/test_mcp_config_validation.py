@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from openhands.sdk import LLM, Agent
 
+from openhands.sdk import LLM, Agent
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.tui.settings.mcp_screen import MCPScreen
 
@@ -107,7 +107,8 @@ CASES = [
         ],
         "unexpected": [],
     },
-    # Overriding/updating servers present in both agent and mcp.json (but different config)
+    # Overriding/updating servers present in both agent and mcp.json (but
+    # different config)
     {
         "id": "overriding_servers_on_restart",
         "agent_mcp": {
