@@ -1,16 +1,5 @@
 from uuid import UUID
 
-# Register tools on import
-from openhands.tools.file_editor import FileEditorTool
-from openhands.tools.task_tracker import TaskTrackerTool
-from openhands.tools.terminal import TerminalTool
-
-
-# Hack to prevent lint complaints for unused imports
-FileEditorTool.name
-TerminalTool.name
-TaskTrackerTool.name
-
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
@@ -18,6 +7,11 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+
+# Register tools on import
+from openhands.tools.file_editor import FileEditorTool  # noqa: F401
+from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
+from openhands.tools.terminal import TerminalTool  # noqa: F401
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
