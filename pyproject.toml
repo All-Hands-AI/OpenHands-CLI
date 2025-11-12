@@ -33,7 +33,6 @@ dev = [
   "flake8>=6",
   "gevent>=24.2.1,<26",
   "isort>=5",
-  "mypy>=1",
   "pre-commit>=4.3",
   "pyinstaller>=6.15",
   "pytest>=8.4.1",
@@ -94,13 +93,6 @@ source = [
   "openhands_cli/",
   "openhands-cli/openhands_cli/",
 ]
-
-[tool.mypy]
-python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-ignore_missing_imports = true
 
 [tool.pyright]
 include = [
