@@ -5,8 +5,7 @@ name: CLI - Build binary and optionally release
 # Run on pushes to main branch and CLI tags, and on pull requests when CLI files change
 on:
     push:
-        branches:
-            branches: [main]
+        branches: [main]
         tags:
             - '*-cli'
     pull_request:
