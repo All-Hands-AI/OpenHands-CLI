@@ -54,12 +54,10 @@ jobs:
                   version: latest
 
             - name: Install dependencies
-              working-directory: openhands-cli
               run: |
                   uv sync
 
             - name: Build binary executable
-              working-directory: openhands-cli
               run: |
                   ./build.sh --install-pyinstaller | tee output.log
                   echo "Full output:"
