@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp.mcp_config import MCPConfig
-from openhands.sdk import Agent
 from prompt_toolkit import HTML, print_formatted_text
 
+from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
 
 

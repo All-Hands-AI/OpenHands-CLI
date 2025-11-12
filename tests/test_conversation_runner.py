@@ -2,14 +2,14 @@ from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ConfigDict, SecretStr, model_validator
+
 from openhands.sdk import Conversation, ConversationCallbackType, LocalConversation
 from openhands.sdk.agent.base import AgentBase
 from openhands.sdk.conversation import ConversationState
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.llm import LLM
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
-from pydantic import ConfigDict, SecretStr, model_validator
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.user_actions.types import UserConfirmation
 

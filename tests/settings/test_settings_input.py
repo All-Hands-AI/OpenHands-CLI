@@ -20,6 +20,7 @@ from openhands_cli.user_actions.settings_action import (
     settings_type_confirmation,
 )
 
+
 # -------------------------------
 # Settings type selection
 # -------------------------------

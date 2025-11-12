@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from openhands.sdk import LLM, Agent
 
+from openhands.sdk import LLM, Agent
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.tui.settings.mcp_screen import MCPScreen
 

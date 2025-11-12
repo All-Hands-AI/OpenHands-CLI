@@ -1,3 +1,5 @@
+from prompt_toolkit import HTML, print_formatted_text
+
 from openhands.sdk import BaseConversation, Message
 from openhands.sdk.conversation.state import (
     ConversationExecutionStatus,
@@ -9,8 +11,6 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
-from prompt_toolkit import HTML, print_formatted_text
-
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 from openhands_cli.setup import setup_conversation
 from openhands_cli.user_actions import ask_user_confirmation

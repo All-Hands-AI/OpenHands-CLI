@@ -2,6 +2,7 @@ from prompt_toolkit.styles import Style, merge_styles
 from prompt_toolkit.styles.base import BaseStyle
 from prompt_toolkit.styles.defaults import default_ui_style
 
+
 # Centralized helper for CLI styles so we can safely merge our custom colors
 # with prompt_toolkit's default UI style. This preserves completion menu and
 # fuzzy-match visibility across different terminal themes (e.g., Ubuntu).

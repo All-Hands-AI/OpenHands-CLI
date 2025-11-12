@@ -2,10 +2,10 @@
 
 from unittest.mock import patch
 
-from openhands.sdk import Conversation, Workspace
-from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from pydantic import SecretStr
 
+from openhands.sdk import Conversation, Workspace
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.user_actions.settings_action import SettingsType
 

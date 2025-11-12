@@ -4,6 +4,7 @@ import sys
 import time
 from collections import defaultdict
 
+
 ENABLE = os.getenv("IMPORT_PROFILING", "0") not in ("", "0", "false", "False")
 OUT = "dist/import_profiler.csv"
 THRESHOLD_MS = float(os.getenv("IMPORT_PROFILING_THRESHOLD_MS", "0"))

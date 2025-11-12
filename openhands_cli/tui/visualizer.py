@@ -1,5 +1,9 @@
 import re
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+
 from openhands.sdk.conversation.visualizer.base import (
     ConversationVisualizerBase,
 )
@@ -14,9 +18,7 @@ from openhands.sdk.event import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
+
 
 # These are external inputs
 _OBSERVATION_COLOR = "yellow"

@@ -16,9 +16,9 @@ import time
 from pathlib import Path
 
 from openhands.sdk import LLM
-
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.utils import get_default_cli_agent, get_llm_metadata
+
 
 # =================================================
 # SECTION: Build Binary

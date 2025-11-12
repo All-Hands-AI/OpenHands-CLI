@@ -1,6 +1,9 @@
 """Tests for the conversation visualizer and event visualization."""
 
 import json
+from typing import ClassVar
+
+from rich.text import Text
 
 from openhands.sdk.event import (
     ActionEvent,
@@ -12,8 +15,6 @@ from openhands.sdk.llm import (
     TextContent,
 )
 from openhands.sdk.tool import Action
-from rich.text import Text
-
 from openhands_cli.tui.visualizer import (
     CLIVisualizer,
 )
@@ -29,7 +30,7 @@ class VisualizerMockAction(Action):
 class VisualizerCustomAction(Action):
     """Custom action with overridden visualize method."""
 
-    task_list: list[dict] = []
+    task_list: ClassVar[list[dict]] = []
 
     @property
     def visualize(self) -> Text:

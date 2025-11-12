@@ -1,14 +1,13 @@
 from uuid import UUID
 
+# register tools
+from prompt_toolkit import HTML, print_formatted_text
+
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
-
-# register tools
-from prompt_toolkit import HTML, print_formatted_text
-
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore

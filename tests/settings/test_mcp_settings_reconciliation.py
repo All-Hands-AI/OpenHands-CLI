@@ -5,11 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from openhands.sdk import LLM, Agent
 from pydantic import SecretStr
 
+from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
 from openhands_cli.tui.settings.store import AgentStore
+
 
 # ---------------------- tiny helpers ----------------------
 

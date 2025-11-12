@@ -3,9 +3,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openhands.sdk import LLM, Conversation, LocalFileStore
 from pydantic import SecretStr
 
+from openhands.sdk import LLM, Conversation, LocalFileStore
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.user_actions.settings_action import SettingsType

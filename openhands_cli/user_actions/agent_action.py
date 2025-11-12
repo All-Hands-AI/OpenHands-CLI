@@ -1,12 +1,12 @@
 import html
 
+from prompt_toolkit import HTML, print_formatted_text
+
 from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from prompt_toolkit import HTML, print_formatted_text
-
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
 from openhands_cli.user_actions.utils import cli_confirm, cli_text_input
 
@@ -28,7 +28,8 @@ def ask_user_confirmation(
 
     print_formatted_text(
         HTML(
-            f"<yellow>🔍 Agent created {len(pending_actions)} action(s) and is waiting for confirmation:</yellow>"
+            f"<yellow>🔍 Agent created {len(pending_actions)} action(s) and is "
+            f"waiting for confirmation:</yellow>"
         )
     )
 

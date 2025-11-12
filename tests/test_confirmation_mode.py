@@ -10,6 +10,9 @@ from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from prompt_toolkit.input.defaults import create_pipe_input
+from prompt_toolkit.output.base import DummyOutput
+
 from openhands.sdk import Action
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -17,9 +20,6 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.base import DummyOutput
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import MissingAgentSpec, setup_conversation
 from openhands_cli.user_actions import agent_action, ask_user_confirmation, utils

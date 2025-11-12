@@ -2,11 +2,12 @@
 
 from datetime import datetime
 
-from openhands.sdk import BaseConversation
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import print_container
 from prompt_toolkit.widgets import Frame, TextArea
+
+from openhands.sdk import BaseConversation
 
 
 def display_status(

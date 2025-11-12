@@ -3,9 +3,10 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
 
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
 from openhands_cli.runner import ConversationRunner
+
 
 CONV_ID = "test-conversation-id"
 
