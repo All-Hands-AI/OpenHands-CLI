@@ -1,4 +1,6 @@
+from prompt_toolkit import HTML, PromptSession
 from prompt_toolkit.application import Application
+from prompt_toolkit.completion import Completer
 from prompt_toolkit.input.base import Input
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
@@ -8,8 +10,10 @@ from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.output.base import Output
 from prompt_toolkit.shortcuts import prompt
+from prompt_toolkit.validation import ValidationError, Validator
 
 from openhands_cli.tui import DEFAULT_STYLE
+from openhands_cli.tui.tui import CommandCompleter
 
 
 def build_keybindings(
@@ -99,33 +103,97 @@ def cli_confirm(
     return int(app.run(in_thread=True))
 
 
-def prompt_user(question: str) -> tuple[str, bool]:
-    """Prompt user to enter a reason for rejecting actions.
+def cli_text_input(
+    question: str,
+    escapable: bool = True,
+    completer: Completer | None = None,
+    validator: Validator | None = None,
+    is_password: bool = False,
+) -> str:
+    """Prompt user to enter text input with optional validation.
+
+    Args:
+        question: The prompt question to display
+        escapable: Whether the user can escape with Ctrl+C or Ctrl+P
+        completer: Optional completer for tab completion
+        validator: Optional callable that takes a string and returns True if valid.
+                  If validation fails, the callable should display error messages
+                  and the user will be reprompted.
 
     Returns:
-        Tuple of (reason, should_defer) where:
-        - reason: The reason entered by the user
-        - should_defer: True if user pressed Ctrl+C or Ctrl+P, False otherwise
+        The validated user input string (stripped of whitespace)
     """
 
     kb = KeyBindings()
 
-    @kb.add("c-c")
-    def _(event: KeyPressEvent) -> None:
-        raise KeyboardInterrupt()
+    if escapable:
 
-    @kb.add("c-p")
-    def _(event: KeyPressEvent) -> None:
-        raise KeyboardInterrupt()
+        @kb.add("c-c")
+        def _(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
 
-    try:
-        reason = str(
-            prompt(
-                question,
-                style=DEFAULT_STYLE,
-                key_bindings=kb,
-            )
+        @kb.add("c-p")
+        def _(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
+
+    @kb.add("enter")
+    def _handle_enter(event: KeyPressEvent):
+        event.app.exit(result=event.current_buffer.text)
+
+    reason = str(
+        prompt(
+            question,
+            style=DEFAULT_STYLE,
+            key_bindings=kb,
+            completer=completer,
+            is_password=is_password,
+            validator=validator,
         )
-        return reason.strip(), False
-    except KeyboardInterrupt:
-        return "", True
+    )
+    return reason.strip()
+
+
+def get_session_prompter(
+    input: Input | None = None,  # strictly for unit testing
+    output: Output | None = None,  # strictly for unit testing
+) -> PromptSession:
+    bindings = KeyBindings()
+
+    @bindings.add("\\", "enter")
+    def _(event: KeyPressEvent) -> None:
+        # Typing '\' + Enter forces a newline regardless
+        event.current_buffer.insert_text("\n")
+
+    @bindings.add("enter")
+    def _handle_enter(event: KeyPressEvent):
+        event.app.exit(result=event.current_buffer.text)
+
+    @bindings.add("c-c")
+    def _keyboard_interrupt(event: KeyPressEvent):
+        event.app.exit(exception=KeyboardInterrupt())
+
+    session = PromptSession(
+        completer=CommandCompleter(),
+        key_bindings=bindings,
+        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",
+        multiline=True,
+        input=input,
+        output=output,
+        style=DEFAULT_STYLE,
+        placeholder=HTML(
+            "<placeholder>"
+            "Type your message… (tip: press <b>\\</b> + <b>Enter</b> to insert a newline)"
+            "</placeholder>"
+        ),
+    )
+
+    return session
+
+
+class NonEmptyValueValidator(Validator):
+    def validate(self, document):
+        text = document.text
+        if not text:
+            raise ValidationError(
+                message="API key cannot be empty. Please enter a valid API key."
+            )

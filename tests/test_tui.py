@@ -3,7 +3,7 @@
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from openhands_cli.tui import COMMANDS, CommandCompleter
+from openhands_cli.tui.tui import COMMANDS, CommandCompleter
 
 
 class TestCommandCompleter:
@@ -35,11 +35,7 @@ class TestCommandCompleter:
         # display_meta is a FormattedText object, so we need to check its content
         # Extract the text from FormattedText
         meta_text = completions[0].display_meta
-        if hasattr(meta_text, "_formatted_text"):
-            # Extract text from FormattedText
-            text_content = "".join([item[1] for item in meta_text._formatted_text])
-        else:
-            text_content = str(meta_text)
+        text_content = str(meta_text)
         assert COMMANDS["/exit"] in text_content
 
     def test_command_completion_no_slash(self) -> None:
@@ -78,10 +74,12 @@ def test_commands_dict() -> None:
         "/exit",
         "/help",
         "/clear",
+        "/new",
         "/status",
         "/confirm",
-        "/new",
         "/resume",
+        "/settings",
+        "/mcp",
     }
     assert set(COMMANDS.keys()) == expected_commands
 

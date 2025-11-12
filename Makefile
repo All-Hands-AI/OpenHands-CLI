@@ -1,13 +1,11 @@
-.PHONY: help install install-dev test lint format clean run install-pre-commit-hooks
+.PHONY: help install install-dev test format clean run
 
 # Default target
 help:
 	@echo "OpenHands CLI - Available commands:"
 	@echo "  install                  - Install the package"
 	@echo "  install-dev              - Install with development dependencies"
-	@echo "  install-pre-commit-hooks - Install pre-commit hooks"
 	@echo "  test                     - Run tests"
-	@echo "  lint                     - Run pre-commit on all files"
 	@echo "  format                   - Format code with ruff"
 	@echo "  clean                    - Clean build artifacts"
 	@echo "  run                      - Run the CLI"
@@ -18,25 +16,11 @@ install:
 
 # Install with development dependencies
 install-dev:
-	uv sync --extra dev
+	uv sync --group dev
 
 # Run tests
 test:
 	uv run pytest
-
-# Install pre-commit hooks
-install-pre-commit-hooks: install-dev
-	@echo "Installing pre-commit hooks..."
-	@git config --unset-all core.hooksPath || true
-	uv run pre-commit install
-	@echo "Pre-commit hooks installed successfully."
-
-# Run pre-commit on all files
-lint: install-dev
-	@echo "Running pre-commit on all files..."
-	uv run pre-commit run --all-files --show-diff-on-failure
-
-
 
 # Format code
 format:
@@ -50,7 +34,7 @@ clean:
 
 # Run the CLI
 run:
-	uv run openhands-cli
+	uv run openhands
 
 # Install UV if not present
 install-uv:

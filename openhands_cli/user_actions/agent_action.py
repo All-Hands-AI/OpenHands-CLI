@@ -1,23 +1,30 @@
+import html
+
+from openhands.sdk.security.confirmation_policy import (
+    ConfirmRisky,
+    NeverConfirm,
+)
+from openhands.sdk.security.risk import SecurityRisk
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands_cli.user_actions.types import UserConfirmation
-from openhands_cli.user_actions.utils import cli_confirm, prompt_user
+from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
+from openhands_cli.user_actions.utils import cli_confirm, cli_text_input
 
 
-def ask_user_confirmation(pending_actions: list) -> tuple[UserConfirmation, str]:
+def ask_user_confirmation(
+    pending_actions: list, using_risk_based_policy: bool = False
+) -> ConfirmationResult:
     """Ask user to confirm pending actions.
 
     Args:
         pending_actions: List of pending actions from the agent
 
     Returns:
-        Tuple of (UserConfirmation, reason) where reason is provided when rejecting with reason
+        ConfirmationResult with decision, optional policy_change, and reason
     """
 
-    reason = ""
-
     if not pending_actions:
-        return UserConfirmation.ACCEPT, reason
+        return ConfirmationResult(decision=UserConfirmation.ACCEPT)
 
     print_formatted_text(
         HTML(
@@ -27,45 +34,48 @@ def ask_user_confirmation(pending_actions: list) -> tuple[UserConfirmation, str]
 
     for i, action in enumerate(pending_actions, 1):
         tool_name = getattr(action, "tool_name", "[unknown tool]")
-        print("tool name", tool_name)
         action_content = (
             str(getattr(action, "action", ""))[:100].replace("\n", " ")
             or "[unknown action]"
         )
-        print("action_content", action_content)
         print_formatted_text(
-            HTML(f"<grey>  {i}. {tool_name}: {action_content}...</grey>")
+            HTML(f"<grey>  {i}. {tool_name}: {html.escape(action_content)}...</grey>")
         )
 
     question = "Choose an option:"
     options = [
         "Yes, proceed",
-        "No, reject (w/o reason)",
-        "No, reject with reason",
+        "Reject",
         "Always proceed (don't ask again)",
     ]
+
+    if not using_risk_based_policy:
+        options.append("Auto-confirm LOW/MEDIUM risk, ask for HIGH risk")
 
     try:
         index = cli_confirm(question, options, escapable=True)
     except (EOFError, KeyboardInterrupt):
         print_formatted_text(HTML("\n<red>No input received; pausing agent.</red>"))
-        return UserConfirmation.DEFER, reason
+        return ConfirmationResult(decision=UserConfirmation.DEFER)
 
     if index == 0:
-        return UserConfirmation.ACCEPT, reason
+        return ConfirmationResult(decision=UserConfirmation.ACCEPT)
     elif index == 1:
-        return UserConfirmation.REJECT, reason
+        # Handle "Reject" option with optional reason
+        try:
+            reason = cli_text_input("Reason (and let OpenHands know why): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ConfirmationResult(decision=UserConfirmation.DEFER)
+
+        return ConfirmationResult(decision=UserConfirmation.REJECT, reason=reason)
     elif index == 2:
-        reason, should_defer = prompt_user(
-            "Please enter your reason for rejecting these actions: "
+        return ConfirmationResult(
+            decision=UserConfirmation.ACCEPT, policy_change=NeverConfirm()
+        )
+    elif index == 3:
+        return ConfirmationResult(
+            decision=UserConfirmation.ACCEPT,
+            policy_change=ConfirmRisky(threshold=SecurityRisk.HIGH),
         )
 
-        # If user pressed Ctrl+C or Ctrl+P during reason input, defer the action
-        if should_defer:
-            return UserConfirmation.DEFER, ""
-
-        return UserConfirmation.REJECT, reason
-    elif index == 3:
-        return UserConfirmation.ALWAYS_ACCEPT, reason
-
-    return UserConfirmation.REJECT, reason
+    return ConfirmationResult(decision=UserConfirmation.REJECT)
