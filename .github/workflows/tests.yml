@@ -34,7 +34,6 @@ jobs:
                   version: latest
 
             - name: Install dependencies
-              working-directory: ./openhands-cli
               run: |
                   uv sync --group dev
 
