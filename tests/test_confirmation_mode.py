@@ -44,12 +44,10 @@ class TestConfirmationMode:
                 patch("openhands_cli.setup.AgentStore") as mock_agent_store_class,
                 patch("openhands_cli.setup.print_formatted_text"),
                 patch("openhands_cli.setup.HTML"),
-                patch("openhands_cli.setup.uuid") as mock_uuid,
                 patch("openhands_cli.setup.CLIVisualizer") as mock_visualizer,
             ):
                 # Mock dependencies
                 mock_conversation_id = MagicMock()
-                mock_uuid.uuid4.return_value = mock_conversation_id
 
                 # Mock AgentStore
                 mock_agent_store_instance = MagicMock()
