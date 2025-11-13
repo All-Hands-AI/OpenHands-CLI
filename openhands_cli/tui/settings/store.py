@@ -10,7 +10,7 @@ from prompt_toolkit import HTML, print_formatted_text
 from openhands.sdk import Agent, AgentContext, LocalFileStore
 from openhands.sdk.context import load_skills_from_dir, load_user_skills
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
-from openhands.sdk.logger import get_logger
+
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -26,7 +26,6 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
-        self.logger = get_logger(__name__)
 
     def load_mcp_configuration(self) -> dict[str, Any]:
         try:
@@ -44,9 +43,8 @@ class AgentStore:
         try:
             user_skills = load_user_skills()
             all_skills.extend(user_skills)
-            self.logger.debug(f"Loaded {len(user_skills)} user skills")
         except Exception as e:
-            self.logger.warning(f"Failed to load user skills: {e}")
+            pass
 
         # Load project-specific skills from .openhands/skills and legacy .openhands/microagents
         project_skills_dirs = [
@@ -64,15 +62,9 @@ class AgentStore:
                         knowledge_skills.values()
                     )
                     all_skills.extend(project_skills)
-                    self.logger.debug(
-                        f"Loaded {len(project_skills)} project skills from {project_skills_dir}"
-                    )
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to load project skills from {project_skills_dir}: {e}"
-                    )
+                    pass
 
-        self.logger.info(f"Total skills loaded: {len(all_skills)}")
         return all_skills
 
     def load(self, session_id: str | None = None) -> Agent | None:
