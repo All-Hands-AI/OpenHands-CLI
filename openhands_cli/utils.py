@@ -11,8 +11,11 @@ def should_set_litellm_extra_body(model_name: str) -> bool:
     """
     Determine if litellm_extra_body should be set based on the model name.
 
-    Only set litellm_extra_body for litellm_proxy models to avoid issues
+    Only set litellm_extra_body for openhands models to avoid issues
     with providers that don't support extra_body parameters.
+
+    The SDK internally translates "openhands/" prefix to "litellm_proxy/"
+    when making API calls.
 
     Args:
         model_name: Name of the LLM model
@@ -20,7 +23,7 @@ def should_set_litellm_extra_body(model_name: str) -> bool:
     Returns:
         True if litellm_extra_body should be set, False otherwise
     """
-    return "litellm_proxy" in model_name
+    return "openhands/" in model_name
 
 
 def get_llm_metadata(
