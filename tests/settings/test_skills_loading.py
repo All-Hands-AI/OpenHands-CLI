@@ -8,7 +8,7 @@ from openhands_cli.tui.settings.store import AgentStore
 
 
 class TestSkillsLoading:
-    """Test skills loading functionality with actual microagents in temporary directories."""
+    """Test skills loading functionality with actual microagents in temp directories."""
 
     def test_load_skills_with_project_microagents_directory(self):
         """Test loading skills when project microagents directory exists."""
@@ -73,7 +73,7 @@ This is a test skill for testing purposes.
                     )  # May be 0 if load_skills_from_dir doesn't find valid skills
 
     def test_load_method_with_actual_microagents(self):
-        """Test that load method works with actual microagents in temporary directory."""
+        """Test that load method works with actual microagents in temp directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create microagents directory with actual file
             microagents_dir = Path(temp_dir) / ".openhands" / "microagents"

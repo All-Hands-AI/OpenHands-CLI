@@ -10,7 +10,6 @@ from prompt_toolkit import HTML, print_formatted_text
 from openhands.sdk import Agent, AgentContext, LocalFileStore
 from openhands.sdk.context import load_skills_from_dir, load_user_skills
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
-
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -43,10 +42,10 @@ class AgentStore:
         try:
             user_skills = load_user_skills()
             all_skills.extend(user_skills)
-        except Exception as e:
+        except Exception:
             pass
 
-        # Load project-specific skills from .openhands/skills and legacy .openhands/microagents
+        # Load project-specific skills from .openhands/skills and legacy microagents
         project_skills_dirs = [
             Path(WORK_DIR) / ".openhands" / "skills",
             Path(WORK_DIR) / ".openhands" / "microagents",  # Legacy support
@@ -62,7 +61,7 @@ class AgentStore:
                         knowledge_skills.values()
                     )
                     all_skills.extend(project_skills)
-                except Exception as e:
+                except Exception:
                     pass
 
         return all_skills
