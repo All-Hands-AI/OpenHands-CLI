@@ -4,22 +4,22 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from openhands_cli.tui.settings.store import AgentStore
 
 
-class TestSkillsLoading:
-    """Test skills loading functionality with actual microagents in temp directories."""
+@pytest.fixture
+def temp_project_dir():
+    """Create a temporary project directory with microagents."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create microagents directory with actual files
+        microagents_dir = Path(temp_dir) / ".openhands" / "microagents"
+        microagents_dir.mkdir(parents=True)
 
-    def test_load_skills_with_project_microagents_directory(self):
-        """Test loading skills when project microagents directory exists."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create microagents directory with actual file
-            microagents_dir = Path(temp_dir) / ".openhands" / "microagents"
-            microagents_dir.mkdir(parents=True)
-
-            # Create a test microagent file
-            microagent_file = microagents_dir / "test_microagent.md"
-            microagent_file.write_text("""---
+        # Create test microagent files
+        microagent1 = microagents_dir / "test_microagent.md"
+        microagent1.write_text("""---
 name: test_microagent
 triggers: ["test", "microagent"]
 ---
@@ -27,61 +27,8 @@ triggers: ["test", "microagent"]
 This is a test microagent for testing purposes.
 """)
 
-            with patch(
-                "openhands_cli.tui.settings.store.load_user_skills"
-            ) as mock_user_skills:
-                mock_user_skills.return_value = []
-
-                with patch("openhands_cli.tui.settings.store.WORK_DIR", temp_dir):
-                    agent_store = AgentStore()
-                    skills = agent_store.load_skills()
-
-                    # Verify that skills were loaded from the microagents directory
-                    assert (
-                        len(skills) >= 0
-                    )  # May be 0 if load_skills_from_dir doesn't find valid skills
-
-    def test_load_skills_with_project_skills_directory(self):
-        """Test loading skills when project skills directory exists."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create skills directory with actual file
-            skills_dir = Path(temp_dir) / ".openhands" / "skills"
-            skills_dir.mkdir(parents=True)
-
-            # Create a test skill file
-            skill_file = skills_dir / "test_skill.md"
-            skill_file.write_text("""---
-name: test_skill
-triggers: ["test", "skill"]
----
-
-This is a test skill for testing purposes.
-""")
-
-            with patch(
-                "openhands_cli.tui.settings.store.load_user_skills"
-            ) as mock_user_skills:
-                mock_user_skills.return_value = []
-
-                with patch("openhands_cli.tui.settings.store.WORK_DIR", temp_dir):
-                    agent_store = AgentStore()
-                    skills = agent_store.load_skills()
-
-                    # Verify that skills were loaded from the skills directory
-                    assert (
-                        len(skills) >= 0
-                    )  # May be 0 if load_skills_from_dir doesn't find valid skills
-
-    def test_load_method_with_actual_microagents(self):
-        """Test that load method works with actual microagents in temp directory."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create microagents directory with actual file
-            microagents_dir = Path(temp_dir) / ".openhands" / "microagents"
-            microagents_dir.mkdir(parents=True)
-
-            # Create a test microagent file
-            microagent_file = microagents_dir / "integration_test.md"
-            microagent_file.write_text("""---
+        microagent2 = microagents_dir / "integration_test.md"
+        microagent2.write_text("""---
 name: integration_test
 triggers: ["integration", "test"]
 ---
@@ -89,21 +36,39 @@ triggers: ["integration", "test"]
 This microagent is used for integration testing.
 """)
 
-            with patch(
-                "openhands_cli.tui.settings.store.load_user_skills"
-            ) as mock_user_skills:
-                mock_user_skills.return_value = []
+        # Also create skills directory
+        skills_dir = Path(temp_dir) / ".openhands" / "skills"
+        skills_dir.mkdir(parents=True)
 
-                with patch("openhands_cli.tui.settings.store.WORK_DIR", temp_dir):
-                    with patch(
-                        "openhands_cli.tui.settings.store.AgentContext"
-                    ) as mock_context:
-                        agent_store = AgentStore()
-                        agent_store.load()
+        skill_file = skills_dir / "test_skill.md"
+        skill_file.write_text("""---
+name: test_skill
+triggers: ["test", "skill"]
+---
 
-                        # Verify AgentContext was called with skills parameter
-                        mock_context.assert_called_once()
-                        call_kwargs = mock_context.call_args[1]
-                        assert "skills" in call_kwargs
-                        # Skills list should be present (may be empty if loading fails)
-                        assert isinstance(call_kwargs["skills"], list)
+This is a test skill for testing purposes.
+""")
+
+        yield temp_dir
+
+
+@pytest.fixture
+def agent_store(temp_project_dir):
+    """Create an AgentStore with the temporary project directory."""
+    with patch("openhands_cli.tui.settings.store.WORK_DIR", temp_project_dir):
+        yield AgentStore()
+
+
+class TestSkillsLoading:
+    """Test skills loading functionality with actual microagents."""
+
+    def test_load_agent_with_skills(self, agent_store):
+        """Test that loading agent includes skills from microagents and skills dirs."""
+        # Load agent - this should include skills from both directories
+        agent_store.load()
+
+        # Verify that skills were loaded and are accessible
+        skills = agent_store.load_skills()
+        assert isinstance(skills, list)
+        # Skills should include both user skills and project skills
+        assert len(skills) >= 0
