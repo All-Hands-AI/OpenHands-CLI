@@ -8,7 +8,9 @@ from fastmcp.mcp_config import MCPConfig
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, AgentContext, LocalFileStore
+from openhands.sdk.context import load_skills_from_dir, load_user_skills
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
+from openhands.sdk.logger import get_logger
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -24,6 +26,7 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
+        self.logger = get_logger(__name__)
 
     def load_mcp_configuration(self) -> dict[str, Any]:
         try:
@@ -32,6 +35,45 @@ class AgentStore:
             return mcp_config.to_dict()["mcpServers"]
         except Exception:
             return {}
+
+    def load_skills(self) -> list:
+        """Load skills from user directories and project-specific directories."""
+        all_skills = []
+
+        # Load user skills from ~/.openhands/skills and ~/.openhands/microagents
+        try:
+            user_skills = load_user_skills()
+            all_skills.extend(user_skills)
+            self.logger.debug(f"Loaded {len(user_skills)} user skills")
+        except Exception as e:
+            self.logger.warning(f"Failed to load user skills: {e}")
+
+        # Load project-specific skills from .openhands/skills and legacy .openhands/microagents
+        project_skills_dirs = [
+            Path(WORK_DIR) / ".openhands" / "skills",
+            Path(WORK_DIR) / ".openhands" / "microagents",  # Legacy support
+        ]
+
+        for project_skills_dir in project_skills_dirs:
+            if project_skills_dir.exists():
+                try:
+                    repo_skills, knowledge_skills = load_skills_from_dir(
+                        project_skills_dir
+                    )
+                    project_skills = list(repo_skills.values()) + list(
+                        knowledge_skills.values()
+                    )
+                    all_skills.extend(project_skills)
+                    self.logger.debug(
+                        f"Loaded {len(project_skills)} project skills from {project_skills_dir}"
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to load project skills from {project_skills_dir}: {e}"
+                    )
+
+        self.logger.info(f"Total skills loaded: {len(all_skills)}")
+        return all_skills
 
     def load(self, session_id: str | None = None) -> Agent | None:
         try:
@@ -49,7 +91,11 @@ class AgentStore:
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
 
+            # Load skills from user directories and project-specific directories
+            skills = self.load_skills()
+
             agent_context = AgentContext(
+                skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
             )
 
