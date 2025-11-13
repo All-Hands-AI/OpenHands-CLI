@@ -31,6 +31,7 @@ from openhands_cli.tui.tui import (
 )
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
 from openhands_cli.user_actions.utils import get_session_prompter
+from openhands_cli.conversation_manager import ConversationManager
 
 
 def _restore_tty() -> None:
@@ -100,6 +101,7 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
     runner = None
     conversation = None
     session = get_session_prompter()
+    conversation_manager = ConversationManager()
 
     # Main chat loop
     while True:
@@ -208,6 +210,25 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
 
                 # Resume without new message
                 message = None
+
+            elif command == '/list':
+                conversation_manager.list_conversations()
+                continue
+
+            elif command.startswith('/load '):
+                conversation_id_arg = command[6:].strip()  # Remove "/load "
+                if not conversation_id_arg:
+                    print_formatted_text(HTML('<red>Please specify a conversation ID.</red>'))
+                    print_formatted_text(HTML('<grey>Usage: /load <conversation_id></grey>'))
+                    continue
+
+                # Attempt to load the conversation
+                loaded_conversation = conversation_manager.load_conversation(conversation_id_arg)
+                if loaded_conversation:
+                    # If we successfully loaded a conversation, we would switch to it here
+                    # For now, this is a placeholder for future enhancement
+                    pass
+                continue
 
             if not runner or not conversation:
                 conversation = setup_conversation(conversation_id)
