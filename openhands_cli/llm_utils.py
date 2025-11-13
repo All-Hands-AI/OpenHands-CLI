@@ -26,6 +26,7 @@ def get_llm_metadata(
     openhands_sdk_version: str = "n/a"
     try:
         import openhands.sdk
+
         openhands_sdk_version = openhands.sdk.__version__
     except (ModuleNotFoundError, AttributeError):
         pass
@@ -33,6 +34,7 @@ def get_llm_metadata(
     openhands_tools_version: str = "n/a"
     try:
         import openhands.tools
+
         openhands_tools_version = openhands.tools.__version__
     except (ModuleNotFoundError, AttributeError):
         pass

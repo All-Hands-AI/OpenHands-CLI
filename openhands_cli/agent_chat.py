@@ -16,6 +16,7 @@ from openhands.sdk import (
     TextContent,
 )
 from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands_cli.conversation_manager import ConversationManager
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import (
     MissingAgentSpec,
@@ -31,7 +32,6 @@ from openhands_cli.tui.tui import (
 )
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
 from openhands_cli.user_actions.utils import get_session_prompter
-from openhands_cli.conversation_manager import ConversationManager
 
 
 def _restore_tty() -> None:
@@ -211,22 +211,29 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
                 # Resume without new message
                 message = None
 
-            elif command == '/list':
+            elif command == "/list":
                 conversation_manager.list_conversations()
                 continue
 
-            elif command.startswith('/load '):
+            elif command.startswith("/load "):
                 conversation_id_arg = command[6:].strip()  # Remove "/load "
                 if not conversation_id_arg:
-                    print_formatted_text(HTML('<red>Please specify a conversation ID.</red>'))
-                    print_formatted_text(HTML('<grey>Usage: /load <conversation_id></grey>'))
+                    print_formatted_text(
+                        HTML("<red>Please specify a conversation ID.</red>")
+                    )
+                    print_formatted_text(
+                        HTML("<grey>Usage: /load <conversation_id></grey>")
+                    )
                     continue
 
                 # Attempt to load the conversation
-                loaded_conversation = conversation_manager.load_conversation(conversation_id_arg)
+                loaded_conversation = conversation_manager.load_conversation(
+                    conversation_id_arg
+                )
                 if loaded_conversation:
-                    # If we successfully loaded a conversation, we would switch to it here
-                    # For now, this is a placeholder for future enhancement
+                    # If we successfully loaded a conversation, we would
+                    # switch to it here. For now, this is a placeholder
+                    # for future enhancement
                     pass
                 continue
 

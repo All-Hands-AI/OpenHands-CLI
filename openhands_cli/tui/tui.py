@@ -7,8 +7,8 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
-from openhands_cli.pt_style import get_cli_style
 from openhands_cli.conversation_manager import ConversationManager
+from openhands_cli.pt_style import get_cli_style
 
 
 DEFAULT_STYLE = get_cli_style()
@@ -24,8 +24,8 @@ COMMANDS = {
     "/resume": "Resume a paused conversation",
     "/settings": "Display and modify current settings",
     "/mcp": "View MCP (Model Context Protocol) server configuration",
-    '/list': 'List past conversations',
-    '/load': 'Load a past conversation by ID',
+    "/list": "List past conversations",
+    "/load": "Load a past conversation by ID",
 }
 
 
@@ -42,16 +42,18 @@ class CommandCompleter(Completer):
     ) -> Generator[Completion, None, None]:
         text = document.text_before_cursor.lstrip()
 
-        if text.startswith('/load '):
+        if text.startswith("/load "):
             # Handle conversation ID completion for /load command
             partial_id = text[6:]  # Remove "/load "
-            suggestions = self.conversation_manager.get_conversation_suggestions(partial_id)
+            suggestions = self.conversation_manager.get_conversation_suggestions(
+                partial_id
+            )
             for suggestion in suggestions:
                 yield Completion(
                     suggestion,
                     start_position=-len(partial_id),
-                    display_meta='conversation ID',
-                    style='bg:ansidarkgray fg:lightblue',
+                    display_meta="conversation ID",
+                    style="bg:ansidarkgray fg:lightblue",
                 )
         elif text.startswith("/"):
             # Handle command completion

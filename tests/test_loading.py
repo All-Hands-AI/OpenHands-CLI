@@ -10,8 +10,9 @@ from unittest.mock import patch
 
 from openhands_cli.listeners.loading_listener import (
     LoadingContext,
-    display_initialization_animation
+    display_initialization_animation,
 )
+
 
 class TestLoadingAnimation(unittest.TestCase):
     """Test cases for loading animation functionality."""
@@ -25,13 +26,15 @@ class TestLoadingAnimation(unittest.TestCase):
             self.assertIsNotNone(ctx.loading_thread)
             # Give the thread a moment to start
             time.sleep(0.1)
+            assert ctx.loading_thread is not None  # for type checker
             self.assertTrue(ctx.loading_thread.is_alive())
 
         # After exiting context, thread should be stopped
         time.sleep(0.1)
+        assert ctx.loading_thread is not None  # for type checker
         self.assertFalse(ctx.loading_thread.is_alive())
 
-    @patch('sys.stdout')
+    @patch("sys.stdout")
     def test_animation_writes_while_running_and_stops_after(self, mock_stdout):
         """Ensure stdout is written while animation runs and stops after it ends."""
         is_loaded = threading.Event()
@@ -39,7 +42,7 @@ class TestLoadingAnimation(unittest.TestCase):
         animation_thread = threading.Thread(
             target=display_initialization_animation,
             args=("Test output", is_loaded),
-            daemon=True
+            daemon=True,
         )
         animation_thread.start()
 
@@ -60,9 +63,8 @@ class TestLoadingAnimation(unittest.TestCase):
         self.assertEqual(
             calls_after_stop,
             mock_stdout.write.call_count,
-            "No extra writes should occur after animation stops"
+            "No extra writes should occur after animation stops",
         )
-
 
 
 if __name__ == "__main__":

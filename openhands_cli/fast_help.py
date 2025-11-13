@@ -20,108 +20,119 @@ def get_fast_cli_parser() -> argparse.ArgumentParser:
     """Create a lightweight argument parser for CLI help command."""
     # Create a description with welcome message explaining available commands
     description = (
-        'Welcome to OpenHands: Code Less, Make More\n\n'
-        'OpenHands supports two main commands:\n'
-        '  serve - Launch the OpenHands GUI server (web interface)\n'
-        '  cli   - Run OpenHands in CLI mode (terminal interface)\n\n'
+        "Welcome to OpenHands: Code Less, Make More\n\n"
+        "OpenHands supports two main commands:\n"
+        "  serve - Launch the OpenHands GUI server (web interface)\n"
+        "  cli   - Run OpenHands in CLI mode (terminal interface)\n\n"
         'Running "openhands" without a command is the same as "openhands cli"'
     )
 
     parser = argparse.ArgumentParser(
         description=description,
-        prog='openhands',
+        prog="openhands",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='For more information about a command, run: openhands COMMAND --help',
+        epilog="For more information about a command, run: openhands COMMAND --help",
     )
 
     # Create subparsers
     subparsers = parser.add_subparsers(
-        dest='command',
-        title='commands',
-        description='OpenHands supports two main commands:',
-        metavar='COMMAND',
+        dest="command",
+        title="commands",
+        description="OpenHands supports two main commands:",
+        metavar="COMMAND",
     )
 
     # Add 'serve' subcommand
     serve_parser = subparsers.add_parser(
-        'serve', help='Launch the OpenHands GUI server using Docker (web interface)'
+        "serve", help="Launch the OpenHands GUI server using Docker (web interface)"
     )
     serve_parser.add_argument(
-        '--mount-cwd',
-        help='Mount the current working directory into the GUI server container',
-        action='store_true',
+        "--mount-cwd",
+        help="Mount the current working directory into the GUI server container",
+        action="store_true",
         default=False,
     )
     serve_parser.add_argument(
-        '--gpu',
-        help='Enable GPU support by mounting all GPUs into the Docker container via nvidia-docker',
-        action='store_true',
+        "--gpu",
+        help=(
+            "Enable GPU support by mounting all GPUs into the Docker "
+            "container via nvidia-docker"
+        ),
+        action="store_true",
         default=False,
     )
 
     # Add 'cli' subcommand with common arguments
     cli_parser = subparsers.add_parser(
-        'cli', help='Run OpenHands in CLI mode (terminal interface)'
+        "cli", help="Run OpenHands in CLI mode (terminal interface)"
     )
 
     # Add common arguments
     cli_parser.add_argument(
-        '--config-file',
+        "--config-file",
         type=str,
-        default='config.toml',
-        help='Path to the config file (default: config.toml in the current directory)',
+        default="config.toml",
+        help="Path to the config file (default: config.toml in the current directory)",
     )
     cli_parser.add_argument(
-        '-t',
-        '--task',
+        "-t",
+        "--task",
         type=str,
-        default='',
-        help='The task for the agent to perform',
+        default="",
+        help="The task for the agent to perform",
     )
     cli_parser.add_argument(
-        '-f',
-        '--file',
+        "-f",
+        "--file",
         type=str,
-        help='Path to a file containing the task. Overrides -t if both are provided.',
+        help="Path to a file containing the task. Overrides -t if both are provided.",
     )
     cli_parser.add_argument(
-        '-n',
-        '--name',
-        help='Session name',
+        "-n",
+        "--name",
+        help="Session name",
         type=str,
-        default='',
+        default="",
     )
     cli_parser.add_argument(
-        '--log-level',
-        help='Set the log level',
+        "--log-level",
+        help="Set the log level",
         type=str,
         default=None,
     )
     cli_parser.add_argument(
-        '-l',
-        '--llm-config',
+        "-l",
+        "--llm-config",
         default=None,
         type=str,
-        help='Replace default LLM ([llm] section in config.toml) config with the specified LLM config, e.g. "llama3" for [llm.llama3] section in config.toml',
+        help=(
+            "Replace default LLM ([llm] section in config.toml) config "
+            'with the specified LLM config, e.g. "llama3" for '
+            "[llm.llama3] section in config.toml"
+        ),
     )
     cli_parser.add_argument(
-        '--agent-config',
+        "--agent-config",
         default=None,
         type=str,
-        help='Replace default Agent ([agent] section in config.toml) config with the specified Agent config, e.g. "CodeAct" for [agent.CodeAct] section in config.toml',
+        help=(
+            "Replace default Agent ([agent] section in config.toml) config "
+            'with the specified Agent config, e.g. "CodeAct" for '
+            "[agent.CodeAct] section in config.toml"
+        ),
     )
     cli_parser.add_argument(
-        '-v', '--version', action='store_true', help='Show version information'
+        "-v", "--version", action="store_true", help="Show version information"
     )
     cli_parser.add_argument(
-        '--override-cli-mode',
-        help='Override the default settings for CLI mode',
+        "--override-cli-mode",
+        help="Override the default settings for CLI mode",
         type=bool,
         default=False,
     )
     parser.add_argument(
-        '--conversation',
-        help='The conversation id to continue',
+        "--conversation",
+        help="The conversation id to continue",
         type=str,
         default=None,
     )
@@ -147,26 +158,26 @@ def handle_fast_commands() -> bool:
         bool: True if a command was handled, False otherwise.
     """
     # Handle --help or -h
-    if len(sys.argv) == 2 and sys.argv[1] in ('--help', '-h'):
+    if len(sys.argv) == 2 and sys.argv[1] in ("--help", "-h"):
         parser = get_fast_cli_parser()
 
         # Print top-level help
         print(parser.format_help())
 
         # Also print help for `cli` subcommand
-        print('\n' + '=' * 80)
-        print('CLI command help:\n')
+        print("\n" + "=" * 80)
+        print("CLI command help:\n")
 
-        cli_parser = get_fast_subparser(parser, 'cli')
+        cli_parser = get_fast_subparser(parser, "cli")
         print(cli_parser.format_help())
 
         return True
 
     # Handle --version or -v
-    if len(sys.argv) == 2 and sys.argv[1] in ('--version', '-v'):
-        import openhands
+    if len(sys.argv) == 2 and sys.argv[1] in ("--version", "-v"):
+        import openhands  # type: ignore[import-untyped]
 
-        print(f'OpenHands CLI version: {openhands.get_version()}')
+        print(f"OpenHands CLI version: {openhands.get_version()}")  # type: ignore[attr-defined]
         return True
 
     return False
