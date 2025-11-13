@@ -48,6 +48,7 @@ jobs:
                   uv run pytest -v \
                     --cov=openhands_cli \
                     --cov-report=term-missing \
+                    --cov-report= \
                     --cov-fail-under=0 \
                     --cov-config=pyproject.toml
 
