@@ -59,7 +59,7 @@ jobs:
                     exit 1
                   fi
 
-            - name: Debug coverage file before upload
+            - name: Prepare coverage file for upload
               if: always()
               run: |
                   echo "Current directory: $(pwd)"
@@ -67,16 +67,23 @@ jobs:
                   ls -la
                   echo "Looking for .coverage file:"
                   find . -name ".coverage" -type f -exec ls -la {} \;
-                  echo "Absolute path to .coverage:"
-                  find $(pwd) -name ".coverage" -type f -exec ls -la {} \;
+                  # Copy coverage file to ensure it's accessible
+                  if [ -f .coverage ]; then
+                    cp .coverage coverage-data.db
+                    echo "Copied .coverage to coverage-data.db"
+                    ls -la coverage-data.db
+                  else
+                    echo "ERROR: .coverage file not found for upload"
+                    exit 1
+                  fi
 
             - name: Upload coverage data
               if: always()
               uses: actions/upload-artifact@v4
               with:
                   name: coverage-data
-                  path: ${{ github.workspace }}/.coverage
-                  if-no-files-found: warn
+                  path: coverage-data.db
+                  if-no-files-found: error
 
     coverage-report:
         name: Generate coverage report
@@ -110,14 +117,21 @@ jobs:
 
             - name: Generate coverage report
               run: |
-                  if [ -f .coverage ]; then
-                    echo "Coverage file found, generating report..."
-                    uv run coverage xml -i -o coverage.xml
-                    uv run coverage report -m
+                  # Check for downloaded coverage file and rename it
+                  if [ -f coverage-data.db ]; then
+                    echo "Downloaded coverage file found, renaming to .coverage..."
+                    mv coverage-data.db .coverage
+                    ls -la .coverage
+                  elif [ -f .coverage ]; then
+                    echo "Coverage file already exists..."
                   else
                     echo "No coverage file found; skipping report generation."
                     exit 0
                   fi
+                  
+                  echo "Generating coverage report..."
+                  uv run coverage xml -i -o coverage.xml
+                  uv run coverage report -m
 
             - name: Post coverage comment to PR
               if: always()
