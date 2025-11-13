@@ -277,14 +277,14 @@ def main() -> int:
     # Test the executable
     if not args.no_test:
         model_name = "dummy-model"
-        kwargs: dict[str, Any] = {}
+        extra_kwargs: dict[str, Any] = {}
         if should_set_litellm_extra_body(model_name):
-            kwargs["litellm_extra_body"] = {
+            extra_kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(
                     model_name=model_name, llm_type="openhands"
                 )
             }
-        llm = LLM(model=model_name, api_key="dummy-key", **kwargs)
+        llm = LLM(model=model_name, api_key="dummy-key", **extra_kwargs)
         dummy_agent = get_default_cli_agent(llm=llm)
         if not test_executable(dummy_agent):
             print("❌ Executable test failed, build process failed")
