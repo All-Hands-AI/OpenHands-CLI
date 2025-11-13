@@ -17,7 +17,11 @@ from pathlib import Path
 
 from openhands.sdk import LLM
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
-from openhands_cli.utils import get_default_cli_agent, get_llm_metadata
+from openhands_cli.utils import (
+    get_default_cli_agent,
+    get_llm_metadata,
+    should_set_litellm_extra_body,
+)
 
 
 # =================================================
@@ -271,17 +275,23 @@ def main() -> int:
 
     # Test the executable
     if not args.no_test:
-        dummy_agent = get_default_cli_agent(
-            llm=LLM(
-                model="dummy-model",
+        model_name = "dummy-model"
+        if should_set_litellm_extra_body(model_name):
+            llm = LLM(
+                model=model_name,
                 api_key="dummy-key",
                 litellm_extra_body={
                     "metadata": get_llm_metadata(
-                        model_name="dummy-model", llm_type="openhands"
+                        model_name=model_name, llm_type="openhands"
                     )
                 },
             )
-        )
+        else:
+            llm = LLM(
+                model=model_name,
+                api_key="dummy-key",
+            )
+        dummy_agent = get_default_cli_agent(llm=llm)
         if not test_executable(dummy_agent):
             print("❌ Executable test failed, build process failed")
             return 1
