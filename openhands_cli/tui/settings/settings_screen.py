@@ -186,17 +186,18 @@ class SettingsScreen:
         )
 
     def _save_llm_settings(self, model, api_key, base_url: str | None = None) -> None:
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "api_key": api_key,
-            "base_url": base_url,
-            "usage_id": "agent",
-        }
+        kwargs: dict[str, Any] = {}
         if should_set_litellm_extra_body(model):
             kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(model_name=model, llm_type="agent")
             }
-        llm = LLM(**kwargs)
+        llm = LLM(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            usage_id="agent",
+            **kwargs,
+        )
 
         agent = self.agent_store.load()
         if not agent:
