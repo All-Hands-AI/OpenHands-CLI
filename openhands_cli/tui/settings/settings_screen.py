@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import print_container
@@ -185,23 +186,17 @@ class SettingsScreen:
         )
 
     def _save_llm_settings(self, model, api_key, base_url: str | None = None) -> None:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "api_key": api_key,
+            "base_url": base_url,
+            "usage_id": "agent",
+        }
         if should_set_litellm_extra_body(model):
-            llm = LLM(
-                model=model,
-                api_key=api_key,
-                base_url=base_url,
-                usage_id="agent",
-                litellm_extra_body={
-                    "metadata": get_llm_metadata(model_name=model, llm_type="agent")
-                },
-            )
-        else:
-            llm = LLM(
-                model=model,
-                api_key=api_key,
-                base_url=base_url,
-                usage_id="agent",
-            )
+            kwargs["litellm_extra_body"] = {
+                "metadata": get_llm_metadata(model_name=model, llm_type="agent")
+            }
+        llm = LLM(**kwargs)
 
         agent = self.agent_store.load()
         if not agent:
