@@ -8,6 +8,10 @@ on:
     pull_request:
         branches: ['**']
 
+permissions:
+    contents: read
+    pull-requests: write
+
 concurrency:
     group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
     cancel-in-progress: true
@@ -37,6 +41,75 @@ jobs:
               run: |
                   uv sync --group dev
 
-            - name: Run tests
+            - name: Run tests with coverage
               run: |
-                  uv run pytest -v
+                  # Clean up any existing coverage file
+                  rm -f .coverage
+                  uv run pytest -v \
+                    --cov=openhands_cli \
+                    --cov-report=term-missing \
+                    --cov-fail-under=0 \
+                    --cov-config=pyproject.toml
+
+            - name: Upload coverage data
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-data
+                  path: .coverage
+                  if-no-files-found: warn
+
+    coverage-report:
+        name: Generate coverage report
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        needs: [test-python]
+        if: always() && github.event_name == 'pull_request'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: 3.12
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: latest
+
+            - name: Install dependencies (for coverage CLI)
+              run: |
+                  uv sync --group dev
+
+            - name: Download coverage data
+              uses: actions/download-artifact@v4
+              with:
+                  name: coverage-data
+              continue-on-error: true
+
+            - name: Generate coverage report
+              run: |
+                  if [ -f .coverage ]; then
+                    echo "Coverage file found, generating report..."
+                    uv run coverage xml -i -o coverage.xml
+                    uv run coverage report -m
+                  else
+                    echo "No coverage file found; skipping report generation."
+                    exit 0
+                  fi
+
+            - name: Post coverage comment to PR
+              if: always()
+              continue-on-error: true
+              uses: MishaKav/pytest-coverage-comment@v1
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  pytest-xml-coverage-path: coverage.xml
+                  title: Coverage Report
+                  create-new-comment: false
+                  hide-report: false
+                  report-only-changed-files: true
+                  remove-links-to-files: true
+                  remove-links-to-lines: true
