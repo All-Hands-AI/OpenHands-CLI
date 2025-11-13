@@ -59,6 +59,15 @@ jobs:
                     exit 1
                   fi
 
+            - name: Debug coverage file before upload
+              if: always()
+              run: |
+                  echo "Current directory: $(pwd)"
+                  echo "Files in current directory:"
+                  ls -la
+                  echo "Looking for .coverage file:"
+                  find . -name ".coverage" -type f -exec ls -la {} \;
+
             - name: Upload coverage data
               if: always()
               uses: actions/upload-artifact@v4
