@@ -48,9 +48,16 @@ jobs:
                   uv run pytest -v \
                     --cov=openhands_cli \
                     --cov-report=term-missing \
-                    --cov-report= \
                     --cov-fail-under=0 \
                     --cov-config=pyproject.toml
+                  # Verify coverage data file exists
+                  if [ -f .coverage ]; then
+                    echo "Coverage data file created successfully"
+                    ls -la .coverage
+                  else
+                    echo "ERROR: Coverage data file not created"
+                    exit 1
+                  fi
 
             - name: Upload coverage data
               if: always()
