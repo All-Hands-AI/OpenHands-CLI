@@ -7,6 +7,22 @@ from openhands.sdk import LLM
 from openhands.tools.preset import get_default_agent
 
 
+def should_set_litellm_extra_body(model_name: str) -> bool:
+    """
+    Determine if litellm_extra_body should be set based on the model name.
+
+    Only set litellm_extra_body for litellm_proxy models to avoid issues
+    with providers that don't support extra_body parameters.
+
+    Args:
+        model_name: Name of the LLM model
+
+    Returns:
+        True if litellm_extra_body should be set, False otherwise
+    """
+    return "litellm_proxy" in model_name
+
+
 def get_llm_metadata(
     model_name: str,
     llm_type: str,
