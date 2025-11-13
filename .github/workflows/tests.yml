@@ -67,13 +67,15 @@ jobs:
                   ls -la
                   echo "Looking for .coverage file:"
                   find . -name ".coverage" -type f -exec ls -la {} \;
+                  echo "Absolute path to .coverage:"
+                  find $(pwd) -name ".coverage" -type f -exec ls -la {} \;
 
             - name: Upload coverage data
               if: always()
               uses: actions/upload-artifact@v4
               with:
                   name: coverage-data
-                  path: .coverage
+                  path: ${{ github.workspace }}/.coverage
                   if-no-files-found: warn
 
     coverage-report:
