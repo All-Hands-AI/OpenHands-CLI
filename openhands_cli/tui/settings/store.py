@@ -16,7 +16,6 @@ from openhands_cli.locations import (
     PERSISTENCE_DIR,
     WORK_DIR,
 )
-from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
 class AgentStore:
@@ -55,32 +54,8 @@ class AgentStore:
 
             mcp_config: dict = self.load_mcp_configuration()
 
-            # Update LLM metadata with current information
-            llm_update = {}
-            if should_set_litellm_extra_body(agent.llm.model):
-                llm_update["litellm_extra_body"] = {
-                    "metadata": get_llm_metadata(
-                        model_name=agent.llm.model,
-                        llm_type="agent",
-                        session_id=session_id,
-                    )
-                }
-            updated_llm = agent.llm.model_copy(update=llm_update)
-
+            updated_llm = agent.llm
             condenser_updates = {}
-            if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-                condenser_llm_update = {}
-                if should_set_litellm_extra_body(agent.condenser.llm.model):
-                    condenser_llm_update["litellm_extra_body"] = {
-                        "metadata": get_llm_metadata(
-                            model_name=agent.condenser.llm.model,
-                            llm_type="condenser",
-                            session_id=session_id,
-                        )
-                    }
-                condenser_updates["llm"] = agent.condenser.llm.model_copy(
-                    update=condenser_llm_update
-                )
 
             # Update tools and context
             agent = agent.model_copy(
