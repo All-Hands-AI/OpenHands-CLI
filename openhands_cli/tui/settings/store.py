@@ -8,6 +8,7 @@ from fastmcp.mcp_config import MCPConfig
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, AgentContext, LocalFileStore
+from openhands.sdk.context import load_skills_from_dir
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
@@ -33,6 +34,31 @@ class AgentStore:
         except Exception:
             return {}
 
+    def load_project_skills(self) -> list:
+        """Load skills project-specific directories."""
+        all_skills = []
+
+        # Load project-specific skills from .openhands/skills and legacy microagents
+        project_skills_dirs = [
+            Path(WORK_DIR) / ".openhands" / "skills",
+            Path(WORK_DIR) / ".openhands" / "microagents",  # Legacy support
+        ]
+
+        for project_skills_dir in project_skills_dirs:
+            if project_skills_dir.exists():
+                try:
+                    repo_skills, knowledge_skills = load_skills_from_dir(
+                        project_skills_dir
+                    )
+                    project_skills = list(repo_skills.values()) + list(
+                        knowledge_skills.values()
+                    )
+                    all_skills.extend(project_skills)
+                except Exception:
+                    pass
+
+        return all_skills
+
     def load(self, session_id: str | None = None) -> Agent | None:
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
@@ -49,8 +75,13 @@ class AgentStore:
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
 
+            # Load skills from user directories and project-specific directories
+            skills = self.load_project_skills()
+
             agent_context = AgentContext(
+                skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
+                load_user_skills=True,
             )
 
             mcp_config: dict = self.load_mcp_configuration()
