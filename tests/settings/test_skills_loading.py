@@ -67,7 +67,7 @@ class TestSkillsLoading:
         from openhands.sdk import LLM, Agent
 
         # Create a test agent to save first
-        test_agent = Agent(llm=LLM(model="gpt-4o-mini"), name="test_agent")
+        test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
         agent_store.save(test_agent)
 
         # Load agent - this should include skills from project directories
@@ -91,7 +91,7 @@ class TestSkillsLoading:
 
     def test_load_agent_with_user_and_project_skills_combined(self, temp_project_dir):
         """Test that user and project skills are properly combined.
-        
+
         This test verifies that when loading an agent, both user and project skills
         are properly loaded and combined.
         """
@@ -138,19 +138,15 @@ This is a user microagent for testing.
                     agent_store = AgentStore()
 
                     # Create a test agent to save first
-                    test_agent = Agent(llm=LLM(model="gpt-4o-mini"), name="test_agent")
+                    test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
                     agent_store.save(test_agent)
 
-                    # Now load the agent - this should include both user and project skills
                     loaded_agent = agent_store.load()
-
                     assert loaded_agent is not None
                     assert loaded_agent.agent_context is not None
 
-                    # The agent context should have skills from both user and project directories
                     # Project skills: 3 (2 microagents + 1 skill)
-                    # User skills: 2 (1 skill + 1 microagent) - loaded via load_user_skills=True
-                    # Total expected: 5 skills
+                    # User skills: 2 (1 skill + 1 microagent)
                     all_skills = loaded_agent.agent_context.skills
                     assert isinstance(all_skills, list)
                     assert len(all_skills) == 5

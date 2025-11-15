@@ -22,6 +22,9 @@ install-dev:
 test:
 	uv run pytest
 
+lint:
+	uv run pre-commit run --all-files
+
 # Format code
 format:
 	uv run ruff format openhands_cli/
