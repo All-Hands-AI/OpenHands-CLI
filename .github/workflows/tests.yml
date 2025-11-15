@@ -128,7 +128,7 @@ jobs:
                     echo "No coverage file found; skipping report generation."
                     exit 0
                   fi
-                  
+
                   echo "Generating coverage report..."
                   uv run coverage xml -i -o coverage.xml
                   uv run coverage report -m
