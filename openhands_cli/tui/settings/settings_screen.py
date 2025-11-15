@@ -21,11 +21,7 @@ from openhands_cli.user_actions.settings_action import (
     save_settings_confirmation,
     settings_type_confirmation,
 )
-from openhands_cli.utils import (
-    get_default_cli_agent,
-    get_llm_metadata,
-    should_set_litellm_extra_body,
-)
+from openhands_cli.utils import get_default_cli_agent
 
 
 class SettingsScreen:
@@ -186,17 +182,11 @@ class SettingsScreen:
         )
 
     def _save_llm_settings(self, model, api_key, base_url: str | None = None) -> None:
-        extra_kwargs: dict[str, Any] = {}
-        if should_set_litellm_extra_body(model):
-            extra_kwargs["litellm_extra_body"] = {
-                "metadata": get_llm_metadata(model_name=model, llm_type="agent")
-            }
         llm = LLM(
             model=model,
             api_key=api_key,
             base_url=base_url,
             usage_id="agent",
-            **extra_kwargs,
         )
 
         agent = self.agent_store.load()

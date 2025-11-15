@@ -46,9 +46,8 @@ def agent_store() -> AgentStore:
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
-@patch("openhands_cli.tui.settings.store.get_llm_metadata", return_value={})
 def test_load_overrides_persisted_mcp_with_mcp_json_file(
-    mock_meta, mock_tools, persistence_dir, agent_store
+    mock_tools, persistence_dir, agent_store
 ):
     """If agent has MCP servers, mcp.json must replace them entirely."""
     # Persist an agent that already contains MCP servers
@@ -89,9 +88,8 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
-@patch("openhands_cli.tui.settings.store.get_llm_metadata", return_value={})
 def test_load_when_mcp_file_missing_ignores_persisted_mcp(
-    mock_meta, mock_tools, persistence_dir, agent_store
+    mock_tools, persistence_dir, agent_store
 ):
     """If mcp.json is absent, loaded agent.mcp_config should be empty
     (persisted MCP ignored)."""
