@@ -8,7 +8,7 @@ from fastmcp.mcp_config import MCPConfig
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, AgentContext, LocalFileStore
-from openhands.sdk.context import load_skills_from_dir, load_user_skills
+from openhands.sdk.context import load_skills_from_dir
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
@@ -34,16 +34,9 @@ class AgentStore:
         except Exception:
             return {}
 
-    def load_skills(self) -> list:
+    def load_project_skills(self) -> list:
         """Load skills from user directories and project-specific directories."""
         all_skills = []
-
-        # Load user skills from ~/.openhands/skills and ~/.openhands/microagents
-        try:
-            user_skills = load_user_skills()
-            all_skills.extend(user_skills)
-        except Exception:
-            pass
 
         # Load project-specific skills from .openhands/skills and legacy microagents
         project_skills_dirs = [
@@ -83,11 +76,12 @@ class AgentStore:
             updated_tools = get_default_tools(enable_browser=False)
 
             # Load skills from user directories and project-specific directories
-            skills = self.load_skills()
+            skills = self.load_project_skills()
 
             agent_context = AgentContext(
                 skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
+                load_user_skills=True,
             )
 
             mcp_config: dict = self.load_mcp_configuration()

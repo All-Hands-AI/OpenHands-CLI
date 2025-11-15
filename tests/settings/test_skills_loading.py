@@ -68,7 +68,7 @@ class TestSkillsLoading:
         agent_store.load()
 
         # Verify that skills were loaded and are accessible
-        skills = agent_store.load_skills()
+        skills = agent_store.load_project_skills()
         assert isinstance(skills, list)
         # Should have exactly 3 project skills: 2 microagents + 1 skill
         # (user skills may be 0 if no user skills directory exists)
@@ -117,7 +117,7 @@ This is a user microagent for testing.
                     agent_store.load()
 
                     # Verify that both user and project skills were loaded
-                    skills = agent_store.load_skills()
+                    skills = agent_store.load_project_skills()
                     assert isinstance(skills, list)
                     # Should have 5 total skills:
                     # - 2 user skills (1 skill + 1 microagent)
