@@ -35,7 +35,7 @@ class AgentStore:
             return {}
 
     def load_project_skills(self) -> list:
-        """Load skills from user directories and project-specific directories."""
+        """Load skills project-specific directories."""
         all_skills = []
 
         # Load project-specific skills from .openhands/skills and legacy microagents
