@@ -64,20 +64,41 @@ class TestSkillsLoading:
 
     def test_load_agent_with_project_skills(self, agent_store):
         """Test that loading agent includes skills from project directories."""
-        # Load agent - this should include skills from both directories
-        agent_store.load()
+        from openhands.sdk import LLM, Agent
 
-        # Verify that skills were loaded and are accessible
-        skills = agent_store.load_project_skills()
-        assert isinstance(skills, list)
+        # Create a test agent to save first
+        test_agent = Agent(llm=LLM(model="gpt-4o-mini"), name="test_agent")
+        agent_store.save(test_agent)
+
+        # Load agent - this should include skills from project directories
+        loaded_agent = agent_store.load()
+
+        assert loaded_agent is not None
+        assert loaded_agent.agent_context is not None
+
+        # Verify that project skills were loaded into the agent context
         # Should have exactly 3 project skills: 2 microagents + 1 skill
-        # (user skills may be 0 if no user skills directory exists)
-        assert len(skills) >= 3
+        # Plus any user skills that might be loaded via load_user_skills=True
+        all_skills = loaded_agent.agent_context.skills
+        assert isinstance(all_skills, list)
+        assert len(all_skills) >= 3
+
+        # Verify we have the expected project skills
+        skill_names = [skill.name for skill in all_skills]
+        assert "test_skill" in skill_names  # project skill
+        assert "test_microagent" in skill_names  # project microagent
+        assert "integration_test" in skill_names  # project microagent
 
     def test_load_agent_with_user_and_project_skills_combined(self, temp_project_dir):
-        """Test that user and project skills are properly combined."""
+        """Test that user and project skills are properly combined.
+        
+        This test verifies that when loading an agent, both user and project skills
+        are properly loaded and combined.
+        """
         # Create temporary user directories
         import tempfile
+
+        from openhands.sdk import LLM, Agent
 
         with tempfile.TemporaryDirectory() as user_temp_dir:
             user_skills_temp = Path(user_temp_dir) / ".openhands" / "skills"
@@ -113,13 +134,31 @@ This is a user microagent for testing.
                 with patch(
                     "openhands_cli.tui.settings.store.WORK_DIR", temp_project_dir
                 ):
+                    # Create a minimal agent configuration for testing
                     agent_store = AgentStore()
-                    agent_store.load()
 
-                    # Verify that both user and project skills were loaded
-                    skills = agent_store.load_project_skills()
-                    assert isinstance(skills, list)
-                    # Should have 5 total skills:
-                    # - 2 user skills (1 skill + 1 microagent)
-                    # - 3 project skills (2 microagents + 1 skill)
-                    assert len(skills) == 5
+                    # Create a test agent to save first
+                    test_agent = Agent(llm=LLM(model="gpt-4o-mini"), name="test_agent")
+                    agent_store.save(test_agent)
+
+                    # Now load the agent - this should include both user and project skills
+                    loaded_agent = agent_store.load()
+
+                    assert loaded_agent is not None
+                    assert loaded_agent.agent_context is not None
+
+                    # The agent context should have skills from both user and project directories
+                    # Project skills: 3 (2 microagents + 1 skill)
+                    # User skills: 2 (1 skill + 1 microagent) - loaded via load_user_skills=True
+                    # Total expected: 5 skills
+                    all_skills = loaded_agent.agent_context.skills
+                    assert isinstance(all_skills, list)
+                    assert len(all_skills) == 5
+
+                    # Verify we have skills from both sources
+                    skill_names = [skill.name for skill in all_skills]
+                    assert "test_skill" in skill_names  # project skill
+                    assert "test_microagent" in skill_names  # project microagent
+                    assert "integration_test" in skill_names  # project microagent
+                    assert "user_skill" in skill_names  # user skill
+                    assert "user_microagent" in skill_names  # user microagent
