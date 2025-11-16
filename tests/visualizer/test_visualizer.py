@@ -3,6 +3,7 @@
 import json
 from typing import ClassVar
 
+from rich.console import Group
 from rich.text import Text
 
 from openhands.sdk.event import (
@@ -56,15 +57,15 @@ def create_tool_call(
 
 
 def test_conversation_visualizer_initialization():
-    """Test DefaultConversationVisualizer can be initialized."""
+    """Test CLIVisualizer can be initialized."""
     visualizer = CLIVisualizer()
     assert visualizer is not None
     assert hasattr(visualizer, "on_event")
-    assert hasattr(visualizer, "_create_event_panel")
+    assert hasattr(visualizer, "_create_event_block")
 
 
 def test_visualizer_event_panel_creation():
-    """Test that visualizer creates panels for different event types."""
+    """Test that visualizer creates event blocks for different event types."""
     conv_viz = CLIVisualizer()
 
     # Test with a simple action event
@@ -78,9 +79,9 @@ def test_visualizer_event_panel_creation():
         tool_call=tool_call,
         llm_response_id="response_1",
     )
-    panel = conv_viz._create_event_panel(action_event)
-    assert panel is not None
-    assert hasattr(panel, "renderable")
+    block = conv_viz._create_event_block(action_event)
+    assert block is not None
+    assert isinstance(block, Group)
 
 
 def test_visualizer_action_event_with_none_action_panel():
@@ -95,16 +96,21 @@ def test_visualizer_action_event_with_none_action_panel():
         llm_response_id="resp_viz_1",
         action=None,
     )
-    panel = visualizer._create_event_panel(action_event)
-    assert panel is not None
+    block = visualizer._create_event_block(action_event)
+    assert block is not None
+    assert isinstance(block, Group)
+    # Check the title is in one of the renderables (it's a Rule in the Group)
+    renderables = list(block.renderables)
+    # The first element should be a Rule with the title
+    title_str = str(renderables[0])
     # Ensure it doesn't fall back to UNKNOWN
-    assert "UNKNOWN Event" not in str(panel.title)
+    assert "UNKNOWN Event" not in title_str
     # And uses the 'Agent Action (Not Executed)' title
-    assert "Agent Action (Not Executed)" in str(panel.title)
+    assert "Agent Action (Not Executed)" in title_str
 
 
 def test_visualizer_user_reject_observation_panel():
-    """UserRejectObservation should render a dedicated panel."""
+    """UserRejectObservation should render a dedicated block."""
     visualizer = CLIVisualizer()
     event = UserRejectObservation(
         tool_name="demo_tool",
@@ -113,15 +119,22 @@ def test_visualizer_user_reject_observation_panel():
         rejection_reason="User rejected the proposed action.",
     )
 
-    panel = visualizer._create_event_panel(event)
-    assert panel is not None
-    title = str(panel.title)
-    assert "UNKNOWN Event" not in title
-    assert "User Rejected Action" in title
-    # ensure the reason is part of the renderable text
-    renderable = panel.renderable
-    assert isinstance(renderable, Text)
-    assert "User rejected the proposed action." in renderable.plain
+    block = visualizer._create_event_block(event)
+    assert block is not None
+    assert isinstance(block, Group)
+    renderables = list(block.renderables)
+    # The first element should be a Rule with the title
+    title_str = str(renderables[0])
+    assert "UNKNOWN Event" not in title_str
+    assert "User Rejected Action" in title_str
+    # Find the content Text in the renderables
+    content_text = None
+    for renderable in renderables:
+        if isinstance(renderable, Text) and renderable.plain.strip():
+            content_text = renderable
+            break
+    assert content_text is not None
+    assert "User rejected the proposed action." in content_text.plain
 
 
 def test_metrics_formatting():
@@ -212,7 +225,7 @@ def test_metrics_abbreviation_formatting():
 
 
 def test_event_base_fallback_visualize():
-    """Test that Event provides fallback visualization."""
+    """Test that unknown events are handled gracefully (returns None and logs warning)."""
     from openhands.sdk.event.base import Event
     from openhands.sdk.event.types import SourceType
 
@@ -222,18 +235,17 @@ def test_event_base_fallback_visualize():
     event = UnknownEvent()
 
     conv_viz = CLIVisualizer()
-    panel = conv_viz._create_event_panel(event)
+    block = conv_viz._create_event_block(event)
 
-    assert panel
-    assert panel.title is not None
-    assert "UNKNOWN Event" in str(panel.title)
+    # Unknown event types should return None (with a warning logged)
+    assert block is None
 
 
 def test_visualizer_does_not_render_system_prompt():
-    """Test that Event provides fallback visualization."""
+    """Test that system prompt events are skipped."""
     system_prompt_event = SystemPromptEvent(
         source="agent", system_prompt=TextContent(text="dummy"), tools=[]
     )
     conv_viz = CLIVisualizer()
-    panel = conv_viz._create_event_panel(system_prompt_event)
-    assert panel is None
+    block = conv_viz._create_event_block(system_prompt_event)
+    assert block is None
