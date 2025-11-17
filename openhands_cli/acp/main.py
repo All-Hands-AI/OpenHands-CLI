@@ -84,7 +84,7 @@ def version() -> None:
     typer.echo(f"OpenHands ACP Agent v{__version__}")
 
 
-async def run_acp_agent(sessions_dir: Optional[str] = None) -> None:
+async def run_acp_agent() -> None:
     """
     Run the OpenHands ACP agent.
     
@@ -100,11 +100,7 @@ async def run_acp_agent(sessions_dir: Optional[str] = None) -> None:
             
             # Create the ACP agent
             agent = OpenHandsACPAgent(write_stream)
-            
-            # Set sessions directory if provided
-            if sessions_dir:
-                agent._session_manager = agent._session_manager.__class__(sessions_dir)
-            
+
             logger.info("OpenHands ACP agent created, starting message loop")
             
             # Start the ACP message loop

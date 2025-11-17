@@ -55,9 +55,5 @@ Examples:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Set the logging level",
     )
-    acp_parser.add_argument(
-        "--sessions-dir",
-        help="Directory to store session data",
-    )
 
     return parser
