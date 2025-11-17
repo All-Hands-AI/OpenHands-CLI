@@ -4,11 +4,13 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 from rich.console import Console, Group
-from rich.rule import Rule
 from rich.text import Text
 
 from openhands.sdk.conversation.visualizer.base import (
     ConversationVisualizerBase,
+)
+from openhands.sdk.conversation.visualizer.default import (
+    build_event_block,
 )
 from openhands.sdk.event import (
     ActionEvent,
@@ -54,10 +56,14 @@ DEFAULT_HIGHLIGHT_REGEX = {
 
 
 class EventVisualizationConfig(BaseModel):
-    """Configuration for how to visualize an event type."""
+    """Configuration for how to visualize an event type.
+
+    This is a CLI-specific extension that supports passing an agent name
+    to title callables for multi-agent scenarios.
+    """
 
     title: str | Callable[[Event, str | None], str]
-    """The title for this event. Can be a string or callable."""
+    """The title for this event. Can be a string or callable accepting (event, name)."""
 
     color: str | Callable[[Event], str]
     """The Rich color to use for the title and rule. Can be a string or callable."""
@@ -72,63 +78,6 @@ class EventVisualizationConfig(BaseModel):
     """If True, skip visualization of this event type entirely."""
 
     model_config = {"arbitrary_types_allowed": True}
-
-
-def indent_content(content: Text, spaces: int = 4) -> Text:
-    """Indent content for visual hierarchy while preserving all formatting."""
-    prefix = " " * spaces
-    lines = content.split("\n")
-
-    indented = Text()
-    for i, line in enumerate(lines):
-        if i > 0:
-            indented.append("\n")
-        indented.append(prefix)
-        indented.append(line)
-
-    return indented
-
-
-def section_header(title: str, color: str) -> Rule:
-    """Create a semantic divider with title."""
-    return Rule(
-        f"[{color} bold]{title}[/{color} bold]",
-        style=color,
-        characters="─",
-        align="left",
-    )
-
-
-def build_event_block(
-    content: Text,
-    title: str,
-    title_color: str,
-    subtitle: str | None = None,
-    indent: bool = False,
-) -> Group:
-    """Build a complete event block with header, content, and optional subtitle."""
-    parts = []
-
-    # Header with rule
-    parts.append(section_header(title, title_color))
-    parts.append(Text())  # Blank line after header
-
-    # Content (optionally indented)
-    if indent:
-        parts.append(indent_content(content))
-    else:
-        parts.append(content)
-
-    # Subtitle (metrics) if provided
-    if subtitle:
-        parts.append(Text())  # Blank line before subtitle
-        subtitle_text = Text.from_markup(subtitle)
-        subtitle_text.stylize("dim")
-        parts.append(subtitle_text)
-
-    parts.append(Text())  # Blank line after block
-
-    return Group(*parts)
 
 
 def _get_action_title(event: Event, name: str | None = None) -> str:
