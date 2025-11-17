@@ -1,275 +1,338 @@
-"""
-OpenHands ACP Agent Implementation.
-
-This module implements the Agent Client Protocol (ACP) interface for OpenHands,
-allowing it to work with ACP-compatible editors like Zed.
-"""
+"""OpenHands Agent Client Protocol (ACP) server implementation."""
 
 import asyncio
 import logging
-import os
 import uuid
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 from acp import (
-    Agent,
+    Agent as ACPAgent,
     AgentSideConnection,
-    AuthenticateRequest,
-    AuthenticateResponse,
-    CancelNotification,
     InitializeRequest,
     InitializeResponse,
-    LoadSessionRequest,
-    LoadSessionResponse,
     NewSessionRequest,
     NewSessionResponse,
     PromptRequest,
     PromptResponse,
-    session_notification,
-    text_block,
-    update_agent_message,
-    PROTOCOL_VERSION,
+    SessionNotification,
+    stdio_streams,
 )
 from acp.schema import (
     AgentCapabilities,
-    AgentMessageChunk,
-    FileSystemCapability,
-    Implementation,
+    AuthenticateRequest,
+    AuthenticateResponse,
+    CancelNotification,
+    ContentBlock1,
+    LoadSessionRequest,
+    McpCapabilities,
     PromptCapabilities,
-    StopReason,
+    SessionUpdate1,
+    SessionUpdate2,
+    SetSessionModeRequest,
+    SetSessionModeResponse,
+    SetSessionModelRequest,
+    SetSessionModelResponse,
 )
 
-from .bridge import OpenHandsBridge
-from .session import SessionManager
+from openhands.sdk import BaseConversation, Conversation, Message, TextContent, Workspace
+from openhands.sdk.event.llm_convertible.message import MessageEvent
+from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.setup import load_agent_specs, MissingAgentSpec
 
 
 logger = logging.getLogger(__name__)
 
 
-class OpenHandsACPAgent(Agent):
-    """
-    OpenHands Agent Client Protocol implementation.
-    
-    This class implements the ACP Agent interface and bridges communication
-    between ACP-compatible editors and the OpenHands agent system.
-    """
+class OpenHandsACPAgent(ACPAgent):
+    """OpenHands Agent Client Protocol implementation."""
 
-    def __init__(self, conn: AgentSideConnection) -> None:
-        """Initialize the OpenHands ACP Agent.
-        
+    def __init__(self, conn: AgentSideConnection):
+        """Initialize the OpenHands ACP agent.
+
         Args:
-            conn: The ACP connection to the client (editor)
+            conn: ACP connection for sending notifications
         """
         self._conn = conn
-        self._session_manager = SessionManager()
-        self._bridge: Optional[OpenHandsBridge] = None
-        self._working_directory: Optional[str] = None
-        
+        self._sessions: dict[str, BaseConversation] = {}  # session_id -> conversation
+
         logger.info("OpenHands ACP Agent initialized")
 
-    async def _send_agent_message(self, session_id: str, content: Any) -> None:
-        """Send an agent message to the client.
-        
-        Args:
-            session_id: The session ID
-            content: The message content
-        """
-        update = (
-            content 
-            if isinstance(content, AgentMessageChunk) 
-            else update_agent_message(content)
-        )
-        await self._conn.sessionUpdate(session_notification(session_id, update))
-
     async def initialize(self, params: InitializeRequest) -> InitializeResponse:
-        """Initialize the ACP connection and negotiate capabilities.
-        
-        Args:
-            params: The initialization request parameters
-            
-        Returns:
-            The initialization response with agent capabilities
-        """
-        logger.info(
-            "Received initialize request from client: %s v%s", 
-            params.clientInfo.name if params.clientInfo else "Unknown",
-            params.clientInfo.version if params.clientInfo else "Unknown"
-        )
-        
-        # Validate protocol version
-        if params.protocolVersion != PROTOCOL_VERSION:
-            logger.warning(
-                "Client requested protocol version %d, we support %d",
-                params.protocolVersion,
-                PROTOCOL_VERSION
-            )
-        
-        # Define our capabilities
-        agent_capabilities = AgentCapabilities(
-            loadSession=True,  # We support session loading
-            promptCapabilities=PromptCapabilities(
-                image=False,  # TODO: Add image support later
-                audio=False,  # TODO: Add audio support later
-                embeddedContext=True,  # We support embedded context
-            ),
-            # MCP capabilities can be added later if needed
-        )
-        
-        agent_info = Implementation(
-            name="openhands-acp",
-            title="OpenHands ACP Agent",
-            version="1.0.6",
-        )
-        
+        """Initialize the ACP protocol."""
+        logger.info(f"Initializing ACP with protocol version: {params.protocolVersion}")
+
+        # Check if agent is configured
+        try:
+            load_agent_specs()
+            auth_methods = []
+            logger.info("Agent configured, no authentication required")
+        except MissingAgentSpec:
+            # Agent not configured - this shouldn't happen in production
+            # but we'll return empty auth methods for now
+            auth_methods = []
+            logger.warning("Agent not configured - users should run 'openhands' first")
+
         return InitializeResponse(
-            protocolVersion=PROTOCOL_VERSION,
-            agentCapabilities=agent_capabilities,
-            agentInfo=agent_info,
-            authMethods=[],  # No authentication required for now
+            protocolVersion=params.protocolVersion,
+            authMethods=auth_methods,
+            agentCapabilities=AgentCapabilities(
+                loadSession=True,
+                mcpCapabilities=McpCapabilities(http=True, sse=True),
+                promptCapabilities=PromptCapabilities(
+                    audio=False,
+                    embeddedContext=False,
+                    image=False,
+                ),
+            ),
         )
 
     async def authenticate(
         self, params: AuthenticateRequest
-    ) -> Optional[AuthenticateResponse]:
-        """Handle authentication request.
-        
-        Args:
-            params: The authentication request parameters
-            
-        Returns:
-            Authentication response or None if not supported
-        """
-        logger.info("Received authenticate request: %s", params.methodId)
-        # For now, we don't require authentication
+    ) -> AuthenticateResponse | None:
+        """Authenticate the client (no-op for now)."""
+        logger.info(f"Authentication requested with method: {params.methodId}")
         return AuthenticateResponse()
 
     async def newSession(self, params: NewSessionRequest) -> NewSessionResponse:
-        """Create a new conversation session.
-        
-        Args:
-            params: The new session request parameters
-            
-        Returns:
-            The new session response with session ID
-        """
-        logger.info("Creating new session with cwd: %s", params.cwd)
-        
-        # Store working directory
-        self._working_directory = params.cwd
-        
-        # Create new session
+        """Create a new conversation session."""
         session_id = str(uuid.uuid4())
-        session = await self._session_manager.create_session(
-            session_id=session_id,
-            working_directory=params.cwd,
-            mcp_servers=params.mcpServers or [],
-        )
-        
-        # Initialize OpenHands bridge for this session
-        if not self._bridge:
-            self._bridge = OpenHandsBridge(
-                connection=self._conn,
-                working_directory=params.cwd,
-            )
-        
-        logger.info("Created new session: %s", session_id)
-        return NewSessionResponse(sessionId=session_id)
 
-    async def loadSession(
-        self, params: LoadSessionRequest
-    ) -> Optional[LoadSessionResponse]:
-        """Load an existing conversation session.
-        
-        Args:
-            params: The load session request parameters
-            
-        Returns:
-            Load session response or None if session not found
-        """
-        logger.info("Loading session: %s", params.sessionId)
-        
-        # Store working directory
-        self._working_directory = params.cwd
-        
-        # Try to load the session
-        session = await self._session_manager.load_session(
-            session_id=params.sessionId,
-            working_directory=params.cwd,
-            mcp_servers=params.mcpServers or [],
-        )
-        
-        if not session:
-            logger.warning("Session not found: %s", params.sessionId)
-            return None
-        
-        # Initialize OpenHands bridge for this session
-        if not self._bridge:
-            self._bridge = OpenHandsBridge(
-                connection=self._conn,
-                working_directory=params.cwd,
+        try:
+            # Load agent from CLI settings
+            agent = load_agent_specs(session_id)
+            logger.info(f"Loaded agent with model: {agent.llm.model}")
+
+            # Validate working directory
+            working_dir = params.cwd or str(Path.cwd())
+            working_path = Path(working_dir)
+
+            logger.info(f"Using working directory: {working_dir}")
+
+            # Create directory if it doesn't exist
+            if not working_path.exists():
+                logger.warning(
+                    f"Working directory {working_dir} doesn't exist, creating it"
+                )
+                working_path.mkdir(parents=True, exist_ok=True)
+
+            if not working_path.is_dir():
+                raise ValueError(
+                    f"Working directory path is not a directory: {working_dir}"
+                )
+
+            workspace = Workspace(working_dir=str(working_path))
+
+            # Create conversation using CLI's persistence directory
+            conversation = Conversation(
+                agent=agent,
+                workspace=workspace,
+                persistence_dir=CONVERSATIONS_DIR,
+                conversation_id=UUID(session_id),
             )
-        
-        # Replay conversation history
-        await self._replay_session_history(params.sessionId, session)
-        
-        logger.info("Loaded session: %s", params.sessionId)
-        return LoadSessionResponse()
+
+            # Store conversation
+            self._sessions[session_id] = conversation
+
+            logger.info(f"Created new session {session_id}")
+
+            return NewSessionResponse(sessionId=session_id)
+
+        except MissingAgentSpec as e:
+            logger.error(f"Agent not configured: {e}")
+            raise ValueError(
+                "Agent not configured. Please run 'openhands' to configure the agent first."
+            )
+        except Exception as e:
+            logger.error(f"Failed to create new session: {e}", exc_info=True)
+            raise
 
     async def prompt(self, params: PromptRequest) -> PromptResponse:
-        """Process a user prompt and generate a response.
-        
-        Args:
-            params: The prompt request parameters
-            
-        Returns:
-            The prompt response
-        """
-        logger.info("Processing prompt for session: %s", params.sessionId)
-        
-        if not self._bridge:
-            logger.error("No bridge initialized for session")
-            return PromptResponse(stopReason=StopReason.error)
-        
+        """Handle a prompt request."""
+        session_id = params.sessionId
+
+        if session_id not in self._sessions:
+            raise ValueError(f"Unknown session: {session_id}")
+
+        conversation = self._sessions[session_id]
+
+        # Extract text from prompt - handle both string and array formats
+        prompt_text = ""
+        if isinstance(params.prompt, str):
+            prompt_text = params.prompt
+        elif isinstance(params.prompt, list):
+            for block in params.prompt:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        prompt_text += block.get("text", "")
+                else:
+                    # Handle ContentBlock objects
+                    if hasattr(block, "type") and block.type == "text":
+                        prompt_text += getattr(block, "text", "")
+        else:
+            # Handle single ContentBlock object
+            if hasattr(params.prompt, "type") and params.prompt.type == "text":
+                prompt_text = getattr(params.prompt, "text", "")
+
+        if not prompt_text.strip():
+            return PromptResponse(stopReason="end_turn")
+
+        logger.info(
+            f"Processing prompt for session {session_id}: {prompt_text[:100]}..."
+        )
+
         try:
-            # Process the prompt through OpenHands
-            stop_reason = await self._bridge.process_prompt(
-                session_id=params.sessionId,
-                content_blocks=params.content,
-            )
-            
-            return PromptResponse(stopReason=stop_reason)
-            
+            # Send the message
+            message = Message(role="user", content=[TextContent(text=prompt_text)])
+            conversation.send_message(message)
+
+            # Run the conversation asynchronously
+            await asyncio.to_thread(conversation.run)
+
+            # Get the last agent message from conversation state and stream it
+            for event in reversed(conversation.state.events):
+                if isinstance(event, MessageEvent) and event.source == "agent":
+                    text_content = ""
+                    for content in event.llm_message.content:
+                        if isinstance(content, TextContent):
+                            text_content += content.text
+
+                    if text_content.strip():
+                        await self._conn.sessionUpdate(
+                            SessionNotification(
+                                sessionId=session_id,
+                                update=SessionUpdate2(
+                                    sessionUpdate="agent_message_chunk",
+                                    content=ContentBlock1(type="text", text=text_content),
+                                ),
+                            )
+                        )
+                    break
+
+            # Return the final response
+            return PromptResponse(stopReason="end_turn")
+
         except Exception as e:
-            logger.error("Error processing prompt: %s", e)
-            return PromptResponse(stopReason=StopReason.error)
+            logger.error(f"Error processing prompt: {e}", exc_info=True)
+            # Send error notification
+            await self._conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=session_id,
+                    update=SessionUpdate2(
+                        sessionUpdate="agent_message_chunk",
+                        content=ContentBlock1(type="text", text=f"Error: {str(e)}"),
+                    ),
+                )
+            )
+            return PromptResponse(stopReason="end_turn")
 
     async def cancel(self, params: CancelNotification) -> None:
-        """Cancel an ongoing operation.
-        
-        Args:
-            params: The cancel notification parameters
-        """
-        logger.info("Cancelling operation for session: %s", params.sessionId)
-        
-        if self._bridge:
-            await self._bridge.cancel_operation(params.sessionId)
+        """Cancel the current operation."""
+        logger.info(f"Cancel requested for session: {params.sessionId}")
 
-    async def _replay_session_history(
-        self, session_id: str, session: Dict[str, Any]
-    ) -> None:
-        """Replay the conversation history for a loaded session.
-        
-        Args:
-            session_id: The session ID
-            session: The session data
-        """
-        # TODO: Implement session history replay
-        # This would involve sending session_update notifications
-        # for each message in the conversation history
-        logger.info("Replaying session history for: %s", session_id)
-        
-        # For now, just send a welcome message
-        await self._send_agent_message(
-            session_id,
-            text_block("Session loaded successfully. How can I help you?")
-        )
+        if params.sessionId in self._sessions:
+            conversation = self._sessions[params.sessionId]
+            # Pause the conversation
+            conversation.pause()
+
+    async def loadSession(self, params: LoadSessionRequest) -> None:
+        """Load an existing session and replay conversation history."""
+        session_id = params.sessionId
+        logger.info(f"Loading session: {session_id}")
+
+        try:
+            # Check if session exists
+            if session_id not in self._sessions:
+                raise ValueError(f"Session not found: {session_id}")
+
+            conversation = self._sessions[session_id]
+
+            # Stream conversation history to client
+            logger.info("Streaming conversation history to client")
+            for event in conversation.state.events:
+                if isinstance(event, MessageEvent):
+                    # Convert MessageEvent to ACP session update
+                    if event.source == "user":
+                        # Stream user message
+                        text_content = ""
+                        for content in event.llm_message.content:
+                            if isinstance(content, TextContent):
+                                text_content += content.text
+
+                        if text_content.strip():
+                            await self._conn.sessionUpdate(
+                                SessionNotification(
+                                    sessionId=session_id,
+                                    update=SessionUpdate1(
+                                        sessionUpdate="user_message_chunk",
+                                        content=ContentBlock1(
+                                            type="text", text=text_content
+                                        ),
+                                    ),
+                                )
+                            )
+
+                    elif event.source == "agent":
+                        # Stream agent message
+                        text_content = ""
+                        for content in event.llm_message.content:
+                            if isinstance(content, TextContent):
+                                text_content += content.text
+
+                        if text_content.strip():
+                            await self._conn.sessionUpdate(
+                                SessionNotification(
+                                    sessionId=session_id,
+                                    update=SessionUpdate2(
+                                        sessionUpdate="agent_message_chunk",
+                                        content=ContentBlock1(
+                                            type="text", text=text_content
+                                        ),
+                                    ),
+                                )
+                            )
+
+            logger.info(f"Successfully loaded session {session_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to load session {session_id}: {e}", exc_info=True)
+            raise
+
+    async def setSessionMode(
+        self, params: SetSessionModeRequest
+    ) -> SetSessionModeResponse | None:
+        """Set session mode (no-op for now)."""
+        logger.info(f"Set session mode requested: {params.sessionId}")
+        return SetSessionModeResponse()
+
+    async def setSessionModel(
+        self, params: SetSessionModelRequest
+    ) -> SetSessionModelResponse | None:
+        """Set session model (no-op for now)."""
+        logger.info(f"Set session model requested: {params.sessionId}")
+        return SetSessionModelResponse()
+
+    async def extMethod(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Extension method (not supported)."""
+        logger.info(f"Extension method '{method}' requested with params: {params}")
+        return {"error": "extMethod not supported"}
+
+    async def extNotification(self, method: str, params: dict[str, Any]) -> None:
+        """Extension notification (no-op for now)."""
+        logger.info(f"Extension notification '{method}' received with params: {params}")
+
+
+async def run_acp_server() -> None:
+    """Run the OpenHands ACP server."""
+    logger.info("Starting OpenHands ACP server...")
+
+    reader, writer = await stdio_streams()
+
+    def create_agent(conn: AgentSideConnection) -> OpenHandsACPAgent:
+        return OpenHandsACPAgent(conn)
+
+    AgentSideConnection(create_agent, writer, reader)
+
+    # Keep the server running
+    await asyncio.Event().wait()

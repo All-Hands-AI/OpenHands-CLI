@@ -38,7 +38,7 @@ def main() -> None:
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         elif args.command == "acp":
             # Import ACP main only when needed
-            from openhands_cli.acp.main import run_acp_agent
+            from openhands_cli.acp_impl.main import run_acp_agent
             import asyncio
             import logging
             
