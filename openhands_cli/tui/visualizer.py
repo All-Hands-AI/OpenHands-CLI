@@ -9,17 +9,19 @@ from openhands.sdk.conversation.visualizer.base import (
 )
 from openhands.sdk.conversation.visualizer.default import (
     EVENT_VISUALIZATION_CONFIG,
+    EventVisualizationConfig,
     build_event_block,
 )
-from openhands.sdk.event import (
-    ConversationStateUpdateEvent,
-    MessageEvent,
-    SystemPromptEvent,
-)
+from openhands.sdk.event import MessageEvent, SystemPromptEvent
 from openhands.sdk.event.base import Event
 
 
 logger = logging.getLogger(__name__)
+
+# CLI-specific customization: skip SystemPromptEvent
+EVENT_VISUALIZATION_CONFIG[SystemPromptEvent] = EventVisualizationConfig(
+    **{**EVENT_VISUALIZATION_CONFIG[SystemPromptEvent].model_dump(), "skip": True}
+)
 
 
 # Color constants for highlighting
@@ -115,10 +117,7 @@ class CLIVisualizer(ConversationVisualizerBase):
             return None
 
         # Check if this event type should be skipped
-        # CLI skips SystemPromptEvent and ConversationStateUpdateEvent
-        if config.skip or isinstance(
-            event, SystemPromptEvent | ConversationStateUpdateEvent
-        ):
+        if config.skip:
             return None
 
         # Check if we should skip user messages based on runtime configuration
