@@ -57,7 +57,7 @@ class EventVisualizationConfig(BaseModel):
     """Configuration for how to visualize an event type."""
 
     title: str | Callable[[Event, str | None], str]
-    """The title to display for this event. Can be a string or callable that takes event and agent name."""
+    """The title for this event. Can be a string or callable."""
 
     color: str | Callable[[Event], str]
     """The Rich color to use for the title and rule. Can be a string or callable."""
@@ -135,7 +135,9 @@ def _get_action_title(event: Event, name: str | None = None) -> str:
     """Get title for ActionEvent based on whether action is None."""
     prefix = f"{name} " if name else ""
     if isinstance(event, ActionEvent):
-        suffix = "Agent Action (Not Executed)" if event.action is None else "Agent Action"
+        suffix = (
+            "Agent Action (Not Executed)" if event.action is None else "Agent Action"
+        )
         return f"{prefix}{suffix}"
     return f"{prefix}Action"
 
@@ -165,7 +167,7 @@ def _get_message_color(event: Event) -> str:
 # Event type to visualization configuration mapping
 EVENT_VISUALIZATION_CONFIG: dict[type[Event], EventVisualizationConfig] = {
     SystemPromptEvent: EventVisualizationConfig(
-        title=lambda event, name: f"{name} System Prompt" if name else "System Prompt",
+        title=lambda _, name: f"{name} System Prompt" if name else "System Prompt",
         color=_SYSTEM_COLOR,
         skip=True,  # Don't emit system prompt in CLI
     ),
@@ -175,11 +177,11 @@ EVENT_VISUALIZATION_CONFIG: dict[type[Event], EventVisualizationConfig] = {
         show_metrics=True,
     ),
     ObservationEvent: EventVisualizationConfig(
-        title=lambda event, name: f"{name} Observation" if name else "Observation",
+        title=lambda _, name: f"{name} Observation" if name else "Observation",
         color=_OBSERVATION_COLOR,
     ),
     UserRejectObservation: EventVisualizationConfig(
-        title=lambda event, name: (
+        title=lambda _, name: (
             f"{name} User Rejected Action" if name else "User Rejected Action"
         ),
         color=_ERROR_COLOR,
@@ -190,30 +192,28 @@ EVENT_VISUALIZATION_CONFIG: dict[type[Event], EventVisualizationConfig] = {
         show_metrics=True,
     ),
     AgentErrorEvent: EventVisualizationConfig(
-        title=lambda event, name: f"{name} Agent Error" if name else "Agent Error",
+        title=lambda _, name: f"{name} Agent Error" if name else "Agent Error",
         color=_ERROR_COLOR,
         show_metrics=True,
     ),
     PauseEvent: EventVisualizationConfig(
-        title=lambda event, name: f"{name} User Paused" if name else "User Paused",
+        title=lambda _, name: f"{name} User Paused" if name else "User Paused",
         color=_PAUSE_COLOR,
     ),
     Condensation: EventVisualizationConfig(
-        title=lambda event, name: f"{name} Condensation" if name else "Condensation",
+        title=lambda _, name: f"{name} Condensation" if name else "Condensation",
         color=_SYSTEM_COLOR,
         show_metrics=True,
     ),
     CondensationRequest: EventVisualizationConfig(
-        title=lambda event, name: (
+        title=lambda _, name: (
             f"{name} Condensation Request" if name else "Condensation Request"
         ),
         color=_SYSTEM_COLOR,
     ),
     ConversationStateUpdateEvent: EventVisualizationConfig(
-        title=lambda event, name: (
-            f"{name} Conversation State Update"
-            if name
-            else "Conversation State Update"
+        title=lambda _, name: (
+            f"{name} Conversation State Update" if name else "Conversation State Update"
         ),
         color=_SYSTEM_COLOR,
         skip=True,

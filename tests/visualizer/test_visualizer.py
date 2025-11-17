@@ -225,7 +225,7 @@ def test_metrics_abbreviation_formatting():
 
 
 def test_event_base_fallback_visualize():
-    """Test that unknown events are handled gracefully (returns None and logs warning)."""
+    """Test that unknown events are handled gracefully."""
     from openhands.sdk.event.base import Event
     from openhands.sdk.event.types import SourceType
 
