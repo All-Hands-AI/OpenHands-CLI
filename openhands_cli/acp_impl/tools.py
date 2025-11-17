@@ -10,7 +10,7 @@ import logging
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from acp import AgentSideConnection
+from acp_impl import AgentSideConnection
 from acp.schema import (
     PermissionOption,
     PermissionOptionKind,

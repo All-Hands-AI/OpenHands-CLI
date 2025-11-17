@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from acp import AgentSideConnection
+from acp_impl import AgentSideConnection
 from acp.schema import (
     ReadTextFileRequest,
     ReadTextFileResponse,

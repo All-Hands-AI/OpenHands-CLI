@@ -11,7 +11,7 @@ import sys
 from typing import Optional
 
 import typer
-from acp import stdio_streams
+from acp_impl import stdio_streams
 
 from .agent import OpenHandsACPAgent
 

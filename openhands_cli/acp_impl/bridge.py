@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from acp import AgentSideConnection, text_block, update_agent_message
+from acp_impl import AgentSideConnection, text_block, update_agent_message
 from acp.schema import StopReason, ToolCallStatus, TextContentBlock
 from openhands.sdk import Conversation, LLM, Action, Event
 
