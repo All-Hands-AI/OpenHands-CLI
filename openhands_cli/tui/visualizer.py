@@ -1,8 +1,6 @@
 import logging
 import re
-from collections.abc import Callable
 
-from pydantic import BaseModel
 from rich.console import Console, Group
 from rich.text import Text
 
@@ -10,36 +8,25 @@ from openhands.sdk.conversation.visualizer.base import (
     ConversationVisualizerBase,
 )
 from openhands.sdk.conversation.visualizer.default import (
+    EVENT_VISUALIZATION_CONFIG,
     build_event_block,
 )
 from openhands.sdk.event import (
-    ActionEvent,
-    AgentErrorEvent,
     ConversationStateUpdateEvent,
     MessageEvent,
-    ObservationEvent,
-    PauseEvent,
     SystemPromptEvent,
-    UserRejectObservation,
 )
 from openhands.sdk.event.base import Event
-from openhands.sdk.event.condenser import Condensation, CondensationRequest
 
 
 logger = logging.getLogger(__name__)
 
 
-# These are external inputs
-_OBSERVATION_COLOR = "yellow"
-_MESSAGE_USER_COLOR = "gold3"
-_PAUSE_COLOR = "bright_yellow"
-# These are internal system stuff
-_SYSTEM_COLOR = "magenta"
+# Color constants for highlighting
 _THOUGHT_COLOR = "bright_black"
-_ERROR_COLOR = "red"
-# These are agent actions
 _ACTION_COLOR = "blue"
-_MESSAGE_ASSISTANT_COLOR = _ACTION_COLOR
+_OBSERVATION_COLOR = "yellow"
+_ERROR_COLOR = "red"
 
 DEFAULT_HIGHLIGHT_REGEX = {
     r"^Reasoning:": f"bold {_THOUGHT_COLOR}",
@@ -55,121 +42,6 @@ DEFAULT_HIGHLIGHT_REGEX = {
 }
 
 
-class EventVisualizationConfig(BaseModel):
-    """Configuration for how to visualize an event type.
-
-    This is a CLI-specific extension that supports passing an agent name
-    to title callables for multi-agent scenarios.
-    """
-
-    title: str | Callable[[Event, str | None], str]
-    """The title for this event. Can be a string or callable accepting (event, name)."""
-
-    color: str | Callable[[Event], str]
-    """The Rich color to use for the title and rule. Can be a string or callable."""
-
-    show_metrics: bool = False
-    """Whether to show the metrics subtitle."""
-
-    indent_content: bool = False
-    """Whether to indent the content."""
-
-    skip: bool = False
-    """If True, skip visualization of this event type entirely."""
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-def _get_action_title(event: Event, name: str | None = None) -> str:
-    """Get title for ActionEvent based on whether action is None."""
-    prefix = f"{name} " if name else ""
-    if isinstance(event, ActionEvent):
-        suffix = (
-            "Agent Action (Not Executed)" if event.action is None else "Agent Action"
-        )
-        return f"{prefix}{suffix}"
-    return f"{prefix}Action"
-
-
-def _get_message_title(event: Event, name: str | None = None) -> str:
-    """Get title for MessageEvent based on role."""
-    agent_name = f"{name} " if name else ""
-    if isinstance(event, MessageEvent) and event.llm_message:
-        if event.llm_message.role == "user":
-            return f"User Message to {agent_name}Agent"
-        else:
-            return f"Message from {agent_name}Agent"
-    return "Message"
-
-
-def _get_message_color(event: Event) -> str:
-    """Get color for MessageEvent based on role."""
-    if isinstance(event, MessageEvent) and event.llm_message:
-        return (
-            _MESSAGE_USER_COLOR
-            if event.llm_message.role == "user"
-            else _MESSAGE_ASSISTANT_COLOR
-        )
-    return "white"
-
-
-# Event type to visualization configuration mapping
-EVENT_VISUALIZATION_CONFIG: dict[type[Event], EventVisualizationConfig] = {
-    SystemPromptEvent: EventVisualizationConfig(
-        title=lambda _, name: f"{name} System Prompt" if name else "System Prompt",
-        color=_SYSTEM_COLOR,
-        skip=True,  # Don't emit system prompt in CLI
-    ),
-    ActionEvent: EventVisualizationConfig(
-        title=_get_action_title,
-        color=_ACTION_COLOR,
-        show_metrics=True,
-    ),
-    ObservationEvent: EventVisualizationConfig(
-        title=lambda _, name: f"{name} Observation" if name else "Observation",
-        color=_OBSERVATION_COLOR,
-    ),
-    UserRejectObservation: EventVisualizationConfig(
-        title=lambda _, name: (
-            f"{name} User Rejected Action" if name else "User Rejected Action"
-        ),
-        color=_ERROR_COLOR,
-    ),
-    MessageEvent: EventVisualizationConfig(
-        title=_get_message_title,
-        color=_get_message_color,
-        show_metrics=True,
-    ),
-    AgentErrorEvent: EventVisualizationConfig(
-        title=lambda _, name: f"{name} Agent Error" if name else "Agent Error",
-        color=_ERROR_COLOR,
-        show_metrics=True,
-    ),
-    PauseEvent: EventVisualizationConfig(
-        title=lambda _, name: f"{name} User Paused" if name else "User Paused",
-        color=_PAUSE_COLOR,
-    ),
-    Condensation: EventVisualizationConfig(
-        title=lambda _, name: f"{name} Condensation" if name else "Condensation",
-        color=_SYSTEM_COLOR,
-        show_metrics=True,
-    ),
-    CondensationRequest: EventVisualizationConfig(
-        title=lambda _, name: (
-            f"{name} Condensation Request" if name else "Condensation Request"
-        ),
-        color=_SYSTEM_COLOR,
-    ),
-    ConversationStateUpdateEvent: EventVisualizationConfig(
-        title=lambda _, name: (
-            f"{name} Conversation State Update" if name else "Conversation State Update"
-        ),
-        color=_SYSTEM_COLOR,
-        skip=True,
-    ),
-}
-
-
 class CLIVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events with Rich formatting.
 
@@ -179,19 +51,15 @@ class CLIVisualizer(ConversationVisualizerBase):
     _console: Console
     _skip_user_messages: bool
     _highlight_patterns: dict[str, str]
-    _name: str | None
 
     def __init__(
         self,
-        name: str | None = None,
         highlight_regex: dict[str, str] | None = DEFAULT_HIGHLIGHT_REGEX,
         skip_user_messages: bool = False,
     ):
         """Initialize the visualizer.
 
         Args:
-            name: Optional name to prefix in titles to identify
-                  which agent/conversation is speaking.
             highlight_regex: Dictionary mapping regex patterns to Rich color styles
                            for highlighting keywords in the visualizer.
                            For example: {"Reasoning:": "bold blue",
@@ -203,7 +71,6 @@ class CLIVisualizer(ConversationVisualizerBase):
         self._console = Console()
         self._skip_user_messages = skip_user_messages
         self._highlight_patterns = highlight_regex or {}
-        self._name = name
 
     def on_event(self, event: Event) -> None:
         """Main event handler that displays events with Rich formatting."""
@@ -248,7 +115,10 @@ class CLIVisualizer(ConversationVisualizerBase):
             return None
 
         # Check if this event type should be skipped
-        if config.skip:
+        # CLI skips SystemPromptEvent and ConversationStateUpdateEvent
+        if config.skip or isinstance(
+            event, SystemPromptEvent | ConversationStateUpdateEvent
+        ):
             return None
 
         # Check if we should skip user messages based on runtime configuration
@@ -271,9 +141,8 @@ class CLIVisualizer(ConversationVisualizerBase):
             content = self._apply_highlighting(content)
 
         # Resolve title (may be a string or callable)
-        # For CLI, we pass the agent name to title functions
         if callable(config.title):
-            title = config.title(event, self._name)
+            title = config.title(event)
         else:
             title = config.title
 
