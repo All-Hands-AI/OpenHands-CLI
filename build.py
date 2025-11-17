@@ -111,34 +111,6 @@ def build_executable(
         return False
 
 
-def build_all_executables(clean: bool = True) -> bool:
-    """Build both CLI and ACP executables."""
-    print("🚀 Building all OpenHands executables...")
-    
-    success = True
-    
-    # Build main CLI executable
-    print("\n" + "="*50)
-    print("Building OpenHands CLI...")
-    print("="*50)
-    if not build_executable("openhands-cli.spec", clean):
-        success = False
-    
-    # Build ACP executable
-    print("\n" + "="*50)
-    print("Building OpenHands ACP Agent...")
-    print("="*50)
-    if not build_executable("openhands-acp.spec", False):  # Don't clean again
-        success = False
-    
-    if success:
-        print("\n🎉 All executables built successfully!")
-    else:
-        print("\n❌ Some builds failed!")
-    
-    return success
-
-
 # =================================================
 # SECTION: Test and profile binary
 # =================================================
@@ -283,14 +255,9 @@ def main() -> int:
         action="store_true",
         help="Install PyInstaller using uv before building",
     )
+
     parser.add_argument(
-        "--no-build", action="store_true", help="Skip building the executable"
-    )
-    parser.add_argument(
-        "--all", action="store_true", help="Build both CLI and ACP executables"
-    )
-    parser.add_argument(
-        "--acp-only", action="store_true", help="Build only the ACP executable"
+        "--no-build", action="store_true", help="Skip testing the built executable"
     )
 
     args = parser.parse_args()
@@ -298,59 +265,33 @@ def main() -> int:
     print("🚀 OpenHands CLI Build Script")
     print("=" * 40)
 
-    # Handle different build modes
-    if args.all:
-        # Build both executables
-        if not args.no_build and not build_all_executables(clean=not args.no_clean):
-            return 1
-        # Skip testing for --all mode for now
-        print("\n🎉 All builds completed!")
-        print("📁 Check the 'dist/' directory for your executables")
-        return 0
-    
-    elif args.acp_only:
-        # Build only ACP executable
-        spec_file = "openhands-acp.spec"
-        if not os.path.exists(spec_file):
-            print(f"❌ ACP spec file '{spec_file}' not found!")
-            return 1
-        
-        if not args.no_build and not build_executable(spec_file, clean=not args.no_clean):
-            return 1
-        
-        print("\n🎉 ACP build completed!")
-        print("📁 Check the 'dist/' directory for your executable")
-        return 0
-    
-    else:
-        # Build single executable (default behavior)
-        # Check if spec file exists
-        if not os.path.exists(args.spec):
-            print(f"❌ Spec file '{args.spec}' not found!")
+    # Check if spec file exists
+    if not os.path.exists(args.spec):
+        print(f"❌ Spec file '{args.spec}' not found!")
+        return 1
+
+    # Build the executable
+    if not args.no_build and not build_executable(args.spec, clean=not args.no_clean):
+        return 1
+
+    # Test the executable
+    if not args.no_test:
+        model_name = "dummy-model"
+        extra_kwargs: dict[str, Any] = {}
+        if should_set_litellm_extra_body(model_name):
+            extra_kwargs["litellm_extra_body"] = {
+                "metadata": get_llm_metadata(
+                    model_name=model_name, llm_type="openhands"
+                )
+            }
+        llm = LLM(model=model_name, api_key="dummy-key", **extra_kwargs)
+        dummy_agent = get_default_cli_agent(llm=llm)
+        if not test_executable(dummy_agent):
+            print("❌ Executable test failed, build process failed")
             return 1
 
-        # Build the executable
-        if not args.no_build and not build_executable(args.spec, clean=not args.no_clean):
-            return 1
-
-        # Test the executable (only for CLI builds)
-        if not args.no_test and args.spec == "openhands-cli.spec":
-            model_name = "dummy-model"
-            extra_kwargs: dict[str, Any] = {}
-            if should_set_litellm_extra_body(model_name):
-                extra_kwargs["litellm_extra_body"] = {
-                    "metadata": get_llm_metadata(
-                        model_name=model_name, llm_type="openhands"
-                    )
-                }
-            llm = LLM(model=model_name, api_key="dummy-key", **extra_kwargs)
-            dummy_agent = get_default_cli_agent(llm=llm)
-            if not test_executable(dummy_agent):
-                print("❌ Executable test failed, build process failed")
-                return 1
-
-        print("\n🎉 Build process completed!")
-        print("📁 Check the 'dist/' directory for your executable")
+    print("\n🎉 Build process completed!")
+    print("📁 Check the 'dist/' directory for your executable")
 
     return 0
 
