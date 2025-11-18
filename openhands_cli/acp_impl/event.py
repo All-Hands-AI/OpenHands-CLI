@@ -4,24 +4,27 @@ from typing import TYPE_CHECKING, Any
 
 from acp import SessionNotification
 from acp.schema import (
-    TextContentBlock,
-    ImageContentBlock,
-    AgentThoughtChunk,
     AgentMessageChunk,
-    ToolCallStart,
-    ToolCallProgress,
+    AgentPlanUpdate,
+    AgentThoughtChunk,
     ContentToolCallContent,
+    FileEditToolCallContent,
+    ImageContentBlock,
+    PlanEntry,
+    PlanEntryStatus,
+    TerminalToolCallContent,
+    TextContentBlock,
     ToolCallLocation,
-    TerminalToolCallContent,
-    TerminalToolCallContent,
+    ToolCallProgress,
+    ToolCallStart,
     ToolKind,
 )
 
-from openhands.sdk import ImageContent, TextContent, Action
+from openhands.sdk import Action, ImageContent, TextContent
 from openhands.sdk.event import (
-    Event,
     ActionEvent,
     AgentErrorEvent,
+    Event,
     LLMConvertibleEvent,
     ObservationBaseEvent,
     ObservationEvent,
@@ -34,7 +37,14 @@ if TYPE_CHECKING:
 
 
 from openhands.sdk import get_logger
-from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.file_editor.definition import (
+    FileEditorAction,
+    FileEditorObservation,
+)
+from openhands.tools.task_tracker.definition import (
+    TaskTrackerObservation,
+)
+
 
 logger = get_logger(__name__)
 
@@ -53,7 +63,7 @@ def get_tool_kind(tool_name: str, action: Action | None) -> ToolKind:
         "browser_use": "fetch",
         "browser": "fetch",
     }
-    
+
     # Special handling for file_editor tool
     if tool_name == "file_editor":
         assert isinstance(action, FileEditorAction)
@@ -76,7 +86,7 @@ def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
 
     Args:
         action: Action to extract locations from
-    
+
     Returns:
         List of ToolCallLocation objects or None
     """
@@ -159,7 +169,9 @@ class EventSubscriber:
                             sessionUpdate="agent_thought_chunk",
                             content=TextContentBlock(
                                 type="text",
-                                text="**Reasoning**:\n" + event.reasoning_content.strip() + "\n",
+                                text="**Reasoning**:\n"
+                                + event.reasoning_content.strip()
+                                + "\n",
                             ),
                         ),
                     )
@@ -179,13 +191,30 @@ class EventSubscriber:
                     )
                 )
 
-            # Now send the tool_call with event.visualize content
+            # Now send the tool_call with appropriate content
             tool_kind = get_tool_kind(event.tool_name, event.action)
 
-            # Use event.visualize for comprehensive tool display
-            action_viz = None
+            # Generate content for the tool call
+            content: (
+                list[
+                    ContentToolCallContent
+                    | FileEditToolCallContent
+                    | TerminalToolCallContent
+                ]
+                | None
+            ) = None
             if event.action:
                 action_viz = _rich_text_to_plain(event.action.visualize)
+                if action_viz.strip():
+                    content = [
+                        ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
+                            ),
+                        )
+                    ]
 
             await self.conn.sessionUpdate(
                 SessionNotification(
@@ -193,21 +222,13 @@ class EventSubscriber:
                     update=ToolCallStart(
                         sessionUpdate="tool_call",
                         toolCallId=event.tool_call_id,
-                        title=action_viz if action_viz is not None else event.tool_name,
+                        title=event.tool_name,
                         kind=tool_kind,
                         status="in_progress",
-                        content=[
-                            ContentToolCallContent(
-                                type="content",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=action_viz,
-                                ),
-                            )
-                        ]
-                        if action_viz is not None and action_viz.strip()
+                        content=content,
+                        locations=extract_action_locations(event.action)
+                        if event.action
                         else None,
-                        locations=extract_action_locations(event.action) if event.action else None,
                         rawInput=event.action.model_dump() if event.action else None,
                     ),
                 )
@@ -215,46 +236,199 @@ class EventSubscriber:
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
 
-    async def _handle_observation_event(
-        self, event: ObservationBaseEvent
-    ):
+    async def _handle_observation_event(self, event: ObservationBaseEvent):
         """Handle observation events by sending tool_call_update notification.
+
+        Routes special observation types to dedicated handlers, otherwise uses
+        generic handling with visualization text.
 
         Args:
             event: ObservationEvent, UserRejectObservation, or AgentErrorEvent
         """
         try:
-            viz_text = _rich_text_to_plain(event.visualize)
-
+            # Route special observation types to dedicated handlers
             if isinstance(event, ObservationEvent):
-                status = "completed"
-            else:  # UserRejectObservation or AgentErrorEvent
-                status = "failed"
+                if isinstance(event.observation, FileEditorObservation):
+                    await self._handle_file_editor_observation(event)
+                    return
 
+                if isinstance(event.observation, TaskTrackerObservation):
+                    await self._handle_task_tracker_observation(event)
+                    return
+
+            # Generic handling for all other observations
+            await self._handle_generic_observation(event)
+        except Exception as e:
+            logger.debug(f"Error processing observation event: {e}", exc_info=True)
+
+    async def _handle_file_editor_observation(self, event: ObservationEvent):
+        """Handle FileEditorObservation with structured diff content.
+
+        Args:
+            event: ObservationEvent containing FileEditorObservation
+        """
+        observation = event.observation
+        assert isinstance(observation, FileEditorObservation)
+
+        content: (
+            list[
+                ContentToolCallContent
+                | FileEditToolCallContent
+                | TerminalToolCallContent
+            ]
+            | None
+        ) = None
+
+        # Use FileEditToolCallContent for file edits with meaningful diffs
+        if (
+            observation._has_meaningful_diff
+            and observation.path is not None
+            and observation.new_content is not None
+        ):
+            content = [
+                FileEditToolCallContent(
+                    type="diff",
+                    path=observation.path,
+                    oldText=observation.old_content,
+                    newText=observation.new_content,
+                )
+            ]
+        else:
+            # Use ContentToolCallContent for view commands and other operations
+            viz_text = _rich_text_to_plain(event.visualize)
+            if viz_text.strip():
+                content = [
+                    ContentToolCallContent(
+                        type="content",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                    )
+                ]
+
+        await self.conn.sessionUpdate(
+            SessionNotification(
+                sessionId=self.session_id,
+                update=ToolCallProgress(
+                    sessionUpdate="tool_call_update",
+                    toolCallId=event.tool_call_id,
+                    status="completed",
+                    content=content,
+                    rawOutput=event.model_dump(),
+                ),
+            )
+        )
+
+    async def _handle_task_tracker_observation(self, event: ObservationEvent):
+        """Handle TaskTrackerObservation by converting to AgentPlanUpdate.
+
+        Args:
+            event: ObservationEvent containing TaskTrackerObservation
+        """
+        try:
+            observation = event.observation
+            assert isinstance(observation, TaskTrackerObservation)
+
+            # Convert TaskItems to PlanEntries
+            entries: list[PlanEntry] = []
+            for task in observation.task_list:
+                # Map status: todo->pending, in_progress->in_progress, done->completed
+                status_map: dict[str, PlanEntryStatus] = {
+                    "todo": "pending",
+                    "in_progress": "in_progress",
+                    "done": "completed",
+                }
+                status = status_map.get(task.status, "pending")
+
+                # Combine title and notes into content
+                content = task.title
+                if task.notes:
+                    content += f"\n{task.notes}"
+
+                entries.append(
+                    PlanEntry(
+                        content=content,
+                        status=status,
+                        priority="medium",  # TaskItem doesn't have priority
+                    )
+                )
+
+            # Send AgentPlanUpdate
+            await self.conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=self.session_id,
+                    update=AgentPlanUpdate(
+                        sessionUpdate="plan",
+                        entries=entries,
+                    ),
+                )
+            )
+
+            # Also send tool_call_update to mark the task_tracker tool as completed
             await self.conn.sessionUpdate(
                 SessionNotification(
                     sessionId=self.session_id,
                     update=ToolCallProgress(
                         sessionUpdate="tool_call_update",
                         toolCallId=event.tool_call_id,
-                        status=status,
-                        content=[
-                            ContentToolCallContent(
-                                type="content",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=viz_text,
-                                ),
-                            )
-                        ]
-                        if viz_text.strip()
-                        else None,
+                        status="completed",
+                        content=None,  # Plan is in AgentPlanUpdate
                         rawOutput=event.model_dump(),
                     ),
                 )
             )
         except Exception as e:
-            logger.debug(f"Error processing observation event: {e}", exc_info=True)
+            logger.debug(f"Error processing TaskTrackerObservation: {e}", exc_info=True)
+
+    async def _handle_generic_observation(self, event: ObservationBaseEvent):
+        """Handle generic observations with visualization text.
+
+        Used for terminal commands, other tool observations, errors, and rejections.
+
+        Args:
+            event: Any observation event without special handling
+        """
+        # Determine status based on event type
+        if isinstance(event, ObservationEvent):
+            status = "completed"
+        else:  # UserRejectObservation or AgentErrorEvent
+            status = "failed"
+
+        # Generate content from visualization text
+        content: (
+            list[
+                ContentToolCallContent
+                | FileEditToolCallContent
+                | TerminalToolCallContent
+            ]
+            | None
+        ) = None
+
+        viz_text = _rich_text_to_plain(event.visualize)
+        if viz_text.strip():
+            content = [
+                ContentToolCallContent(
+                    type="content",
+                    content=TextContentBlock(
+                        type="text",
+                        text=viz_text,
+                    ),
+                )
+            ]
+
+        await self.conn.sessionUpdate(
+            SessionNotification(
+                sessionId=self.session_id,
+                update=ToolCallProgress(
+                    sessionUpdate="tool_call_update",
+                    toolCallId=event.tool_call_id,
+                    status=status,
+                    content=content,
+                    rawOutput=event.model_dump(),
+                ),
+            )
+        )
 
     async def _handle_llm_convertible_event(self, event: LLMConvertibleEvent):
         """Handle other LLMConvertibleEvent events.
