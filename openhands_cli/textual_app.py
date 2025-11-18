@@ -13,6 +13,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.reactive import reactive
+from textual.theme import Theme
 from textual.widgets import (
     Input,
     RichLog,
@@ -124,15 +125,39 @@ class OpenHandsApp(App):
 
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
-        return """[yellow]     ___                    _   _                 _
+        return """[#FFD700]     ___                    _   _                 _
     /  _ \\ _ __   ___ _ __ | | | | __ _ _ __   __| |___
     | | | | '_ \\ / _ \\ '_ \\| |_| |/ _` | '_ \\ / _` / __|
     | |_| | |_) |  __/ | | |  _  | (_| | | | | (_| \\__ \\
     \\___/| .__/ \\___|_| |_|_| |_|\\__,_|_| |_|\\__,_|___/
-          |_|[/yellow]"""
+          |_|[/#FFD700]"""
 
     async def on_mount(self) -> None:
         """Initialize the application when mounted."""
+        # Create and register custom theme
+        openhands_theme = Theme(
+            name="openhands",
+            primary="#808080",  # Grey for most elements
+            secondary="#808080",  # Grey
+            accent="#808080",  # Grey
+            foreground="#D3D3D3",  # Light grey for default text
+            background="#000000",  # Black background
+            success="#00FF00",  # Bright green for success
+            warning="#FFFF00",  # Bright yellow for warnings
+            error="#FF0000",  # Bright red for errors
+            surface="#1A1A1A",  # Dark grey for surfaces
+            panel="#2A2A2A",  # Slightly lighter grey for panels
+            dark=True,
+            variables={
+                # Override specific color variables
+                "text": "#D3D3D3",  # Default text color (light grey)
+            },
+        )
+        
+        # Register and apply the theme
+        self.register_theme(openhands_theme)
+        self.theme = "openhands"
+
         # Set up conversation ID
         if self.resume_conversation_id:
             try:
@@ -176,16 +201,18 @@ class OpenHandsApp(App):
         # Display conversation initialization message
         if not resume:
             chat_log.write(
-                f"[grey]Initialized conversation {self.conversation_id}[/grey]"
+                f"[#808080]Initialized conversation {self.conversation_id}[/#808080]"
             )
         else:
-            chat_log.write(f"[grey]Resumed conversation {self.conversation_id}[/grey]")
+            chat_log.write(
+                f"[#808080]Resumed conversation {self.conversation_id}[/#808080]"
+            )
 
         chat_log.write("")
-        chat_log.write("[yellow]Let's start building![/yellow]")
+        chat_log.write("[#FFD700]Let's start building![/#FFD700]")
         chat_log.write(
-            "[bright_green]What do you want to build? "
-            "[dim]Type /help for help[/dim][/bright_green]"
+            "[#00FF00]What do you want to build? "
+            "[#808080]Type /help for help[/#808080][/#00FF00]"
         )
         chat_log.write("")
 
