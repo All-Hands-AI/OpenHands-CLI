@@ -109,11 +109,12 @@ class OpenHandsApp(App):
         main_display.can_focus = False
         yield main_display
 
-
         # Input area - docked to bottom
         with Container(id="input_area"):
             text_input = Input(
-                placeholder="Type your message or /help for commands...",
+                placeholder=(
+                    "Type your message… (tip: press \\ + Enter to insert a newline)"
+                ),
                 id="user_input",
             )
 
@@ -134,16 +135,6 @@ class OpenHandsApp(App):
 
     async def on_mount(self) -> None:
         """Initialize the application when mounted."""
-        # Show welcome message
-        main_display = self.query_one("#main_display", RichLog)
-        main_display.write(self._get_banner_text())
-        main_display.write("\n[bold cyan]Welcome to OpenHands CLI![/bold cyan]")
-        main_display.write("Type your message or /help for commands...")
-
-        # Focus the input
-        input_widget = self.query_one("#user_input", Input)
-        input_widget.focus()
-
         # Set up conversation ID
         if self.resume_conversation_id:
             try:
@@ -169,7 +160,7 @@ class OpenHandsApp(App):
             self.exit()
             return
 
-        # Display welcome message
+        # Display welcome message (this will show the banner and conversation info)
         self.display_welcome(resume)
 
         # Focus the input
@@ -179,6 +170,12 @@ class OpenHandsApp(App):
     def display_welcome(self, resume: bool = False) -> None:
         """Display the welcome message."""
         chat_log = self.query_one("#main_display", RichLog)
+
+        # Display the banner first
+        chat_log.write(self._get_banner_text())
+        chat_log.write("")
+
+        # Display conversation initialization message
         if not resume:
             chat_log.write(
                 f"[grey]Initialized conversation {self.conversation_id}[/grey]"
@@ -333,6 +330,8 @@ class OpenHandsApp(App):
 
     def action_clear(self) -> None:
         """Clear the chat log."""
+        chat_log = self.query_one("#main_display", RichLog)
+        chat_log.clear()
         self.display_welcome()
 
     async def action_new(self) -> None:
