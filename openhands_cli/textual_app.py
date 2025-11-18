@@ -124,14 +124,12 @@ class OpenHandsApp(App):
 
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
-        return """[bold gold]
-     ___                    _   _                 _
+        return """[yellow]     ___                    _   _                 _
     /  _ \\ _ __   ___ _ __ | | | | __ _ _ __   __| |___
     | | | | '_ \\ / _ \\ '_ \\| |_| |/ _` | '_ \\ / _` / __|
     | |_| | |_) |  __/ | | |  _  | (_| | | | | (_| \\__ \\
     \\___/| .__/ \\___|_| |_|_| |_|\\__,_|_| |_|\\__,_|___/
-          |_|
-[/bold gold]"""
+          |_|[/yellow]"""
 
     async def on_mount(self) -> None:
         """Initialize the application when mounted."""
@@ -184,9 +182,10 @@ class OpenHandsApp(App):
             chat_log.write(f"[grey]Resumed conversation {self.conversation_id}[/grey]")
 
         chat_log.write("")
-        chat_log.write("[gold]Let's start building![/gold]")
+        chat_log.write("[yellow]Let's start building![/yellow]")
         chat_log.write(
-            "[green]What do you want to build? [grey]Type /help for help[/grey][/green]"
+            "[bright_green]What do you want to build? "
+            "[dim]Type /help for help[/dim][/bright_green]"
         )
         chat_log.write("")
 
