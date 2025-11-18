@@ -7,6 +7,7 @@ This replaces the prompt_toolkit implementation with a modern Textual interface.
 import uuid
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -29,7 +30,11 @@ from openhands_cli.setup import (
     MissingAgentSpec,
     setup_conversation,
     verify_agent_exists_or_setup_agent,
+    load_agent_specs,
 )
+from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.textual_dialogs import DIALOG_CSS
 from openhands_cli.textual_user_actions import (
     ask_user_confirmation_textual,
@@ -186,6 +191,33 @@ class OpenHandsApp(App):
         chat_log = self.query_one("#chat_log", RichLog)
         chat_log.write(message)
 
+    def setup_textual_conversation(
+        self, conversation_id: UUID, visualizer: TextualVisualizer, include_security_analyzer: bool = True
+    ) -> BaseConversation:
+        """Setup the conversation with agent and textual visualizer.
+        
+        This is a modified version of setup_conversation that accepts a visualizer instance.
+        """
+        agent = load_agent_specs(str(conversation_id))
+
+        # Create conversation with our textual visualizer
+        conversation: BaseConversation = Conversation(
+            agent=agent,
+            workspace=Workspace(working_dir=WORK_DIR),
+            # Conversation will add /<conversation_id> to this path
+            persistence_dir=CONVERSATIONS_DIR,
+            conversation_id=conversation_id,
+            visualizer=visualizer,
+        )
+
+        # Security analyzer is set though conversation API now
+        if not include_security_analyzer:
+            conversation.set_security_analyzer(None)
+        else:
+            conversation.set_security_analyzer(LLMSecurityAnalyzer())
+
+        return conversation
+
     @on(Input.Submitted, "#user_input")
     async def handle_input(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
@@ -239,13 +271,14 @@ class OpenHandsApp(App):
         # Initialize conversation if needed
         if not self.runner or not self.conversation:
             conversation_id = uuid.UUID(self.conversation_id)
-            self.conversation = setup_conversation(conversation_id)
-            self.runner = TextualConversationRunner(self.conversation, self)
             
             # Set up the visualizer to output to our chat log
             chat_log = self.query_one("#chat_log", RichLog)
             visualizer = TextualVisualizer(chat_log)
-            self.conversation.add_visualizer(visualizer)
+            
+            # Create conversation with our visualizer
+            self.conversation = self.setup_textual_conversation(conversation_id, visualizer)
+            self.runner = TextualConversationRunner(self.conversation, self)
 
         # Log user message
         self.log_message(f"[bold blue]User:[/bold blue] {user_input}")

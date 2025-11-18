@@ -8,8 +8,7 @@ import logging
 import os
 import warnings
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+# Removed prompt_toolkit imports - using regular print instead
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 
@@ -44,11 +43,11 @@ def main() -> None:
             # Start textual app
             run_textual_app(resume_conversation_id=args.resume)
     except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print("\nGoodbye! 👋")
     except EOFError:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print("\nGoodbye! 👋")
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {e}</red>"))
+        print(f"Error: {e}")
         import traceback
 
         traceback.print_exc()

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from prompt_toolkit import HTML, print_formatted_text
+# Removed prompt_toolkit imports - using regular print instead
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.security.confirmation_policy import (
@@ -65,7 +65,7 @@ def setup_conversation(
         MissingAgentSpec: If agent specification is not found or invalid.
     """
 
-    print_formatted_text(HTML("<white>Initializing agent...</white>"))
+    print("Initializing agent...")
 
     agent = load_agent_specs(str(conversation_id))
 
@@ -86,7 +86,5 @@ def setup_conversation(
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(AlwaysConfirm())
 
-    print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
-    )
+    print(f"✓ Agent initialized with model: {agent.llm.model}")
     return conversation
