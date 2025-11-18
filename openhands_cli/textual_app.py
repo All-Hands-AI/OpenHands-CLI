@@ -57,21 +57,29 @@ class OpenHandsApp(App):
     #main_display {
         height: 1fr;
         border: solid $primary;
-        margin: 1;
+        margin: 1 1 0 1;
         overflow-y: scroll;
     }
     
     #input_area {
-        height: 3;
+        height: 5;
         dock: bottom;
         background: $surface;
         border-top: solid $primary;
+        padding: 1;
     }
     
     #user_input {
-        width: 1fr;
-        height: 1;
-        margin: 1;
+        width: 100%;
+        height: 3;
+        background: $background;
+        color: $text;
+        border: solid $accent;
+    }
+    
+    #user_input:focus {
+        border: solid $primary;
+        background: $surface;
     }
     """
 
