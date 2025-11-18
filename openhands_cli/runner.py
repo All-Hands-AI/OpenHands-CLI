@@ -22,10 +22,11 @@ from openhands_cli.user_actions.types import UserConfirmation
 class ConversationRunner:
     """Handles the conversation state machine logic cleanly."""
 
-    def __init__(self, conversation: BaseConversation):
+    def __init__(self, conversation: BaseConversation, on_agent_finished=None):
         self.conversation = conversation
         self._running = False
         self._run_thread = None
+        self.on_agent_finished = on_agent_finished
 
     @property
     def is_confirmation_mode_active(self):
@@ -136,6 +137,9 @@ class ConversationRunner:
                     "<green>✅ Agent finished. You can now use commands again.</green>"
                 )
             )
+            # Call the callback if provided
+            if self.on_agent_finished:
+                self.on_agent_finished()
 
     def _run_without_confirmation(self) -> None:
         with pause_listener(self.conversation):

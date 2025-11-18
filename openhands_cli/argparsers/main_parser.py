@@ -26,6 +26,11 @@ Examples:
 
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+    parser.add_argument(
+        "--pinned-input", 
+        action="store_true", 
+        help="Use pinned input box at bottom of terminal (experimental)"
+    )
 
     # Only serve as subcommand
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
