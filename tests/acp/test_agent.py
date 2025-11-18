@@ -7,7 +7,7 @@ from uuid import UUID
 from acp import InitializeRequest, NewSessionRequest, PromptRequest
 from acp.schema import AgentCapabilities, TextContentBlock, Implementation
 
-from openhands_cli.acp.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent import OpenHandsACPAgent
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ async def test_initialize_with_configured_agent(acp_agent):
     )
 
     # Mock load_agent_specs to succeed
-    with patch('openhands_cli.acp.agent.load_agent_specs') as mock_load:
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load:
         mock_agent = MagicMock()
         mock_load.return_value = mock_agent
 
@@ -55,7 +55,7 @@ async def test_initialize_without_configured_agent(acp_agent):
     )
 
     # Mock load_agent_specs to raise MissingAgentSpec
-    with patch('openhands_cli.acp.agent.load_agent_specs') as mock_load:
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load:
         mock_load.side_effect = MissingAgentSpec("Not configured")
 
         response = await acp_agent.initialize(request)
@@ -81,8 +81,8 @@ async def test_new_session_success(acp_agent, tmp_path):
     request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
 
     # Mock the CLI utilities
-    with patch('openhands_cli.acp.agent.load_agent_specs') as mock_load, \
-         patch('openhands_cli.acp.agent.Conversation') as mock_conv:
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load, \
+         patch('openhands_cli.acp_impl.agent.Conversation') as mock_conv:
 
         # Mock agent
         mock_agent = MagicMock()
@@ -115,7 +115,7 @@ async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
 
     # Mock load_agent_specs to raise MissingAgentSpec
-    with patch('openhands_cli.acp.agent.load_agent_specs') as mock_load:
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load:
         mock_load.side_effect = MissingAgentSpec("Not configured")
 
         with pytest.raises(ValueError, match="Agent not configured"):
@@ -129,8 +129,8 @@ async def test_new_session_creates_working_directory(acp_agent, tmp_path):
     new_dir = tmp_path / "subdir" / "workdir"
     request = NewSessionRequest(cwd=str(new_dir), mcpServers=[])
 
-    with patch('openhands_cli.acp.agent.load_agent_specs') as mock_load, \
-         patch('openhands_cli.acp.agent.Conversation') as mock_conv:
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load, \
+         patch('openhands_cli.acp_impl.agent.Conversation') as mock_conv:
 
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
@@ -311,3 +311,68 @@ async def test_ext_notification(acp_agent):
     """Test extension notification."""
     # Should not raise any errors
     await acp_agent.extNotification("test-notification", {"key": "value"})
+
+
+@pytest.mark.asyncio
+async def test_prompt_with_image(acp_agent, mock_connection):
+    """Test prompt with image content."""
+    from acp.schema import TextContentBlock, ImageContentBlock
+    from openhands.sdk.event.llm_convertible.message import MessageEvent
+    from openhands.sdk import Message, TextContent
+
+    session_id = "test-session"
+
+    # Create mock conversation
+    mock_conversation = MagicMock()
+    mock_conversation.state.events = []
+    acp_agent._sessions[session_id] = mock_conversation
+
+    # Create a mock agent message event
+    mock_message = Message(role="assistant", content=[TextContent(text="I see an OpenHands logo!")])
+    mock_event = MessageEvent(source="agent", llm_message=mock_message)
+
+    # Mock conversation.run to add the event
+    async def mock_run(fn):
+        fn()
+        mock_conversation.state.events.append(mock_event)
+
+    with patch('asyncio.to_thread', side_effect=mock_run):
+        # Create request with both text and image
+        # Note: ACP ImageContentBlock uses 'data' field which can be a URL or base64 data
+        request = PromptRequest(
+            sessionId=session_id,
+            prompt=[
+                TextContentBlock(type="text", text="What do you see in this image?"),
+                ImageContentBlock(
+                    type="image",
+                    data="https://example.com/image.png",
+                    mimeType="image/png"
+                ),
+            ]
+        )
+        response = await acp_agent.prompt(request)
+
+        assert response.stopReason == "end_turn"
+
+        # Verify sessionUpdate was called
+        mock_connection.sessionUpdate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_initialize_reports_image_capability(acp_agent):
+    """Test that initialization reports image capability."""
+    from acp.schema import Implementation
+
+    request = InitializeRequest(
+        protocolVersion=1,
+        clientInfo=Implementation(name="test-client", version="1.0.0"),
+    )
+
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load:
+        mock_agent = MagicMock()
+        mock_load.return_value = mock_agent
+
+        response = await acp_agent.initialize(request)
+
+        # Verify image capability is enabled
+        assert response.agentCapabilities.promptCapabilities.image is True

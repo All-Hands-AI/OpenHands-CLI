@@ -36,7 +36,7 @@ from acp.schema import (
     SetSessionModelResponse,
 )
 
-from openhands.sdk import BaseConversation, Conversation, Message, TextContent, Workspace
+from openhands.sdk import BaseConversation, Conversation, ImageContent, Message, TextContent, Workspace
 from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.setup import load_agent_specs, MissingAgentSpec
@@ -83,7 +83,7 @@ class OpenHandsACPAgent(ACPAgent):
                 promptCapabilities=PromptCapabilities(
                     audio=False,
                     embeddedContext=False,
-                    image=False,
+                    image=True,  # Enable image support
                 ),
             ),
         )
@@ -157,34 +157,59 @@ class OpenHandsACPAgent(ACPAgent):
 
         conversation = self._sessions[session_id]
 
-        # Extract text from prompt - handle both string and array formats
+        # Extract content from prompt - handle text and images
+        message_content = []
         prompt_text = ""
+
         if isinstance(params.prompt, str):
             prompt_text = params.prompt
+            message_content.append(TextContent(text=prompt_text))
         elif isinstance(params.prompt, list):
             for block in params.prompt:
                 if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        prompt_text += block.get("text", "")
+                    block_type = block.get("type")
+                    if block_type == "text":
+                        text = block.get("text", "")
+                        prompt_text += text
+                        message_content.append(TextContent(text=text))
+                    elif block_type == "image":
+                        # Handle image content from ACP
+                        # ACP uses 'data' field which can be URL or base64
+                        image_data = block.get("data")
+                        if image_data:
+                            message_content.append(ImageContent(image_urls=[image_data]))
+                            logger.info(f"Added image to message: {image_data[:100]}...")
                 else:
                     # Handle ContentBlock objects
-                    if hasattr(block, "type") and block.type == "text":
-                        prompt_text += getattr(block, "text", "")
+                    if hasattr(block, "type"):
+                        if block.type == "text":
+                            text = getattr(block, "text", "")
+                            prompt_text += text
+                            message_content.append(TextContent(text=text))
+                        elif block.type == "image":
+                            # Handle ImageContentBlock from ACP
+                            # ACP ImageContentBlock uses 'data' field
+                            if hasattr(block, "data"):
+                                image_data = block.data
+                                message_content.append(ImageContent(image_urls=[image_data]))
+                                logger.info(f"Added image to message: {image_data[:100]}...")
         else:
             # Handle single ContentBlock object
-            if hasattr(params.prompt, "type") and params.prompt.type == "text":
-                prompt_text = getattr(params.prompt, "text", "")
+            if hasattr(params.prompt, "type"):
+                if params.prompt.type == "text":
+                    prompt_text = getattr(params.prompt, "text", "")
+                    message_content.append(TextContent(text=prompt_text))
 
-        if not prompt_text.strip():
+        if not message_content:
             return PromptResponse(stopReason="end_turn")
 
         logger.info(
-            f"Processing prompt for session {session_id}: {prompt_text[:100]}..."
+            f"Processing prompt for session {session_id}: {prompt_text[:100] if prompt_text else '[image only]'}..."
         )
 
         try:
-            # Send the message
-            message = Message(role="user", content=[TextContent(text=prompt_text)])
+            # Send the message with potentially multiple content types (text + images)
+            message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
             # Run the conversation asynchronously
