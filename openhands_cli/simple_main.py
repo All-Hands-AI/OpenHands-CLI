@@ -38,11 +38,11 @@ def main() -> None:
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         else:
             # Default CLI behavior - no subcommand needed
-            # Import agent_chat only when needed
-            from openhands_cli.agent_chat import run_cli_entry
+            # Import textual_app only when needed
+            from openhands_cli.textual_app import run_textual_app
 
-            # Start agent chat
-            run_cli_entry(resume_conversation_id=args.resume)
+            # Start textual app
+            run_textual_app(resume_conversation_id=args.resume)
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except EOFError:
