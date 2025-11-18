@@ -284,7 +284,7 @@ class OpenHandsApp(App):
 
             # Set up the visualizer to output to our chat log
             chat_log = self.query_one("#main_display", RichLog)
-            visualizer = TextualVisualizer(chat_log)
+            visualizer = TextualVisualizer(chat_log, self)
 
             # Create conversation with our visualizer
             self.conversation = self.setup_textual_conversation(

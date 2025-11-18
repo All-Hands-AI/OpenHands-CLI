@@ -6,7 +6,6 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import re
 from typing import TYPE_CHECKING
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
@@ -23,8 +22,11 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
 
+
 if TYPE_CHECKING:
     from textual.widgets import RichLog
+
+    from openhands_cli.textual_app import OpenHandsApp
 
 
 # Color scheme matching the original visualizer
@@ -55,13 +57,14 @@ _PANEL_PADDING = (1, 1)
 
 class TextualVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
-    
+
     This visualizer outputs to a Textual RichLog widget instead of directly to console.
     """
 
     def __init__(
         self,
         rich_log: "RichLog",
+        app: "OpenHandsApp",
         name: str | None = None,
         highlight_regex: dict[str, str] | None = DEFAULT_HIGHLIGHT_REGEX,
         skip_user_messages: bool = False,
@@ -70,12 +73,14 @@ class TextualVisualizer(ConversationVisualizerBase):
 
         Args:
             rich_log: The Textual RichLog widget to write to
+            app: The Textual app instance for thread-safe UI updates
             name: Optional name to prefix in panel titles
             highlight_regex: Dictionary mapping regex patterns to Rich color styles
             skip_user_messages: If True, skip displaying user messages
         """
         super().__init__(name=name)
         self._rich_log = rich_log
+        self._app = app
         self._skip_user_messages = skip_user_messages
         self._highlight_patterns = highlight_regex or {}
 
@@ -83,9 +88,13 @@ class TextualVisualizer(ConversationVisualizerBase):
         """Main event handler that displays events with Rich formatting."""
         panel = self._create_event_panel(event)
         if panel:
-            # Write the panel to the RichLog widget
-            self._rich_log.write(panel)
-            self._rich_log.write("")  # Add spacing between events
+            # Use call_from_thread to ensure UI updates happen on the main thread
+            self._app.call_from_thread(self._write_panel_to_ui, panel)
+
+    def _write_panel_to_ui(self, panel: Panel) -> None:
+        """Write a panel to the UI (must be called from main thread)."""
+        self._rich_log.write(panel)
+        self._rich_log.write("")  # Add spacing between events
 
     def _apply_highlighting(self, text: Text) -> Text:
         """Apply regex-based highlighting to text content."""

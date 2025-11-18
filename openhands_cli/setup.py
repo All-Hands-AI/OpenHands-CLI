@@ -1,7 +1,6 @@
 from uuid import UUID
 
 # Removed prompt_toolkit imports - using regular print instead
-
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,

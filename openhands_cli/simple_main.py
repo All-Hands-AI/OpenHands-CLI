@@ -9,7 +9,6 @@ import os
 import warnings
 
 # Removed prompt_toolkit imports - using regular print instead
-
 from openhands_cli.argparsers.main_parser import create_main_parser
 
 

@@ -2,13 +2,13 @@
 Textual-based dialog widgets to replace prompt_toolkit dialogs.
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Center, Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import Button, Input, Select, Static
 
 
 class ConfirmationDialog(ModalScreen[bool]):
@@ -31,7 +31,9 @@ class ConfirmationDialog(ModalScreen[bool]):
                 yield Static(self.question, id="question")
                 with Horizontal(id="buttons"):
                     for i, choice in enumerate(self.choices):
-                        variant = "primary" if i == self.initial_selection else "default"
+                        variant = (
+                            "primary" if i == self.initial_selection else "default"
+                        )
                         yield Button(choice, id=f"choice_{i}", variant=variant)
 
     @on(Button.Pressed)
@@ -72,7 +74,7 @@ class TextInputDialog(ModalScreen[str]):
                 yield Input(
                     placeholder=self.placeholder,
                     password=self.is_password,
-                    id="text_input"
+                    id="text_input",
                 )
                 with Horizontal(id="buttons"):
                     yield Button("OK", id="ok", variant="primary")
@@ -87,11 +89,11 @@ class TextInputDialog(ModalScreen[str]):
         """Handle OK button press."""
         text_input = self.query_one("#text_input", Input)
         value = text_input.value.strip()
-        
+
         if self.validator and not self.validator(value):
             # Could show error message here
             return
-            
+
         self.dismiss(value)
 
     @on(Button.Pressed, "#cancel")
@@ -103,10 +105,10 @@ class TextInputDialog(ModalScreen[str]):
     def handle_input_submit(self, event: Input.Submitted) -> None:
         """Handle input submission."""
         value = event.value.strip()
-        
+
         if self.validator and not self.validator(value):
             return
-            
+
         self.dismiss(value)
 
     def on_key(self, event) -> None:
@@ -136,7 +138,7 @@ class SelectionDialog(ModalScreen[int]):
                 yield Select(
                     options=[(display, value) for value, display in self.choices],
                     value=self.choices[self.initial_selection][0],
-                    id="selection"
+                    id="selection",
                 )
                 with Horizontal(id="buttons"):
                     yield Button("OK", id="ok", variant="primary")

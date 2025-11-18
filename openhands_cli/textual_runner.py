@@ -2,6 +2,7 @@
 Textual-aware conversation runner that handles confirmations through the UI.
 """
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from openhands.sdk import BaseConversation, Message
@@ -15,10 +16,11 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
-from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
+from openhands_cli.listeners.pause_listener import pause_listener
 from openhands_cli.setup import setup_conversation
 from openhands_cli.textual_user_actions import ask_user_confirmation_textual
 from openhands_cli.user_actions.types import UserConfirmation
+
 
 if TYPE_CHECKING:
     from openhands_cli.textual_app import OpenHandsApp
@@ -66,8 +68,7 @@ class TextualConversationRunner:
             )
         else:
             self.app.log_message(
-                "[yellow]Agent running...[/yellow] "
-                "[grey](Press Ctrl-P to pause)[/grey]"
+                "[yellow]Agent running...[/yellow] [grey](Press Ctrl-P to pause)[/grey]"
             )
 
     async def process_message(self, message: Message | None) -> None:
@@ -86,11 +87,13 @@ class TextualConversationRunner:
         if self.is_confirmation_mode_active:
             await self._run_with_confirmation()
         else:
-            self._run_without_confirmation()
+            await self._run_without_confirmation()
 
-    def _run_without_confirmation(self) -> None:
+    async def _run_without_confirmation(self) -> None:
+        """Run conversation without confirmation in a background thread."""
         with pause_listener(self.conversation):
-            self.conversation.run()
+            # Run the blocking conversation.run() in a thread pool
+            await asyncio.get_event_loop().run_in_executor(None, self.conversation.run)
 
     async def _run_with_confirmation(self) -> None:
         # If agent was paused, resume with confirmation request
@@ -104,7 +107,10 @@ class TextualConversationRunner:
 
         while True:
             with pause_listener(self.conversation) as listener:
-                self.conversation.run()
+                # Run the blocking conversation.run() in a thread pool
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self.conversation.run
+                )
 
                 if listener.is_paused():
                     break
