@@ -15,6 +15,7 @@ from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import FormattedText, HTML
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding.defaults import load_key_bindings
 from prompt_toolkit.layout import Layout, HSplit
 from prompt_toolkit.layout.containers import Window, WindowAlign
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
@@ -104,34 +105,38 @@ class OpenHandsTUI:
         # Set initial focus to input buffer
         layout.focus(self.input_buffer)
         
-        # Key bindings
-        kb = KeyBindings()
+        # Create custom key bindings
+        custom_kb = KeyBindings()
         
-        @kb.add('enter')
+        @custom_kb.add('enter')
         def handle_enter(event):
             """Handle Enter key - process user input only if in input buffer."""
             if event.app.layout.current_buffer == self.input_buffer:
                 asyncio.create_task(self._handle_user_input())
         
-        @kb.add('c-c')
-        def handle_ctrl_c(event):
-            """Handle Ctrl+C - copy selected text to clipboard."""
-            self._handle_copy()
-        
-        @kb.add('c-d')
+        @custom_kb.add('c-d')
         def handle_ctrl_d(event):
             """Handle Ctrl+D - exit with confirmation."""
             asyncio.create_task(self._handle_exit())
         
+        # Tab to switch between buffers
+        @custom_kb.add('tab')
+        def switch_buffer(event):
+            """Switch focus between output and input buffers."""
+            if event.app.layout.current_buffer == self.input_buffer:
+                event.app.layout.focus(self.output_buffer)
+            else:
+                event.app.layout.focus(self.input_buffer)
+        
         # Create condition for when output buffer is focused
         output_focused = Condition(lambda: self.app and self.app.layout.current_buffer == self.output_buffer)
         
-        # Prevent common editing keys in output buffer
+        # Prevent common editing keys in output buffer (but allow selection and copy)
         editing_keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'space', 'backspace', 'delete']
         
         for key in editing_keys:
-            @kb.add(key, filter=output_focused)
+            @custom_kb.add(key, filter=output_focused)
             def prevent_output_edit(event, key=key):
                 """Prevent editing in the output buffer - redirect focus to input."""
                 self.app.layout.focus(self.input_buffer)
@@ -141,14 +146,12 @@ class OpenHandsTUI:
                 elif len(key) == 1:  # Single character
                     self.input_buffer.insert_text(key)
         
-        # Tab to switch between buffers
-        @kb.add('tab')
-        def switch_buffer(event):
-            """Switch focus between output and input buffers."""
-            if event.app.layout.current_buffer == self.input_buffer:
-                event.app.layout.focus(self.output_buffer)
-            else:
-                event.app.layout.focus(self.input_buffer)
+        # Load default key bindings (includes text selection with Shift+arrows, Ctrl+C for copy, etc.)
+        default_kb = load_key_bindings()
+        
+        # Merge custom and default key bindings
+        from prompt_toolkit.key_binding.key_bindings import merge_key_bindings
+        kb = merge_key_bindings([default_kb, custom_kb])
         
         # Create application
         self.app = Application(
@@ -217,29 +220,7 @@ class OpenHandsTUI:
         content = "\n".join(self.output_content)
         self.output_buffer.document = Document(content, cursor_position=len(content))
     
-    def _handle_copy(self) -> None:
-        """Handle copying selected text to clipboard."""
-        try:
-            # Get selected text from the output buffer
-            selected_text = self.output_buffer.copy_selection()
-            if selected_text:
-                # Try to copy to system clipboard
-                import pyperclip
-                pyperclip.copy(selected_text)
-                # Show feedback
-                self._add_output("📋 Text copied to clipboard!")
-            else:
-                self._add_output("ℹ️  No text selected. Use mouse or Shift+arrows to select text first.")
-        except ImportError:
-            # Fallback if pyperclip is not available
-            selected_text = self.output_buffer.copy_selection()
-            if selected_text:
-                self._add_output("📋 Selected text (pyperclip not available for system clipboard):")
-                self._add_output(f"'{selected_text}'")
-            else:
-                self._add_output("ℹ️  No text selected. Use mouse or Shift+arrows to select text first.")
-        except Exception as e:
-            self._add_output(f"❌ Error copying text: {e}")
+
     
     def _clear_output(self) -> None:
         """Clear the output area."""

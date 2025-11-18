@@ -1703,7 +1703,6 @@ dependencies = [
     { name = "openhands-sdk" },
     { name = "openhands-tools" },
     { name = "prompt-toolkit" },
-    { name = "pyperclip" },
     { name = "typer" },
 ]
 
@@ -1727,7 +1726,6 @@ requires-dist = [
     { name = "openhands-sdk", specifier = "==1.1" },
     { name = "openhands-tools", specifier = "==1.1" },
     { name = "prompt-toolkit", specifier = ">=3" },
-    { name = "pyperclip", specifier = ">=1.8.0" },
     { name = "typer", specifier = ">=0.17.4" },
 ]
 
