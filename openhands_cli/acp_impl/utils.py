@@ -335,21 +335,17 @@ class EventSubscriber:
                     )
                 )
 
-            # Now send the tool_call with action.visualize content
+            # Now send the tool_call with event.visualize content
             tool_kind = get_tool_kind(event.tool_name)
 
-            # Use action.title for a brief summary
+            # Use event.visualize for comprehensive tool display
+            action_viz = _rich_text_to_plain(event.visualize)
+
+            # Use action.title for a brief summary if available
             title = (
                 event.action.title  # type: ignore[attr-defined]
                 if event.action and hasattr(event.action, "title")
-                else "Action"
-            )
-
-            # Use action.visualize for rich content
-            action_viz = (
-                _rich_text_to_plain(event.action.visualize)  # type: ignore[attr-defined]
-                if event.action and hasattr(event.action, "visualize")
-                else ""
+                else event.tool_name
             )
 
             # Extract locations if available
