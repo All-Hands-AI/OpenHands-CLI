@@ -6,6 +6,7 @@ This replaces the prompt_toolkit implementation with a modern Textual interface.
 
 import uuid
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID
 
 from textual import on
@@ -16,6 +17,7 @@ from textual.widgets import (
     Input,
     RichLog,
 )
+from textual_autocomplete import AutoComplete
 
 from openhands.sdk import (
     BaseConversation,
@@ -39,8 +41,6 @@ from openhands_cli.textual_user_actions import (
 )
 from openhands_cli.textual_visualizer import TextualVisualizer
 from openhands_cli.user_actions import UserConfirmation
-from textual.suggester import SuggestFromList
-from textual_autocomplete import AutoComplete, DropdownItem
 
 
 class OpenHandsApp(App):
@@ -50,22 +50,23 @@ class OpenHandsApp(App):
     Screen {
         layout: vertical;
     }
-    
+
     #main_display {
-        height: 1fr;
+        height: 70%;
         border: solid $primary;
         margin: 1 1 0 1;
         overflow-y: scroll;
     }
-    
+
     #input_area {
-        height: 5;
+        height: 8;
         dock: bottom;
         background: $surface;
         border-top: solid $primary;
         padding: 1;
+        margin-bottom: 1;
     }
-    
+
     #user_input {
         width: 100%;
         height: 3;
@@ -73,14 +74,14 @@ class OpenHandsApp(App):
         color: $text;
         border: solid $accent;
     }
-    
+
     #user_input:focus {
         border: solid $primary;
         background: $surface;
     }
     """
 
-    BINDINGS = [
+    BINDINGS: ClassVar = [
         ("ctrl+c", "quit", "Quit"),
         ("ctrl+p", "pause", "Pause"),
         ("f1", "help", "Help"),
@@ -116,11 +117,7 @@ class OpenHandsApp(App):
 
             yield text_input
 
-            yield AutoComplete(
-                text_input,
-                candidates=["/help", "/exit", "/settings"]
-            )
-
+            yield AutoComplete(text_input, candidates=["/help", "/exit", "/settings"])
 
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
@@ -152,7 +149,8 @@ class OpenHandsApp(App):
                 resume = True
             except ValueError:
                 self.log_message(
-                    f"[yellow]Warning: '{self.resume_conversation_id}' is not a valid UUID.[/yellow]"
+                    f"[yellow]Warning: '{self.resume_conversation_id}' "
+                    "is not a valid UUID.[/yellow]"
                 )
                 self.conversation_id = str(uuid.uuid4())
                 resume = False
@@ -206,7 +204,8 @@ class OpenHandsApp(App):
     ) -> BaseConversation:
         """Setup the conversation with agent and textual visualizer.
 
-        This is a modified version of setup_conversation that accepts a visualizer instance.
+        This is a modified version of setup_conversation that accepts a
+        visualizer instance.
         """
         agent = load_agent_specs(str(conversation_id))
 
@@ -419,11 +418,12 @@ class OpenHandsApp(App):
             self.log_message("[yellow]Goodbye! 👋[/yellow]")
             if self.conversation_id:
                 self.log_message(
-                    f"[grey]Conversation ID:[/grey] [yellow]{self.conversation_id}[/yellow]"
+                    f"[grey]Conversation ID:[/grey] "
+                    f"[yellow]{self.conversation_id}[/yellow]"
                 )
                 self.log_message(
-                    f"[grey]Hint:[/grey] run [gold]openhands --resume {self.conversation_id}[/gold] "
-                    "to resume this conversation."
+                    f"[grey]Hint:[/grey] run [gold]openhands --resume "
+                    f"{self.conversation_id}[/gold] to resume this conversation."
                 )
             self.exit()
 
