@@ -37,17 +37,10 @@ def main() -> None:
 
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         else:
-            # Default CLI behavior - no subcommand needed
-            if args.pinned_input:
-                # Use the new pinned input TUI
-                from openhands_cli.tui_agent_chat import run_tui_cli_entry
-                
-                run_tui_cli_entry(resume_conversation_id=args.resume)
-            else:
-                # Use the original CLI interface
-                from openhands_cli.agent_chat import run_cli_entry
-
-                run_cli_entry(resume_conversation_id=args.resume)
+            # Default CLI behavior - use the new TUI interface
+            from openhands_cli.tui_main import run_tui_cli_entry
+            
+            run_tui_cli_entry(resume_conversation_id=args.resume)
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except EOFError:
