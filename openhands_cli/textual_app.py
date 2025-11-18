@@ -6,44 +6,41 @@ This replaces the prompt_toolkit implementation with a modern Textual interface.
 
 import uuid
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container
 from textual.reactive import reactive
 from textual.widgets import (
-    Button,
-    Footer,
-    Header,
     Input,
-    Label,
     RichLog,
-    Static,
 )
 
-from openhands.sdk import Message, TextContent
-from openhands.sdk.conversation.state import ConversationExecutionStatus
-from openhands_cli.textual_runner import TextualConversationRunner
-from openhands_cli.setup import (
-    MissingAgentSpec,
-    setup_conversation,
-    verify_agent_exists_or_setup_agent,
-    load_agent_specs,
+from openhands.sdk import (
+    BaseConversation,
+    Conversation,
+    Message,
+    TextContent,
+    Workspace,
 )
-from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
-from openhands_cli.textual_dialogs import DIALOG_CSS
+from openhands_cli.setup import (
+    MissingAgentSpec,
+    load_agent_specs,
+    verify_agent_exists_or_setup_agent,
+)
+from openhands_cli.textual_runner import TextualConversationRunner
+from openhands_cli.textual_settings import MCPScreen, SettingsScreen
 from openhands_cli.textual_user_actions import (
-    ask_user_confirmation_textual,
     exit_session_confirmation_textual,
 )
 from openhands_cli.textual_visualizer import TextualVisualizer
-from openhands_cli.textual_settings import MCPScreen, SettingsScreen
-from openhands_cli.tui.status import display_status
-from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
+from openhands_cli.user_actions import UserConfirmation
+from textual.suggester import SuggestFromList
+from textual_autocomplete import AutoComplete, DropdownItem
 
 
 class OpenHandsApp(App):
@@ -108,13 +105,22 @@ class OpenHandsApp(App):
         """Create the UI layout."""
         # Main display area - takes up most of the screen
         yield RichLog(id="main_display", highlight=True, markup=True)
-        
+
         # Input area - docked to bottom
         with Container(id="input_area"):
-            yield Input(
+            text_input = Input(
                 placeholder="Type your message or /help for commands...",
-                id="user_input"
+                id="user_input",
+                # suggester=SuggestFromList(["/help", "/exit"], case_sensitive=True),
             )
+
+            yield text_input
+
+            yield AutoComplete(
+                text_input,
+                candidates=["/help", "/exit", "/settings"]
+            )
+
 
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
@@ -134,11 +140,11 @@ class OpenHandsApp(App):
         main_display.write(self._get_banner_text())
         main_display.write("\n[bold cyan]Welcome to OpenHands CLI![/bold cyan]")
         main_display.write("Type your message or /help for commands...")
-        
+
         # Focus the input
         input_widget = self.query_one("#user_input", Input)
         input_widget.focus()
-        
+
         # Set up conversation ID
         if self.resume_conversation_id:
             try:
@@ -165,7 +171,7 @@ class OpenHandsApp(App):
 
         # Display welcome message
         self.display_welcome(resume)
-        
+
         # Focus the input
         input_widget = self.query_one("#user_input", Input)
         input_widget.focus()
@@ -173,16 +179,18 @@ class OpenHandsApp(App):
     def display_welcome(self, resume: bool = False) -> None:
         """Display the welcome message."""
         chat_log = self.query_one("#main_display", RichLog)
-        chat_log.clear()
-        
         if not resume:
-            chat_log.write(f"[grey]Initialized conversation {self.conversation_id}[/grey]")
+            chat_log.write(
+                f"[grey]Initialized conversation {self.conversation_id}[/grey]"
+            )
         else:
             chat_log.write(f"[grey]Resumed conversation {self.conversation_id}[/grey]")
-        
+
         chat_log.write("")
         chat_log.write("[gold]Let's start building![/gold]")
-        chat_log.write("[green]What do you want to build? [grey]Type /help for help[/grey][/green]")
+        chat_log.write(
+            "[green]What do you want to build? [grey]Type /help for help[/grey][/green]"
+        )
         chat_log.write("")
 
     def log_message(self, message: str) -> None:
@@ -191,10 +199,13 @@ class OpenHandsApp(App):
         chat_log.write(message)
 
     def setup_textual_conversation(
-        self, conversation_id: UUID, visualizer: TextualVisualizer, include_security_analyzer: bool = True
+        self,
+        conversation_id: UUID,
+        visualizer: TextualVisualizer,
+        include_security_analyzer: bool = True,
     ) -> BaseConversation:
         """Setup the conversation with agent and textual visualizer.
-        
+
         This is a modified version of setup_conversation that accepts a visualizer instance.
         """
         agent = load_agent_specs(str(conversation_id))
@@ -221,7 +232,7 @@ class OpenHandsApp(App):
     async def handle_input(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
         user_input = event.value.strip()
-        
+
         if not user_input:
             return
 
@@ -238,7 +249,7 @@ class OpenHandsApp(App):
     async def handle_command(self, command: str) -> None:
         """Handle slash commands."""
         cmd = command.lower()
-        
+
         if cmd == "/exit":
             await self.action_quit()
         elif cmd == "/help":
@@ -271,18 +282,20 @@ class OpenHandsApp(App):
         # Initialize conversation if needed
         if not self.runner or not self.conversation:
             conversation_id = uuid.UUID(self.conversation_id)
-            
+
             # Set up the visualizer to output to our chat log
             chat_log = self.query_one("#main_display", RichLog)
             visualizer = TextualVisualizer(chat_log)
-            
+
             # Create conversation with our visualizer
-            self.conversation = self.setup_textual_conversation(conversation_id, visualizer)
+            self.conversation = self.setup_textual_conversation(
+                conversation_id, visualizer
+            )
             self.runner = TextualConversationRunner(self.conversation, self)
 
         # Log user message
         self.log_message(f"[bold blue]User:[/bold blue] {user_input}")
-        
+
         # Process the message
         try:
             await self.runner.process_message(message)
@@ -295,7 +308,7 @@ class OpenHandsApp(App):
         self.log_message("[gold]🤖 OpenHands CLI Help[/gold]")
         self.log_message("[grey]Available commands:[/grey]")
         self.log_message("")
-        
+
         commands = {
             "/exit": "Exit the application",
             "/help": "Display available commands",
@@ -307,10 +320,10 @@ class OpenHandsApp(App):
             "/settings": "Display and modify current settings",
             "/mcp": "View MCP (Model Context Protocol) server configuration",
         }
-        
+
         for command, description in commands.items():
             self.log_message(f"  [white]{command}[/white] - {description}")
-        
+
         self.log_message("")
         self.log_message("[grey]Tips:[/grey]")
         self.log_message("  • Use F1-F5 for quick access to common functions")
@@ -336,11 +349,19 @@ class OpenHandsApp(App):
         """Display conversation status."""
         if self.conversation is not None:
             # For now, just display basic info
-            self.log_message(f"[yellow]Conversation ID:[/yellow] {self.conversation_id}")
-            self.log_message(f"[yellow]Session started:[/yellow] {self.session_start_time}")
+            self.log_message(
+                f"[yellow]Conversation ID:[/yellow] {self.conversation_id}"
+            )
+            self.log_message(
+                f"[yellow]Session started:[/yellow] {self.session_start_time}"
+            )
             if self.runner:
-                confirmation_status = "enabled" if self.runner.is_confirmation_mode_active else "disabled"
-                self.log_message(f"[yellow]Confirmation mode:[/yellow] {confirmation_status}")
+                confirmation_status = (
+                    "enabled" if self.runner.is_confirmation_mode_active else "disabled"
+                )
+                self.log_message(
+                    f"[yellow]Confirmation mode:[/yellow] {confirmation_status}"
+                )
         else:
             self.log_message("[yellow]No active conversation[/yellow]")
 
@@ -363,7 +384,9 @@ class OpenHandsApp(App):
         """Toggle confirmation mode."""
         if self.runner is not None:
             self.runner.toggle_confirmation_mode()
-            new_status = "enabled" if self.runner.is_confirmation_mode_active else "disabled"
+            new_status = (
+                "enabled" if self.runner.is_confirmation_mode_active else "disabled"
+            )
         else:
             new_status = "disabled (no active conversation)"
         self.log_message(f"[yellow]Confirmation mode {new_status}[/yellow]")
@@ -377,7 +400,8 @@ class OpenHandsApp(App):
         conversation = self.runner.conversation
         if not (
             conversation.state.execution_status == ConversationExecutionStatus.PAUSED
-            or conversation.state.execution_status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+            or conversation.state.execution_status
+            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
         ):
             self.log_message("[red]No paused conversation to resume...[/red]")
             return
@@ -394,7 +418,9 @@ class OpenHandsApp(App):
         if confirmation == UserConfirmation.ACCEPT:
             self.log_message("[yellow]Goodbye! 👋[/yellow]")
             if self.conversation_id:
-                self.log_message(f"[grey]Conversation ID:[/grey] [yellow]{self.conversation_id}[/yellow]")
+                self.log_message(
+                    f"[grey]Conversation ID:[/grey] [yellow]{self.conversation_id}[/yellow]"
+                )
                 self.log_message(
                     f"[grey]Hint:[/grey] run [gold]openhands --resume {self.conversation_id}[/gold] "
                     "to resume this conversation."
