@@ -1,12 +1,6 @@
 """TUI-compatible visualizer that captures agent events for display in the TUI."""
 
-import re
-from io import StringIO
 from typing import Callable
-
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 from openhands.sdk.conversation.visualizer.base import (
     ConversationVisualizerBase,
@@ -24,47 +18,19 @@ from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
 
 
-# These are external inputs
-_OBSERVATION_COLOR = "yellow"
-_MESSAGE_USER_COLOR = "gold3"
-_PAUSE_COLOR = "bright_yellow"
-# These are internal system stuff
-_SYSTEM_COLOR = "magenta"
-_THOUGHT_COLOR = "bright_black"
-_ERROR_COLOR = "red"
-# These are agent actions
-_ACTION_COLOR = "blue"
-_MESSAGE_ASSISTANT_COLOR = _ACTION_COLOR
 
-DEFAULT_HIGHLIGHT_REGEX = {
-    r"^Reasoning:": f"bold {_THOUGHT_COLOR}",
-    r"^Thought:": f"bold {_THOUGHT_COLOR}",
-    r"^Action:": f"bold {_ACTION_COLOR}",
-    r"^Arguments:": f"bold {_ACTION_COLOR}",
-    r"^Tool:": f"bold {_OBSERVATION_COLOR}",
-    r"^Result:": f"bold {_OBSERVATION_COLOR}",
-    r"^Rejection Reason:": f"bold {_ERROR_COLOR}",
-    # Markdown-style
-    r"\*\*(.*?)\*\*": "bold",
-    r"\*(.*?)\*": "italic",
-}
-
-_PANEL_PADDING = (1, 1)
 
 
 class TUIVisualizer(ConversationVisualizerBase):
     """TUI-compatible visualizer that captures agent events for display in the TUI."""
 
-    _console: Console
     _skip_user_messages: bool
-    _highlight_patterns: dict[str, str]
     _output_callback: Callable[[str], None]
 
     def __init__(
         self,
         output_callback: Callable[[str], None],
         name: str | None = None,
-        highlight_regex: dict[str, str] | None = DEFAULT_HIGHLIGHT_REGEX,
         skip_user_messages: bool = False,
     ):
         """Initialize the TUI visualizer.
@@ -73,257 +39,111 @@ class TUIVisualizer(ConversationVisualizerBase):
             output_callback: Function to call with formatted output for the TUI
             name: Optional name to prefix in panel titles to identify
                                   which agent/conversation is speaking.
-            highlight_regex: Dictionary mapping regex patterns to Rich color styles
-                           for highlighting keywords in the visualizer.
-                           For example: {"Reasoning:": "bold blue",
-                           "Thought:": "bold green"}
             skip_user_messages: If True, skip displaying user messages. Useful for
                                 scenarios where user input is not relevant to show.
         """
         super().__init__(
             name=name,
         )
-        # Use a StringIO buffer to capture Rich output
-        self._string_buffer = StringIO()
-        self._console = Console(file=self._string_buffer, width=120, force_terminal=True)
         self._skip_user_messages = skip_user_messages
-        self._highlight_patterns = highlight_regex or {}
         self._output_callback = output_callback
 
     def on_event(self, event: Event) -> None:
-        """Main event handler that displays events with Rich formatting."""
-        panel = self._create_event_panel(event)
-        if panel:
-            # Clear the buffer
-            self._string_buffer.seek(0)
-            self._string_buffer.truncate(0)
-            
-            # Print to the buffer
-            self._console.print(panel)
-            self._console.print()  # Add spacing between events
-            
-            # Get the content and send to TUI
-            content = self._string_buffer.getvalue()
-            if content.strip():
-                self._output_callback(content)
+        """Main event handler that displays events in plain text format."""
+        formatted_output = self._format_event_for_tui(event)
+        if formatted_output:
+            self._output_callback(formatted_output)
 
-    def _apply_highlighting(self, text: Text) -> Text:
-        """Apply regex-based highlighting to text content.
-
-        Args:
-            text: The Rich Text object to highlight
-
-        Returns:
-            A new Text object with highlighting applied
-        """
-        if not self._highlight_patterns:
-            return text
-
-        # Create a copy to avoid modifying the original
-        highlighted = text.copy()
-
-        # Apply each pattern using Rich's built-in highlight_regex method
-        for pattern, style in self._highlight_patterns.items():
-            pattern_compiled = re.compile(pattern, re.MULTILINE)
-            highlighted.highlight_regex(pattern_compiled, style)
-
-        return highlighted
-
-    def _create_event_panel(self, event: Event) -> Panel | None:
-        """Create a Rich Panel for the event with appropriate styling."""
+    def _format_event_for_tui(self, event: Event) -> str | None:
+        """Format event as plain text for TUI display."""
         # Use the event's visualize property for content
         content = event.visualize
-
+        
         if not content.plain.strip():
             return None
-
-        # Apply highlighting if configured
-        if self._highlight_patterns:
-            content = self._apply_highlighting(content)
-
+        
+        # Get plain text content
+        text_content = content.plain
+        
+        # Create simple text-based formatting
+        agent_name = f"{self._name} " if self._name else ""
+        
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
-            title = f"[bold {_SYSTEM_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"System Prompt[/bold {_SYSTEM_COLOR}]"
             return None
         elif isinstance(event, ActionEvent):
-            # Check if action is None (non-executable)
-            title = f"[bold {_ACTION_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
             if event.action is None:
-                title += f"Agent Action (Not Executed)[/bold {_ACTION_COLOR}]"
+                title = f"🤖 {agent_name}Agent Action (Not Executed)"
             else:
-                title += f"Agent Action[/bold {_ACTION_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                subtitle=self._format_metrics_subtitle(),
-                border_style=_ACTION_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+                title = f"🤖 {agent_name}Agent Action"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, ObservationEvent):
-            title = f"[bold {_OBSERVATION_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"Observation[/bold {_OBSERVATION_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                border_style=_OBSERVATION_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+            title = f"👁️  {agent_name}Observation"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, UserRejectObservation):
-            title = f"[bold {_ERROR_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"User Rejected Action[/bold {_ERROR_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                border_style=_ERROR_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+            title = f"❌ {agent_name}User Rejected Action"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, MessageEvent):
             if (
                 self._skip_user_messages
                 and event.llm_message
                 and event.llm_message.role == "user"
             ):
-                return
+                return None
             assert event.llm_message is not None
-            # Role-based styling
-            role_colors = {
-                "user": _MESSAGE_USER_COLOR,
-                "assistant": _MESSAGE_ASSISTANT_COLOR,
-            }
-            role_color = role_colors.get(event.llm_message.role, "white")
-
-            # "User Message To [Name] Agent" for user
-            # "Message from [Name] Agent" for agent
-            agent_name = f"{self._name} " if self._name else ""
-
+            
             if event.llm_message.role == "user":
-                title_text = (
-                    f"[bold {role_color}]User Message to "
-                    f"{agent_name}Agent[/bold {role_color}]"
-                )
+                title = f"👤 User Message to {agent_name}Agent"
             else:
-                title_text = (
-                    f"[bold {role_color}]Message from "
-                    f"{agent_name}Agent[/bold {role_color}]"
-                )
-            return Panel(
-                content,
-                title=title_text,
-                subtitle=self._format_metrics_subtitle(),
-                border_style=role_color,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+                title = f"🤖 Message from {agent_name}Agent"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, AgentErrorEvent):
-            title = f"[bold {_ERROR_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"Agent Error[/bold {_ERROR_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                subtitle=self._format_metrics_subtitle(),
-                border_style=_ERROR_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+            title = f"💥 {agent_name}Agent Error"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, PauseEvent):
-            title = f"[bold {_PAUSE_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"User Paused[/bold {_PAUSE_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                border_style=_PAUSE_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
+            title = f"⏸️  {agent_name}User Paused"
+            return self._create_text_box(title, text_content)
         elif isinstance(event, Condensation):
-            title = f"[bold {_SYSTEM_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"Condensation[/bold {_SYSTEM_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                subtitle=self._format_metrics_subtitle(),
-                border_style=_SYSTEM_COLOR,
-                expand=True,
-            )
+            title = f"📦 {agent_name}Condensation"
+            return self._create_text_box(title, text_content)
         else:
-            # Fallback panel for unknown event types
-            title = f"[bold {_ERROR_COLOR}]"
-            if self._name:
-                title += f"{self._name} "
-            title += f"UNKNOWN Event: {event.__class__.__name__}[/bold {_ERROR_COLOR}]"
-            return Panel(
-                content,
-                title=title,
-                subtitle=f"({event.source})",
-                border_style=_ERROR_COLOR,
-                padding=_PANEL_PADDING,
-                expand=True,
-            )
-
-    def _format_metrics_subtitle(self) -> str | None:
-        """Format LLM metrics as a visually appealing subtitle string with icons,
-        colors, and k/m abbreviations using conversation stats."""
-        stats = self.conversation_stats
-        if not stats:
-            return None
-
-        combined_metrics = stats.get_combined_metrics()
-        if not combined_metrics or not combined_metrics.accumulated_token_usage:
-            return None
-
-        usage = combined_metrics.accumulated_token_usage
-        cost = combined_metrics.accumulated_cost or 0.0
-
-        # helper: 1234 -> "1.2K", 1200000 -> "1.2M"
-        def abbr(n: int | float) -> str:
-            n = int(n or 0)
-            if n >= 1_000_000_000:
-                val, suffix = n / 1_000_000_000, "B"
-            elif n >= 1_000_000:
-                val, suffix = n / 1_000_000, "M"
-            elif n >= 1_000:
-                val, suffix = n / 1_000, "K"
+            # Fallback for unknown event types
+            title = f"❓ {agent_name}UNKNOWN Event: {event.__class__.__name__}"
+            return self._create_text_box(title, text_content)
+    
+    def _create_text_box(self, title: str, content: str) -> str:
+        """Create a simple text box with title and content."""
+        # Create a simple border
+        border_char = "─"
+        corner_char = "┌┐└┘"
+        side_char = "│"
+        
+        # Split content into lines and limit width
+        max_width = 100
+        lines = []
+        for line in content.split('\n'):
+            if len(line) <= max_width:
+                lines.append(line)
             else:
-                return str(n)
-            return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-        input_tokens = abbr(usage.prompt_tokens or 0)
-        output_tokens = abbr(usage.completion_tokens or 0)
-
-        # Cache hit rate (prompt + cache)
-        prompt = usage.prompt_tokens or 0
-        cache_read = usage.cache_read_tokens or 0
-        cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
-        reasoning_tokens = usage.reasoning_tokens or 0
-
-        # Cost
-        cost_str = f"{cost:.4f}" if cost > 0 else "0.00"
-
-        # Build with fixed color scheme
-        parts: list[str] = []
-        parts.append(f"[cyan]↑ input {input_tokens}[/cyan]")
-        parts.append(f"[magenta]cache hit {cache_rate}[/magenta]")
-        if reasoning_tokens > 0:
-            parts.append(f"[yellow] reasoning {abbr(reasoning_tokens)}[/yellow]")
-        parts.append(f"[blue]↓ output {output_tokens}[/blue]")
-        parts.append(f"[green]$ {cost_str}[/green]")
-
-        return "Tokens: " + " • ".join(parts)
+                # Wrap long lines
+                while line:
+                    lines.append(line[:max_width])
+                    line = line[max_width:]
+        
+        # Calculate box width
+        content_width = max(len(title), max((len(line) for line in lines), default=0))
+        box_width = min(content_width + 4, max_width + 4)
+        
+        # Build the box
+        result = []
+        result.append(f"┌{border_char * (box_width - 2)}┐")
+        result.append(f"│ {title:<{box_width - 4}} │")
+        result.append(f"├{border_char * (box_width - 2)}┤")
+        
+        for line in lines:
+            result.append(f"│ {line:<{box_width - 4}} │")
+        
+        result.append(f"└{border_char * (box_width - 2)}┘")
+        result.append("")  # Add spacing
+        
+        return "\n".join(result)
