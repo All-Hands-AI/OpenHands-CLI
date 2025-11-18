@@ -17,12 +17,11 @@ from textual.widgets import (
     Button,
     Footer,
     Header,
+    Input,
     Label,
     RichLog,
     Static,
 )
-
-from openhands_cli.textual_autocomplete import AutocompleteInput
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.conversation.state import ConversationExecutionStatus
@@ -82,41 +81,6 @@ class OpenHandsApp(App):
         border: solid $primary;
         background: $surface;
     }
-    
-    /* Autocomplete widget styling */
-    #autocomplete_container {
-        width: 100%;
-        height: 100%;
-    }
-    
-    #dropdown_container {
-        height: auto;
-        max-height: 6;
-        background: $surface;
-        border: solid $accent;
-        margin-top: 1;
-    }
-    
-    #suggestions_list {
-        height: auto;
-        max-height: 5;
-        background: $surface;
-    }
-    
-    #suggestions_list > ListItem {
-        height: 1;
-        padding: 0 1;
-        background: $surface;
-    }
-    
-    #suggestions_list > ListItem.selected {
-        background: $primary;
-        color: $text;
-    }
-    
-    #suggestions_list > ListItem:hover {
-        background: $accent;
-    }
     """
 
     BINDINGS = [
@@ -147,7 +111,7 @@ class OpenHandsApp(App):
         
         # Input area - docked to bottom
         with Container(id="input_area"):
-            yield AutocompleteInput(
+            yield Input(
                 placeholder="Type your message or /help for commands...",
                 id="user_input"
             )
@@ -172,7 +136,7 @@ class OpenHandsApp(App):
         main_display.write("Type your message or /help for commands...")
         
         # Focus the input
-        input_widget = self.query_one("#user_input", AutocompleteInput)
+        input_widget = self.query_one("#user_input", Input)
         input_widget.focus()
         
         # Set up conversation ID
@@ -203,7 +167,7 @@ class OpenHandsApp(App):
         self.display_welcome(resume)
         
         # Focus the input
-        input_widget = self.query_one("#user_input", AutocompleteInput)
+        input_widget = self.query_one("#user_input", Input)
         input_widget.focus()
 
     def display_welcome(self, resume: bool = False) -> None:
@@ -253,13 +217,16 @@ class OpenHandsApp(App):
 
         return conversation
 
-    @on(AutocompleteInput.Submitted, "#user_input")
-    async def handle_input(self, event: AutocompleteInput.Submitted) -> None:
+    @on(Input.Submitted, "#user_input")
+    async def handle_input(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
         user_input = event.value.strip()
         
         if not user_input:
             return
+
+        # Clear the input
+        event.input.value = ""
 
         # Handle commands
         if user_input.startswith("/"):
