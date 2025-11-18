@@ -20,6 +20,8 @@ jobs:
     release-cli:
         name: Publish CLI to PyPI
         runs-on: blacksmith-2vcpu-ubuntu-2404
+        permissions:
+            id-token: write
     # Run when manually dispatched for "cli" OR for tag pushes that contain '-cli'
         if: |
             (github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'cli')
@@ -46,4 +48,4 @@ jobs:
 
             - name: Publish CLI to PyPI
               run: |
-                  uv publish --token ${{ secrets.PYPI_TOKEN_OPENHANDS }}
+                  uv publish
