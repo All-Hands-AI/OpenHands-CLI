@@ -1,13 +1,16 @@
 """Simplified tests for the /status command functionality."""
 
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
-from uuid import uuid4
+from unittest.mock import MagicMock, Mock, patch
+from uuid import UUID, uuid4
 
 import pytest
+from prompt_toolkit.input.defaults import create_pipe_input
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands.sdk.llm.utils.metrics import Metrics, TokenUsage
 from openhands_cli.tui.status import display_status
+from openhands_cli.user_actions import UserConfirmation
 
 
 # ---------- Fixtures & helpers ----------
@@ -132,3 +135,74 @@ def test_display_status_metrics(conversation, cost, usage, expecteds):
     assert pf.called and pc.called
     for expected in expecteds:
         assert expected in text
+
+
+def test_status_command_no_active_conversation():
+    """Test /status command when no conversation is active.
+
+    Prevents UnboundLocalError.
+    """
+    with (
+        patch(
+            "openhands_cli.agent_chat.exit_session_confirmation"
+        ) as mock_exit_confirm,
+        patch(
+            "openhands_cli.agent_chat.get_session_prompter"
+        ) as mock_get_session_prompter,
+        patch("openhands_cli.agent_chat.setup_conversation") as mock_setup_conversation,
+        patch(
+            "openhands_cli.agent_chat.verify_agent_exists_or_setup_agent"
+        ) as mock_verify_agent,
+        patch("openhands_cli.agent_chat.ConversationRunner") as mock_runner_cls,
+    ):
+        # Auto-accept the exit prompt to avoid interactive UI
+        mock_exit_confirm.return_value = UserConfirmation.ACCEPT
+
+        # Mock agent verification to succeed
+        mock_agent = MagicMock()
+        mock_verify_agent.return_value = mock_agent
+
+        # Mock conversation setup (won't be called for /status without a message first)
+        conv = MagicMock()
+        conv.id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        mock_setup_conversation.return_value = conv
+
+        # Mock runner
+        runner = MagicMock()
+        runner.conversation = conv
+        mock_runner_cls.return_value = runner
+
+        # Real session fed by a pipe
+        from openhands_cli.user_actions.utils import (
+            get_session_prompter as real_get_session_prompter,
+        )
+
+        with create_pipe_input() as pipe:
+            output = DummyOutput()
+            session = real_get_session_prompter(input=pipe, output=output)
+            mock_get_session_prompter.return_value = session
+
+            from openhands_cli.agent_chat import run_cli_entry
+
+            # Send /status command immediately without any prior message
+            # This tests the scenario where conversation is still None
+            pipe.send_text("/status\r/exit\r")
+
+            # Capture printed output
+            with patch("openhands_cli.agent_chat.print_formatted_text") as mock_print:
+                run_cli_entry(None)
+
+            # Verify "No active conversation" warning was printed
+            warning_calls = [
+                call
+                for call in mock_print.call_args_list
+                if "No active conversation" in str(call)
+            ]
+            assert len(warning_calls) > 0, (
+                "Expected warning about no active conversation"
+            )
+
+            # Verify that setup_conversation was NOT called (no conversation started)
+            assert mock_setup_conversation.call_count == 0, (
+                "setup_conversation should not be called for /status without message"
+            )
