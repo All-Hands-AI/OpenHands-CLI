@@ -79,7 +79,7 @@ def choose_llm_model(step_counter: StepCounter, provider: str, escapable=True) -
             "Select LLM Model (TAB for options, CTRL-c to cancel): "
         )
     alternate_option = "Select another model"
-    display_options = models[:4] + [alternate_option]
+    display_options = models[:10] + [alternate_option]
     index = cli_confirm(question, display_options, escapable=escapable)
     chosen_option = display_options[index]
 
