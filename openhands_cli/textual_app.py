@@ -81,11 +81,6 @@ class OpenHandsApp(App):
         background: $surface-lighten-1;
     }
     
-    Input > .input--cursor {
-        color: $text;
-        background: $text;
-    }
-    
     #help_text {
         height: 1;
         color: $text-muted;
