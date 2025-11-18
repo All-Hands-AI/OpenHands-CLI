@@ -70,15 +70,18 @@ class OpenHandsApp(App):
     }
     
     #user_input {
-        height: 1;
-        background: $surface;
-        color: $text;
-        border: solid $primary;
+        height: 3;
+        background: #000000;
+        color: auto;
+        border: solid #0000ff;
+        padding: 1;
     }
     
     #user_input:focus {
-        border: solid $accent;
-        background: $surface-lighten-1;
+        border: solid #00ffff;
+        background: #111111;
+        color: auto;
+        padding: 1;
     }
     
     #help_text {
@@ -177,7 +180,11 @@ class OpenHandsApp(App):
         self.display_welcome(resume)
         
         # Focus the input
-        self.query_one("#user_input", Input).focus()
+        input_widget = self.query_one("#user_input", Input)
+        input_widget.focus()
+        
+        # Add debug message
+        self.log_message("[dim]Input widget focused. Try typing something and press Enter...[/dim]")
 
     def display_welcome(self, resume: bool = False) -> None:
         """Display the welcome message."""
@@ -230,6 +237,10 @@ class OpenHandsApp(App):
     async def handle_input(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
         user_input = event.value.strip()
+        
+        # Debug: Log that we received input
+        self.log_message(f"[dim]DEBUG: Received input: '{user_input}'[/dim]")
+        
         if not user_input:
             return
 
