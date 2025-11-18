@@ -1,5 +1,6 @@
 """Tests for the EventSubscriber class."""
 
+from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,12 +9,11 @@ from acp.schema import SessionUpdate2, SessionUpdate4, SessionUpdate5
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.event import (
-    ActionEvent,
     AgentErrorEvent,
     MessageEvent,
     ObservationEvent,
 )
-from openhands_cli.acp_impl.utils import EventSubscriber
+from openhands_cli.acp_impl.event import EventSubscriber
 
 
 @pytest.fixture
@@ -68,7 +68,9 @@ async def test_handle_action_event(event_subscriber, mock_connection):
 
     # Create event (use a simple object to avoid MagicMock's hasattr behavior)
     class MockEvent:
-        thought = [TextContent(text="Thinking about the task")]
+        thought: ClassVar[list[TextContent]] = [
+            TextContent(text="Thinking about the task")
+        ]
         reasoning_content = "This is my reasoning"
         tool_name = "terminal"
         tool_call_id = "test-call-123"

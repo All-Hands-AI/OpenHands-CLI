@@ -45,8 +45,8 @@ from openhands.sdk import (
 )
 from openhands.sdk.event import Event
 from openhands.sdk.event.llm_convertible.message import MessageEvent
+from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
-    EventSubscriber,
     convert_acp_prompt_to_message_content,
     transform_acp_mcp_servers_to_agent_format,
 )
