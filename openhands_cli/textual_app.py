@@ -49,20 +49,20 @@ class OpenHandsApp(App):
     CSS = """
     Screen {
         layout: vertical;
+        background: $background;
     }
 
     #main_display {
         height: 70%;
-        border: solid $primary;
         margin: 1 1 0 1;
         overflow-y: scroll;
+        background: $background;
     }
 
     #input_area {
         height: 8;
         dock: bottom;
-        background: $surface;
-        border-top: solid $primary;
+        background: $background;
         padding: 1;
         margin-bottom: 1;
     }
@@ -77,7 +77,7 @@ class OpenHandsApp(App):
 
     #user_input:focus {
         border: solid $primary;
-        background: $surface;
+        background: $background;
     }
     """
 
