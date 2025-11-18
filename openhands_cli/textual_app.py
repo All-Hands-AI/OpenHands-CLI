@@ -123,6 +123,21 @@ class OpenHandsApp(App):
 
             yield AutoComplete(text_input, candidates=["/help", "/exit", "/settings"])
 
+    def _get_theme_color(self, color_name: str) -> str:
+        """Get a color value from the current theme."""
+        if hasattr(self, 'openhands_theme'):
+            return getattr(self.openhands_theme, color_name, "#FFFFFF")
+        # Fallback colors if theme not available
+        fallback_colors = {
+            "primary": "#FFD700",
+            "secondary": "#808080", 
+            "accent": "#FFFFFF",
+            "success": "#00FF00",
+            "warning": "#FFD700",
+            "error": "#FF0000",
+        }
+        return fallback_colors.get(color_name, "#FFFFFF")
+
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
         return r"""
@@ -137,7 +152,7 @@ class OpenHandsApp(App):
     async def on_mount(self) -> None:
         """Initialize the application when mounted."""
         # Create and register custom theme
-        openhands_theme = Theme(
+        self.openhands_theme = Theme(
             name="openhands",
             primary="#FFD700",  # Gold for primary elements (banner, titles)
             secondary="#808080",  # Grey for secondary text
@@ -160,7 +175,7 @@ class OpenHandsApp(App):
         )
         
         # Register and apply the theme
-        self.register_theme(openhands_theme)
+        self.register_theme(self.openhands_theme)
         self.theme = "openhands"
 
         # Set up conversation ID
@@ -200,26 +215,31 @@ class OpenHandsApp(App):
         chat_log = self.query_one("#main_display", RichLog)
 
         # Display the banner first
-        chat_log.write(f"[primary]{self._get_banner_text()}[/primary]")
+        primary_color = self._get_theme_color("primary")
+        secondary_color = self._get_theme_color("secondary")
+        success_color = self._get_theme_color("success")
+        
+        chat_log.write(f"[{primary_color}]{self._get_banner_text()}[/{primary_color}]")
         chat_log.write("")
 
         # Display conversation initialization message
         if not resume:
             chat_log.write(
-                f"[secondary]Initialized conversation "
-                f"{self.conversation_id}[/secondary]"
+                f"[{secondary_color}]Initialized conversation "
+                f"{self.conversation_id}[/{secondary_color}]"
             )
         else:
             chat_log.write(
-                f"[secondary]Resumed conversation "
-                f"{self.conversation_id}[/secondary]"
+                f"[{secondary_color}]Resumed conversation "
+                f"{self.conversation_id}[/{secondary_color}]"
             )
 
         chat_log.write("")
-        chat_log.write("[primary]Let's start building![/primary]")
+        chat_log.write(f"[{primary_color}]Let's start building![/{primary_color}]")
         chat_log.write(
-            "[success]What do you want to build? "
-            "[secondary]Type /help for help[/secondary][/success]"
+            f"[{success_color}]What do you want to build? "
+            f"[{secondary_color}]Type /help for help[/{secondary_color}]"
+            f"[/{success_color}]"
         )
         chat_log.write("")
 
@@ -300,10 +320,16 @@ class OpenHandsApp(App):
         elif cmd == "/resume":
             await self.action_resume()
         else:
-            self.log_message(f"[error]Unknown command: {command}[/error]")
+            error_color = self._get_theme_color("error")
+            warning_color = self._get_theme_color("warning")
+            accent_color = self._get_theme_color("accent")
+            
             self.log_message(
-                "[warning]Type [accent]/help[/accent] to see available "
-                "commands[/warning]"
+                f"[{error_color}]Unknown command: {command}[/{error_color}]"
+            )
+            self.log_message(
+                f"[{warning_color}]Type [{accent_color}]/help[/{accent_color}] "
+                f"to see available commands[/{warning_color}]"
             )
 
     async def process_user_message(self, user_input: str) -> None:
@@ -338,9 +364,13 @@ class OpenHandsApp(App):
 
     def action_help(self) -> None:
         """Display help information."""
+        primary_color = self._get_theme_color("primary")
+        secondary_color = self._get_theme_color("secondary")
+        accent_color = self._get_theme_color("accent")
+        
         self.log_message("")
-        self.log_message("[primary]🤖 OpenHands CLI Help[/primary]")
-        self.log_message("[secondary]Available commands:[/secondary]")
+        self.log_message(f"[{primary_color}]🤖 OpenHands CLI Help[/{primary_color}]")
+        self.log_message(f"[{secondary_color}]Available commands:[/{secondary_color}]")
         self.log_message("")
 
         commands = {
@@ -356,10 +386,12 @@ class OpenHandsApp(App):
         }
 
         for command, description in commands.items():
-            self.log_message(f"  [accent]{command}[/accent] - {description}")
+            self.log_message(
+                f"  [{accent_color}]{command}[/{accent_color}] - {description}"
+            )
 
         self.log_message("")
-        self.log_message("[secondary]Tips:[/secondary]")
+        self.log_message(f"[{secondary_color}]Tips:[/{secondary_color}]")
         self.log_message("  • Use F1-F5 for quick access to common functions")
         self.log_message("  • Press Ctrl+C to quit, Ctrl+P to pause")
         self.log_message("")
