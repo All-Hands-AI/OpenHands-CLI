@@ -106,7 +106,7 @@ class OpenHandsApp(App):
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
         # Main display area - takes up most of the screen
-        main_display = RichLog(id="main_display", highlight=True, markup=True)
+        main_display = RichLog(id="main_display", highlight=False, markup=True)
         main_display.can_focus = False
         yield main_display
 
@@ -296,7 +296,10 @@ class OpenHandsApp(App):
             await self.action_resume()
         else:
             self.log_message(f"[red]Unknown command: {command}[/red]")
-            self.log_message("[yellow]Type /help to see available commands[/yellow]")
+            self.log_message(
+                "[#FFD700]Type [#FFFFFF]/help[/#FFFFFF] to see available "
+                "commands[/#FFD700]"
+            )
 
     async def process_user_message(self, user_input: str) -> None:
         """Process a regular user message."""
@@ -331,8 +334,8 @@ class OpenHandsApp(App):
     def action_help(self) -> None:
         """Display help information."""
         self.log_message("")
-        self.log_message("[gold]🤖 OpenHands CLI Help[/gold]")
-        self.log_message("[grey]Available commands:[/grey]")
+        self.log_message("[#FFD700]🤖 OpenHands CLI Help[/#FFD700]")
+        self.log_message("[#808080]Available commands:[/#808080]")
         self.log_message("")
 
         commands = {
@@ -348,10 +351,10 @@ class OpenHandsApp(App):
         }
 
         for command, description in commands.items():
-            self.log_message(f"  [white]{command}[/white] - {description}")
+            self.log_message(f"  [#FFFFFF]{command}[/#FFFFFF] - {description}")
 
         self.log_message("")
-        self.log_message("[grey]Tips:[/grey]")
+        self.log_message("[#808080]Tips:[/#808080]")
         self.log_message("  • Use F1-F5 for quick access to common functions")
         self.log_message("  • Press Ctrl+C to quit, Ctrl+P to pause")
         self.log_message("")
