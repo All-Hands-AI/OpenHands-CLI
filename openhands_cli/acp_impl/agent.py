@@ -45,7 +45,10 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.event.llm_convertible.message import MessageEvent
-from openhands_cli.acp_impl.utils import transform_acp_mcp_servers_to_agent_format
+from openhands_cli.acp_impl.utils import (
+    convert_acp_prompt_to_message_content,
+    transform_acp_mcp_servers_to_agent_format,
+)
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
@@ -175,62 +178,11 @@ class OpenHandsACPAgent(ACPAgent):
 
         conversation = self._sessions[session_id]
 
-        # Extract content from prompt - handle text and images
-        message_content = []
-        prompt_text = ""
-
-        if isinstance(params.prompt, str):
-            prompt_text = params.prompt
-            message_content.append(TextContent(text=prompt_text))
-        elif isinstance(params.prompt, list):
-            for block in params.prompt:
-                if isinstance(block, dict):
-                    block_type = block.get("type")
-                    if block_type == "text":
-                        text = block.get("text", "")
-                        prompt_text += text
-                        message_content.append(TextContent(text=text))
-                    elif block_type == "image":
-                        # Handle image content from ACP
-                        # ACP uses 'data' field which can be URL or base64
-                        image_data = block.get("data")
-                        if image_data:
-                            message_content.append(
-                                ImageContent(image_urls=[image_data])
-                            )
-                            logger.info(
-                                f"Added image to message: {image_data[:100]}..."
-                            )
-                else:
-                    # Handle ContentBlock objects
-                    if hasattr(block, "type"):
-                        if block.type == "text":
-                            text = getattr(block, "text", "")
-                            prompt_text += text
-                            message_content.append(TextContent(text=text))
-                        elif block.type == "image":
-                            # Handle ImageContentBlock from ACP
-                            # ACP ImageContentBlock uses 'data' field
-                            if hasattr(block, "data"):
-                                image_data = block.data
-                                message_content.append(
-                                    ImageContent(image_urls=[image_data])
-                                )
-                                logger.info(
-                                    f"Added image to message: {image_data[:100]}..."
-                                )
-        else:
-            # Handle single ContentBlock object
-            if hasattr(params.prompt, "type"):
-                if params.prompt.type == "text":
-                    prompt_text = getattr(params.prompt, "text", "")
-                    message_content.append(TextContent(text=prompt_text))
+        # Convert ACP prompt format to OpenHands message content
+        message_content = convert_acp_prompt_to_message_content(params.prompt)
 
         if not message_content:
             return PromptResponse(stopReason="end_turn")
-
-        preview = prompt_text[:100] if prompt_text else "[image only]"
-        logger.info(f"Processing prompt for session {session_id}: {preview}...")
 
         try:
             # Send the message with potentially multiple content types (text + images)

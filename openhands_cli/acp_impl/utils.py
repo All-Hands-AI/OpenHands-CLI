@@ -1,9 +1,15 @@
 """Utility functions for ACP implementation."""
 
+import logging
 from collections.abc import Sequence
 from typing import Any
 
 from acp.schema import HttpMcpServer, SseMcpServer, StdioMcpServer
+
+from openhands.sdk import ImageContent, TextContent
+
+
+logger = logging.getLogger(__name__)
 
 
 # Union type for all MCP server types from ACP
@@ -68,3 +74,79 @@ def transform_acp_mcp_servers_to_agent_format(
         transformed_servers[server_name] = server_config
 
     return transformed_servers
+
+
+def _process_text_block(block: dict | Any) -> TextContent | None:
+    """Process a text block and return TextContent."""
+    text = ""
+    if isinstance(block, dict):
+        text = block.get("text", "")
+    elif hasattr(block, "text"):
+        text = getattr(block, "text", "")
+    return TextContent(text=text) if text else None
+
+
+def _process_image_block(block: dict | Any) -> ImageContent | None:
+    """Process an image block and return ImageContent."""
+    image_data = None
+    if isinstance(block, dict):
+        image_data = block.get("data")
+    elif hasattr(block, "data"):
+        image_data = block.data
+    
+    if image_data:
+        logger.indebugfo(f"Added image to message: {image_data[:100]}...")
+        return ImageContent(image_urls=[image_data])
+    return None
+
+
+def _process_content_block(block: dict | Any) -> TextContent | ImageContent | None:
+    """Process a single content block (text or image)."""
+    block_type = None
+    if isinstance(block, dict):
+        block_type = block.get("type")
+    elif hasattr(block, "type"):
+        block_type = block.type
+    
+    if block_type == "text":
+        return _process_text_block(block)
+    elif block_type == "image":
+        return _process_image_block(block)
+    raise ValueError(f"Unsupported content block type: {block_type}")
+
+
+def convert_acp_prompt_to_message_content(
+    prompt: str | list | Any,
+) -> list[TextContent | ImageContent]:
+    """
+    Convert ACP prompt to OpenHands message content format.
+    
+    Handles various ACP prompt formats:
+    - Simple string
+    - List of content blocks (text/image)
+    - Single ContentBlock object
+    
+    Args:
+        prompt: ACP prompt in various formats (string, list, or ContentBlock)
+    
+    Returns:
+        List of TextContent and ImageContent objects
+    """
+    message_content: list[TextContent | ImageContent] = []
+    
+    if isinstance(prompt, str):
+        # Simple string prompt
+        message_content.append(TextContent(text=prompt))
+    elif isinstance(prompt, list):
+        # List of content blocks
+        for block in prompt:
+            content = _process_content_block(block)
+            if content:
+                message_content.append(content)
+    else:
+        # Single ContentBlock object
+        content = _process_content_block(prompt)
+        if content:
+            message_content.append(content)
+    
+    return message_content
