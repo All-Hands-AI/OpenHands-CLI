@@ -67,7 +67,7 @@ def build_layout(question: str, choices: list[str], selected_ref: list[int]) -> 
     content_window = Window(
         FormattedTextControl(get_choice_text),
         always_hide_cursor=True,
-        height=Dimension(max=16),
+        height=Dimension(max=8),
     )
     return Layout(HSplit([content_window]))
 
