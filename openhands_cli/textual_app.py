@@ -182,9 +182,6 @@ class OpenHandsApp(App):
         # Focus the input
         input_widget = self.query_one("#user_input", Input)
         input_widget.focus()
-        
-        # Add debug message
-        self.log_message("[dim]Input widget focused. Try typing something and press Enter...[/dim]")
 
     def display_welcome(self, resume: bool = False) -> None:
         """Display the welcome message."""
@@ -237,9 +234,6 @@ class OpenHandsApp(App):
     async def handle_input(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
         user_input = event.value.strip()
-        
-        # Debug: Log that we received input
-        self.log_message(f"[dim]DEBUG: Received input: '{user_input}'[/dim]")
         
         if not user_input:
             return
