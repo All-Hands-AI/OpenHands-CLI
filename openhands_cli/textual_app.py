@@ -71,6 +71,19 @@ class OpenHandsApp(App):
     
     #user_input {
         height: 1;
+        background: $surface;
+        color: $text;
+        border: solid $primary;
+    }
+    
+    #user_input:focus {
+        border: solid $accent;
+        background: $surface-lighten-1;
+    }
+    
+    Input > .input--cursor {
+        color: $text;
+        background: $text;
     }
     
     #help_text {
