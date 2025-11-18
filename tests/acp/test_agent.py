@@ -5,7 +5,11 @@ from uuid import UUID
 
 import pytest
 from acp import InitializeRequest, NewSessionRequest, PromptRequest
-from acp.schema import AgentCapabilities, Implementation, TextContentBlock
+from acp.schema import (
+    AgentCapabilities,
+    Implementation,
+    TextContentBlock,
+)
 
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent
 
@@ -153,7 +157,10 @@ async def test_prompt_unknown_session(acp_agent):
     """Test prompt with unknown session ID."""
 
     content_blocks = [TextContentBlock(type="text", text="Hello")]
-    request = PromptRequest(sessionId="unknown-session", prompt=content_blocks)
+    request = PromptRequest(
+        sessionId="unknown-session",
+        prompt=content_blocks,  # type: ignore[arg-type]
+    )
 
     with pytest.raises(ValueError, match="Unknown session"):
         await acp_agent.prompt(request)
@@ -181,15 +188,38 @@ async def test_prompt_empty_text(acp_agent):
 @pytest.mark.asyncio
 async def test_prompt_success(acp_agent, mock_connection):
     """Test successful prompt processing."""
+    from pathlib import Path
+
     from openhands.sdk import Message, TextContent
     from openhands.sdk.event.llm_convertible.message import MessageEvent
 
-    session_id = "test-session"
-
-    # Create mock conversation
+    # Create mock conversation with callbacks list
+    # Store callbacks to trigger them after conversation.run
     mock_conversation = MagicMock()
     mock_conversation.state.events = []
-    acp_agent._sessions[session_id] = mock_conversation
+    # Store the callbacks that will be set during newSession
+    callbacks_holder = []
+
+    # Create a real newSession to set up callbacks
+    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+        # Mock agent specs
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = MagicMock(agent=mock_agent)
+
+        with patch("openhands_cli.acp_impl.agent.Conversation") as MockConv:
+            # Capture the callbacks parameter
+            def capture_callbacks(*args, **kwargs):
+                if "callbacks" in kwargs:
+                    callbacks_holder.extend(kwargs["callbacks"])
+                return mock_conversation
+
+            MockConv.side_effect = capture_callbacks
+
+            # Create session to set up callbacks
+            request = NewSessionRequest(cwd=str(Path.cwd()), mcpServers=[])
+            response = await acp_agent.newSession(request)
+            session_id = response.sessionId
 
     # Create a mock agent message event
     mock_message = Message(
@@ -197,11 +227,14 @@ async def test_prompt_success(acp_agent, mock_connection):
     )
     mock_event = MessageEvent(source="agent", llm_message=mock_message)
 
-    # Mock conversation.run to add the event
+    # Mock conversation.run to trigger callbacks
     async def mock_run(fn):
         # Call the real function which is conversation.run
         fn()
         mock_conversation.state.events.append(mock_event)
+        # Trigger the callbacks that were set during newSession
+        for callback in callbacks_holder:
+            callback(mock_event)
 
     with patch("asyncio.to_thread", side_effect=mock_run):
         request = PromptRequest(
@@ -211,8 +244,11 @@ async def test_prompt_success(acp_agent, mock_connection):
 
         assert response.stopReason == "end_turn"
 
-        # Verify sessionUpdate was called
-        mock_connection.sessionUpdate.assert_called_once()
+        # Verify sessionUpdate was called (give it a moment for async tasks)
+        import asyncio
+
+        await asyncio.sleep(0.1)
+        mock_connection.sessionUpdate.assert_called()
 
 
 @pytest.mark.asyncio
@@ -326,17 +362,39 @@ async def test_ext_notification(acp_agent):
 @pytest.mark.asyncio
 async def test_prompt_with_image(acp_agent, mock_connection):
     """Test prompt with image content."""
+    from pathlib import Path
+
     from acp.schema import ImageContentBlock
 
     from openhands.sdk import Message, TextContent
     from openhands.sdk.event.llm_convertible.message import MessageEvent
 
-    session_id = "test-session"
-
-    # Create mock conversation
+    # Create mock conversation with callbacks list
     mock_conversation = MagicMock()
     mock_conversation.state.events = []
-    acp_agent._sessions[session_id] = mock_conversation
+    # Store the callbacks that will be set during newSession
+    callbacks_holder = []
+
+    # Create a real newSession to set up callbacks
+    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+        # Mock agent specs
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = MagicMock(agent=mock_agent)
+
+        with patch("openhands_cli.acp_impl.agent.Conversation") as MockConv:
+            # Capture the callbacks parameter
+            def capture_callbacks(*args, **kwargs):
+                if "callbacks" in kwargs:
+                    callbacks_holder.extend(kwargs["callbacks"])
+                return mock_conversation
+
+            MockConv.side_effect = capture_callbacks
+
+            # Create session to set up callbacks
+            request = NewSessionRequest(cwd=str(Path.cwd()), mcpServers=[])
+            response = await acp_agent.newSession(request)
+            session_id = response.sessionId
 
     # Create a mock agent message event
     mock_message = Message(
@@ -344,10 +402,13 @@ async def test_prompt_with_image(acp_agent, mock_connection):
     )
     mock_event = MessageEvent(source="agent", llm_message=mock_message)
 
-    # Mock conversation.run to add the event
+    # Mock conversation.run to trigger callbacks
     async def mock_run(fn):
         fn()
         mock_conversation.state.events.append(mock_event)
+        # Trigger the callbacks that were set during newSession
+        for callback in callbacks_holder:
+            callback(mock_event)
 
     with patch("asyncio.to_thread", side_effect=mock_run):
         # Create request with both text and image
@@ -368,8 +429,11 @@ async def test_prompt_with_image(acp_agent, mock_connection):
 
         assert response.stopReason == "end_turn"
 
-        # Verify sessionUpdate was called
-        mock_connection.sessionUpdate.assert_called_once()
+        # Verify sessionUpdate was called (give it a moment for async tasks)
+        import asyncio
+
+        await asyncio.sleep(0.1)
+        mock_connection.sessionUpdate.assert_called()
 
 
 @pytest.mark.asyncio

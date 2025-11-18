@@ -39,13 +39,14 @@ from acp.schema import (
 from openhands.sdk import (
     BaseConversation,
     Conversation,
-    ImageContent,
     Message,
     TextContent,
     Workspace,
 )
+from openhands.sdk.event import Event
 from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.acp_impl.utils import (
+    EventSubscriber,
     convert_acp_prompt_to_message_content,
     transform_acp_mcp_servers_to_agent_format,
 )
@@ -66,7 +67,8 @@ class OpenHandsACPAgent(ACPAgent):
             conn: ACP connection for sending notifications
         """
         self._conn = conn
-        self._sessions: dict[str, BaseConversation] = {}  # session_id -> conversation
+        # session_id -> conversation
+        self._sessions: dict[str, BaseConversation] = {}
 
         logger.info("OpenHands ACP Agent initialized")
 
@@ -144,12 +146,26 @@ class OpenHandsACPAgent(ACPAgent):
 
             workspace = Workspace(working_dir=str(working_path))
 
+            # Create event subscriber for streaming updates
+            subscriber = EventSubscriber(session_id, self._conn)
+
+            # Get the current event loop to use in the callback
+            loop = asyncio.get_event_loop()
+
+            # Create a synchronous wrapper for the async subscriber
+            def sync_callback(event: Event) -> None:
+                """Synchronous wrapper that schedules async event handling."""
+                # Schedule the coroutine on the event loop thread-safely
+                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+
             # Create conversation using CLI's persistence directory
+            # Pass the callback at creation time
             conversation = Conversation(
                 agent=agent,
                 workspace=workspace,
                 persistence_dir=CONVERSATIONS_DIR,
                 conversation_id=UUID(session_id),
+                callbacks=[sync_callback],
             )
 
             # Store conversation
@@ -185,34 +201,14 @@ class OpenHandsACPAgent(ACPAgent):
             return PromptResponse(stopReason="end_turn")
 
         try:
-            # Send the message with potentially multiple content types (text + images)
+            # Send the message with potentially multiple content types
+            # (text + images)
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
             # Run the conversation asynchronously
+            # Callbacks are already set up when conversation was created
             await asyncio.to_thread(conversation.run)
-
-            # Get the last agent message from conversation state and stream it
-            for event in reversed(conversation.state.events):
-                if isinstance(event, MessageEvent) and event.source == "agent":
-                    text_content = ""
-                    for content in event.llm_message.content:
-                        if isinstance(content, TextContent):
-                            text_content += content.text
-
-                    if text_content.strip():
-                        await self._conn.sessionUpdate(
-                            SessionNotification(
-                                sessionId=session_id,
-                                update=SessionUpdate2(
-                                    sessionUpdate="agent_message_chunk",
-                                    content=ContentBlock1(
-                                        type="text", text=text_content
-                                    ),
-                                ),
-                            )
-                        )
-                    break
 
             # Return the final response
             return PromptResponse(stopReason="end_turn")
