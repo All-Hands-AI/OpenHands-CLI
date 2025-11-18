@@ -1,6 +1,6 @@
 """TUI-compatible visualizer that captures agent events for display in the TUI."""
 
-from typing import Callable
+from collections.abc import Callable
 
 from openhands.sdk.conversation.visualizer.base import (
     ConversationVisualizerBase,
@@ -16,9 +16,6 @@ from openhands.sdk.event import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
-
-
-
 
 
 class TUIVisualizer(ConversationVisualizerBase):
@@ -58,16 +55,16 @@ class TUIVisualizer(ConversationVisualizerBase):
         """Format event as plain text for TUI display."""
         # Use the event's visualize property for content
         content = event.visualize
-        
+
         if not content.plain.strip():
             return None
-        
+
         # Get plain text content
         text_content = content.plain
-        
+
         # Create simple text-based formatting
         agent_name = f"{self._name} " if self._name else ""
-        
+
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
             return None
@@ -91,7 +88,7 @@ class TUIVisualizer(ConversationVisualizerBase):
             ):
                 return None
             assert event.llm_message is not None
-            
+
             if event.llm_message.role == "user":
                 title = f"👤 User Message to {agent_name}Agent"
             else:
@@ -110,18 +107,18 @@ class TUIVisualizer(ConversationVisualizerBase):
             # Fallback for unknown event types
             title = f"❓ {agent_name}UNKNOWN Event: {event.__class__.__name__}"
             return self._create_text_box(title, text_content)
-    
+
     def _create_text_box(self, title: str, content: str) -> str:
         """Create a simple text box with title and content."""
         # Create a simple border
         border_char = "─"
         corner_char = "┌┐└┘"
         side_char = "│"
-        
+
         # Split content into lines and limit width
         max_width = 100
         lines = []
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             if len(line) <= max_width:
                 lines.append(line)
             else:
@@ -129,21 +126,21 @@ class TUIVisualizer(ConversationVisualizerBase):
                 while line:
                     lines.append(line[:max_width])
                     line = line[max_width:]
-        
+
         # Calculate box width
         content_width = max(len(title), max((len(line) for line in lines), default=0))
         box_width = min(content_width + 4, max_width + 4)
-        
+
         # Build the box
         result = []
         result.append(f"┌{border_char * (box_width - 2)}┐")
         result.append(f"│ {title:<{box_width - 4}} │")
         result.append(f"├{border_char * (box_width - 2)}┤")
-        
+
         for line in lines:
             result.append(f"│ {line:<{box_width - 4}} │")
-        
+
         result.append(f"└{border_char * (box_width - 2)}┘")
         result.append("")  # Add spacing
-        
+
         return "\n".join(result)

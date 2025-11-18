@@ -15,20 +15,32 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands_cli.listeners.pause_listener import PauseListener, pause_listener
 from openhands_cli.setup import setup_conversation
-from openhands_cli.user_actions import ask_user_confirmation
+from openhands_cli.user_actions import ask_user_confirmation, ask_user_confirmation_tui
 from openhands_cli.user_actions.types import UserConfirmation
 
 
 class ConversationRunner:
     """Handles the conversation state machine logic cleanly."""
 
-    def __init__(self, conversation: BaseConversation, on_agent_finished=None, output_callback=None, error_callback=None):
+    def __init__(
+        self,
+        conversation: BaseConversation,
+        on_agent_finished=None,
+        output_callback=None,
+        error_callback=None,
+        tui_instance=None,
+    ):
         self.conversation = conversation
         self._running = False
         self._run_thread = None
         self.on_agent_finished = on_agent_finished
-        self.output_callback = output_callback or (lambda msg: print_formatted_text(HTML(msg)))
-        self.error_callback = error_callback or (lambda msg: print_formatted_text(HTML(f"<red>{msg}</red>")))
+        self.output_callback = output_callback or (
+            lambda msg: print_formatted_text(HTML(msg))
+        )
+        self.error_callback = error_callback or (
+            lambda msg: print_formatted_text(HTML(f"<red>{msg}</red>"))
+        )
+        self.tui_instance = tui_instance
 
     @property
     def is_confirmation_mode_active(self):
@@ -69,7 +81,9 @@ class ConversationRunner:
             self.conversation.state.execution_status
             == ConversationExecutionStatus.PAUSED
         ):
-            self.output_callback("⏸️  Resuming paused conversation... (Press Ctrl-P to pause)")
+            self.output_callback(
+                "⏸️  Resuming paused conversation... (Press Ctrl-P to pause)"
+            )
         else:
             self.output_callback("🤖 Agent running... (Press Ctrl-P to pause)")
         self.output_callback("")
@@ -180,10 +194,18 @@ class ConversationRunner:
         if not pending_actions:
             return UserConfirmation.ACCEPT
 
-        result = ask_user_confirmation(
-            pending_actions,
-            isinstance(self.conversation.state.confirmation_policy, ConfirmRisky),
-        )
+        # Use TUI confirmation if TUI instance is available, otherwise use CLI
+        if self.tui_instance:
+            result = ask_user_confirmation_tui(
+                pending_actions,
+                isinstance(self.conversation.state.confirmation_policy, ConfirmRisky),
+                self.tui_instance,
+            )
+        else:
+            result = ask_user_confirmation(
+                pending_actions,
+                isinstance(self.conversation.state.confirmation_policy, ConfirmRisky),
+            )
         decision = result.decision
         policy_change = result.policy_change
 

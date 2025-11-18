@@ -39,7 +39,7 @@ def main() -> None:
         else:
             # Default CLI behavior - use the new TUI interface
             from openhands_cli.tui_main import run_tui_cli_entry
-            
+
             run_tui_cli_entry(resume_conversation_id=args.resume)
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
