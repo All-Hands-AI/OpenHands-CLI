@@ -100,3 +100,15 @@ def display_welcome(conversation_id: UUID, resume: bool = False) -> None:
         )
     )
     print()
+
+
+def display_agent_running_status() -> None:
+    """Display status when agent is running and accepting messages."""
+    print_formatted_text("")
+    print_formatted_text(
+        HTML(
+            "<yellow>🤖 Agent is running...</yellow> "
+            "<grey>(You can send additional messages or press Ctrl+C to pause)</grey>"
+        )
+    )
+    print_formatted_text("")

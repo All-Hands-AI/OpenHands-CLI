@@ -30,7 +30,10 @@ from openhands_cli.tui.tui import (
     display_welcome,
 )
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
-from openhands_cli.user_actions.utils import get_session_prompter
+from openhands_cli.user_actions.utils import (
+    get_message_only_prompter,
+    get_session_prompter,
+)
 
 
 def _restore_tty() -> None:
@@ -100,20 +103,55 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
     runner = None
     conversation = None
     session = get_session_prompter()
+    message_session = get_message_only_prompter()
 
     # Main chat loop
     while True:
         try:
-            # Get user input
-            user_input = session.prompt(
-                HTML("<gold>> </gold>"),
-                multiline=False,
-            )
+            # Choose appropriate prompter based on agent state
+            if runner and runner.is_running:
+                # Agent is running - only allow message sending
+                try:
+                    user_input = message_session.prompt(
+                        HTML("<gold>📤 </gold>"),
+                        multiline=False,
+                    )
+                except KeyboardInterrupt:
+                    # Allow Ctrl+C to pause the agent
+                    if runner and runner.is_running:
+                        runner.conversation.pause()
+                        print_formatted_text(
+                            HTML("<yellow>Agent paused by user</yellow>")
+                        )
+                    continue
+
+                if not user_input.strip():
+                    continue
+
+                # Send message to running agent
+                message = Message(
+                    role="user",
+                    content=[TextContent(text=user_input)],
+                )
+
+                try:
+                    runner.send_message_while_running(message)
+                except RuntimeError:
+                    # Agent stopped running, fall back to normal processing
+                    pass
+
+                continue
+            else:
+                # Agent is idle - allow all commands
+                user_input = session.prompt(
+                    HTML("<gold>> </gold>"),
+                    multiline=False,
+                )
 
             if not user_input.strip():
                 continue
 
-            # Handle commands
+            # Handle commands (only when agent is not running)
             command = user_input.strip().lower()
 
             message = Message(

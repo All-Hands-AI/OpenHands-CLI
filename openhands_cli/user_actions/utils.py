@@ -191,6 +191,43 @@ def get_session_prompter(
     return session
 
 
+def get_message_only_prompter(
+    input: Input | None = None,  # strictly for unit testing
+    output: Output | None = None,  # strictly for unit testing
+) -> PromptSession:
+    """Get a prompt session that only accepts messages (no commands) when agent runs."""
+    bindings = KeyBindings()
+
+    @bindings.add("\\", "enter")
+    def _(event: KeyPressEvent) -> None:
+        # Typing '\' + Enter forces a newline regardless
+        event.current_buffer.insert_text("\n")
+
+    @bindings.add("enter")
+    def _handle_enter(event: KeyPressEvent):
+        event.app.exit(result=event.current_buffer.text)
+
+    @bindings.add("c-c")
+    def _keyboard_interrupt(event: KeyPressEvent):
+        event.app.exit(exception=KeyboardInterrupt())
+
+    session = PromptSession(
+        key_bindings=bindings,
+        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",  # noqa: ARG005
+        multiline=True,
+        input=input,
+        output=output,
+        style=DEFAULT_STYLE,
+        placeholder=HTML(
+            "<placeholder>"
+            "Send message to running agent… (commands disabled while agent runs)"
+            "</placeholder>"
+        ),
+    )
+
+    return session
+
+
 class NonEmptyValueValidator(Validator):
     def validate(self, document):
         text = document.text

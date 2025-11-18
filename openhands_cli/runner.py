@@ -1,3 +1,5 @@
+import threading
+
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import BaseConversation, Message
@@ -22,10 +24,17 @@ class ConversationRunner:
 
     def __init__(self, conversation: BaseConversation):
         self.conversation = conversation
+        self._running = False
+        self._run_thread = None
 
     @property
     def is_confirmation_mode_active(self):
         return self.conversation.is_confirmation_mode_active
+
+    @property
+    def is_running(self):
+        """Check if the agent is currently running."""
+        return self._running
 
     def toggle_confirmation_mode(self):
         new_confirmation_mode_state = not self.is_confirmation_mode_active
@@ -73,6 +82,21 @@ class ConversationRunner:
             )
         print_formatted_text("")
 
+    def send_message_while_running(self, message: Message) -> None:
+        """Send a message to the conversation while the agent is running.
+
+        This allows users to send additional messages without interrupting
+        the current agent execution.
+
+        Args:
+            message: The user message to send
+        """
+        if not self._running:
+            raise RuntimeError("Agent is not currently running")
+
+        print_formatted_text(HTML("<green>📨 Message sent to running agent</green>"))
+        self.conversation.send_message(message)
+
     def process_message(self, message: Message | None) -> None:
         """Process a user message through the conversation.
 
@@ -86,10 +110,32 @@ class ConversationRunner:
         if message:
             self.conversation.send_message(message)
 
-        if self.is_confirmation_mode_active:
-            self._run_with_confirmation()
-        else:
-            self._run_without_confirmation()
+        # Start agent execution in a separate thread
+        self._running = True
+        self._run_thread = threading.Thread(target=self._run_agent_thread, daemon=True)
+        self._run_thread.start()
+
+        # Display status that agent is now running and accepting messages
+        from openhands_cli.tui.tui import display_agent_running_status
+
+        display_agent_running_status()
+
+    def _run_agent_thread(self) -> None:
+        """Run the agent in a separate thread."""
+        try:
+            if self.is_confirmation_mode_active:
+                self._run_with_confirmation()
+            else:
+                self._run_without_confirmation()
+        finally:
+            self._running = False
+            self._run_thread = None
+            # Notify that agent has finished
+            print_formatted_text(
+                HTML(
+                    "<green>✅ Agent finished. You can now use commands again.</green>"
+                )
+            )
 
     def _run_without_confirmation(self) -> None:
         with pause_listener(self.conversation):
