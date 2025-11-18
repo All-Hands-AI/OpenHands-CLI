@@ -376,3 +376,48 @@ async def test_initialize_reports_image_capability(acp_agent):
 
         # Verify image capability is enabled
         assert response.agentCapabilities.promptCapabilities.image is True
+
+
+@pytest.mark.asyncio
+async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
+    """Test creating a new session with MCP servers transforms env correctly."""
+    from acp.schema import StdioMcpServer
+
+    # Create MCP server with env as array (ACP format)
+    mcp_server = StdioMcpServer(
+        name="test-server",
+        command="/usr/bin/node",
+        args=["server.js"],
+        env=[]  # Empty array - should be converted to {}
+    )
+
+    request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[mcp_server])
+
+    with patch('openhands_cli.acp_impl.agent.load_agent_specs') as mock_load, \
+         patch('openhands_cli.acp_impl.agent.Conversation') as mock_conv:
+
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        mock_conversation = MagicMock()
+        mock_conv.return_value = mock_conversation
+
+        response = await acp_agent.newSession(request)
+
+        # Verify session was created
+        assert response.sessionId is not None
+
+        # Verify load_agent_specs was called with transformed MCP servers dict
+        mock_load.assert_called_once()
+        call_kwargs = mock_load.call_args[1]
+        assert 'mcp_servers' in call_kwargs
+        mcp_servers_dict = call_kwargs['mcp_servers']
+
+        # Verify it's a dict in Agent format (not ACP Pydantic models)
+        assert isinstance(mcp_servers_dict, dict)
+        assert 'test-server' in mcp_servers_dict
+        assert mcp_servers_dict['test-server']['command'] == '/usr/bin/node'
+        assert mcp_servers_dict['test-server']['args'] == ['server.js']
+        assert mcp_servers_dict['test-server']['env'] == {}  # Transformed from []
+        assert 'name' not in mcp_servers_dict['test-server']  # Name used as key

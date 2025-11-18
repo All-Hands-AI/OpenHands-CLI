@@ -38,6 +38,7 @@ from acp.schema import (
 
 from openhands.sdk import BaseConversation, Conversation, ImageContent, Message, TextContent, Workspace
 from openhands.sdk.event.llm_convertible.message import MessageEvent
+from openhands_cli.acp_impl.utils import transform_acp_mcp_servers_to_agent_format
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.setup import load_agent_specs, MissingAgentSpec
 
@@ -100,10 +101,15 @@ class OpenHandsACPAgent(ACPAgent):
         session_id = str(uuid.uuid4())
 
         try:
-            # Load agent from CLI settings, passing MCP servers from params
+            # Transform ACP MCP servers to Agent format
+            mcp_servers_dict = None
+            if params.mcpServers:
+                mcp_servers_dict = transform_acp_mcp_servers_to_agent_format(params.mcpServers)
+
+            # Load agent from CLI settings
             agent = load_agent_specs(
                 conversation_id=session_id,
-                mcp_servers=[p.model_dump() for p in params.mcpServers]
+                mcp_servers=mcp_servers_dict
             )
             logger.info(f"Loaded agent with model: {agent.llm.model}")
 

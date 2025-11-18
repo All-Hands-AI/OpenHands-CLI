@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -26,13 +27,13 @@ class MissingAgentSpec(Exception):
 
 def load_agent_specs(
     conversation_id: str | None = None,
-    mcp_servers: list | None = None,
+    mcp_servers: dict[str, dict[str, Any]] | None = None,
 ) -> Agent:
     """Load agent specifications.
 
     Args:
         conversation_id: Optional conversation ID for session tracking
-        mcp_servers: Optional list of MCP servers to augment agent configuration
+        mcp_servers: Optional dict of MCP servers to augment agent configuration
 
     Returns:
         Configured Agent instance
@@ -49,15 +50,10 @@ def load_agent_specs(
 
     # If MCP servers are provided, augment the agent's MCP configuration
     if mcp_servers:
-        # Convert list to dict format expected by agent
-        mcp_config = agent.mcp_config or {}
-        existing_servers = mcp_config.get("mcpServers", {})
-
-        # Merge provided MCP servers with existing ones
-        # Provided servers take precedence
-        for server in mcp_servers:
-            if isinstance(server, dict) and "name" in server:
-                existing_servers[server["name"]] = server
+        # Merge with existing MCP configuration (provided servers take precedence)
+        mcp_config: dict[str, Any] = agent.mcp_config or {}
+        existing_servers: dict[str, dict[str, Any]] = mcp_config.get("mcpServers", {})
+        existing_servers.update(mcp_servers)
 
         agent = agent.model_copy(
             update={"mcp_config": {"mcpServers": existing_servers}}
