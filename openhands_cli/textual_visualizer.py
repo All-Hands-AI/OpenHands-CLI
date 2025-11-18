@@ -4,6 +4,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
 import re
+import threading
 from typing import TYPE_CHECKING
 
 from rich.panel import Panel
@@ -83,13 +84,21 @@ class TextualVisualizer(ConversationVisualizerBase):
         self._app = app
         self._skip_user_messages = skip_user_messages
         self._highlight_patterns = highlight_regex or {}
+        # Store the main thread ID for thread safety checks
+        self._main_thread_id = threading.get_ident()
 
     def on_event(self, event: Event) -> None:
         """Main event handler that displays events with Rich formatting."""
         panel = self._create_event_panel(event)
         if panel:
-            # Use call_from_thread to ensure UI updates happen on the main thread
-            self._app.call_from_thread(self._write_panel_to_ui, panel)
+            # Check if we're in the main thread or a background thread
+            current_thread_id = threading.get_ident()
+            if current_thread_id == self._main_thread_id:
+                # We're in the main thread, update UI directly
+                self._write_panel_to_ui(panel)
+            else:
+                # We're in a background thread, use call_from_thread
+                self._app.call_from_thread(self._write_panel_to_ui, panel)
 
     def _write_panel_to_ui(self, panel: Panel) -> None:
         """Write a panel to the UI (must be called from main thread)."""
