@@ -30,17 +30,24 @@ from acp.schema import (
     PromptCapabilities,
     SessionUpdate1,
     SessionUpdate2,
-    SetSessionModeRequest,
-    SetSessionModeResponse,
     SetSessionModelRequest,
     SetSessionModelResponse,
+    SetSessionModeRequest,
+    SetSessionModeResponse,
 )
 
-from openhands.sdk import BaseConversation, Conversation, ImageContent, Message, TextContent, Workspace
+from openhands.sdk import (
+    BaseConversation,
+    Conversation,
+    ImageContent,
+    Message,
+    TextContent,
+    Workspace,
+)
 from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.acp_impl.utils import transform_acp_mcp_servers_to_agent_format
 from openhands_cli.locations import CONVERSATIONS_DIR
-from openhands_cli.setup import load_agent_specs, MissingAgentSpec
+from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
 
 logger = logging.getLogger(__name__)
@@ -104,12 +111,13 @@ class OpenHandsACPAgent(ACPAgent):
             # Transform ACP MCP servers to Agent format
             mcp_servers_dict = None
             if params.mcpServers:
-                mcp_servers_dict = transform_acp_mcp_servers_to_agent_format(params.mcpServers)
+                mcp_servers_dict = transform_acp_mcp_servers_to_agent_format(
+                    params.mcpServers
+                )
 
             # Load agent from CLI settings
             agent = load_agent_specs(
-                conversation_id=session_id,
-                mcp_servers=mcp_servers_dict
+                conversation_id=session_id, mcp_servers=mcp_servers_dict
             )
             logger.info(f"Loaded agent with model: {agent.llm.model}")
 
@@ -151,7 +159,8 @@ class OpenHandsACPAgent(ACPAgent):
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
             raise ValueError(
-                "Agent not configured. Please run 'openhands' to configure the agent first."
+                "Agent not configured. Please run 'openhands' to configure "
+                "the agent first."
             )
         except Exception as e:
             logger.error(f"Failed to create new session: {e}", exc_info=True)
@@ -186,8 +195,12 @@ class OpenHandsACPAgent(ACPAgent):
                         # ACP uses 'data' field which can be URL or base64
                         image_data = block.get("data")
                         if image_data:
-                            message_content.append(ImageContent(image_urls=[image_data]))
-                            logger.info(f"Added image to message: {image_data[:100]}...")
+                            message_content.append(
+                                ImageContent(image_urls=[image_data])
+                            )
+                            logger.info(
+                                f"Added image to message: {image_data[:100]}..."
+                            )
                 else:
                     # Handle ContentBlock objects
                     if hasattr(block, "type"):
@@ -200,8 +213,12 @@ class OpenHandsACPAgent(ACPAgent):
                             # ACP ImageContentBlock uses 'data' field
                             if hasattr(block, "data"):
                                 image_data = block.data
-                                message_content.append(ImageContent(image_urls=[image_data]))
-                                logger.info(f"Added image to message: {image_data[:100]}...")
+                                message_content.append(
+                                    ImageContent(image_urls=[image_data])
+                                )
+                                logger.info(
+                                    f"Added image to message: {image_data[:100]}..."
+                                )
         else:
             # Handle single ContentBlock object
             if hasattr(params.prompt, "type"):
@@ -212,9 +229,8 @@ class OpenHandsACPAgent(ACPAgent):
         if not message_content:
             return PromptResponse(stopReason="end_turn")
 
-        logger.info(
-            f"Processing prompt for session {session_id}: {prompt_text[:100] if prompt_text else '[image only]'}..."
-        )
+        preview = prompt_text[:100] if prompt_text else "[image only]"
+        logger.info(f"Processing prompt for session {session_id}: {preview}...")
 
         try:
             # Send the message with potentially multiple content types (text + images)
@@ -238,7 +254,9 @@ class OpenHandsACPAgent(ACPAgent):
                                 sessionId=session_id,
                                 update=SessionUpdate2(
                                     sessionUpdate="agent_message_chunk",
-                                    content=ContentBlock1(type="text", text=text_content),
+                                    content=ContentBlock1(
+                                        type="text", text=text_content
+                                    ),
                                 ),
                             )
                         )

@@ -1,14 +1,16 @@
 """Utility functions for ACP implementation."""
 
+from collections.abc import Sequence
 from typing import Any
 
-from acp.schema import EnvVariable, HttpMcpServer, SseMcpServer, StdioMcpServer
+from acp.schema import HttpMcpServer, SseMcpServer, StdioMcpServer
+
 
 # Union type for all MCP server types from ACP
 ACPMCPServerType = StdioMcpServer | HttpMcpServer | SseMcpServer
 
 
-def _transform_env_to_dict(env: list[dict[str, str]]) -> dict[str, str]:
+def _transform_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
     """
     Transform environment variables from serialized EnvVariable format to a dictionary.
 
@@ -30,7 +32,7 @@ def _transform_env_to_dict(env: list[dict[str, str]]) -> dict[str, str]:
 
 
 def transform_acp_mcp_servers_to_agent_format(
-    mcp_servers: list[ACPMCPServerType],
+    mcp_servers: Sequence[ACPMCPServerType],
 ) -> dict[str, dict[str, Any]]:
     """
     Transform MCP servers from ACP format to Agent format.
@@ -54,7 +56,9 @@ def transform_acp_mcp_servers_to_agent_format(
         server_name: str = server_dict["name"]
 
         # Create config without the name field
-        server_config: dict[str, Any] = {k: v for k, v in server_dict.items() if k != "name"}
+        server_config: dict[str, Any] = {
+            k: v for k, v in server_dict.items() if k != "name"
+        }
 
         # Transform env from array to dict format if present
         # ACP sends env as array of EnvVariable objects, but Agent expects dict
