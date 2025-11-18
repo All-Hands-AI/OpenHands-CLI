@@ -46,4 +46,4 @@ jobs:
 
             - name: Publish CLI to PyPI
               run: |
-                  uv publish --token ${{ secrets.PYPI_TOKEN_OPENHANDS }}
+                  uv publish
