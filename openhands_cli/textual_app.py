@@ -139,20 +139,23 @@ class OpenHandsApp(App):
         # Create and register custom theme
         openhands_theme = Theme(
             name="openhands",
-            primary="#808080",  # Grey for most elements
-            secondary="#808080",  # Grey
-            accent="#808080",  # Grey
+            primary="#FFD700",  # Gold for primary elements (banner, titles)
+            secondary="#808080",  # Grey for secondary text
+            accent="#FFFFFF",  # White for commands and important text
             foreground="#D3D3D3",  # Light grey for default text
             background="#000000",  # Black background
             success="#00FF00",  # Bright green for success
-            warning="#FFFF00",  # Bright yellow for warnings
+            warning="#FFD700",  # Gold for warnings (same as primary)
             error="#FF0000",  # Bright red for errors
             surface="#1A1A1A",  # Dark grey for surfaces
             panel="#2A2A2A",  # Slightly lighter grey for panels
             dark=True,
             variables={
-                # Override specific color variables
-                "text": "#D3D3D3",  # Default text color (light grey)
+                # Custom variables for our specific use cases
+                "banner-color": "#FFD700",  # Gold for ASCII banner
+                "help-text-color": "#808080",  # Grey for help text
+                "command-color": "#FFFFFF",  # White for commands
+                "conversation-id-color": "#808080",  # Grey for conversation ID
             },
         )
         
@@ -197,24 +200,26 @@ class OpenHandsApp(App):
         chat_log = self.query_one("#main_display", RichLog)
 
         # Display the banner first
-        chat_log.write(self._get_banner_text())
+        chat_log.write(f"[primary]{self._get_banner_text()}[/primary]")
         chat_log.write("")
 
         # Display conversation initialization message
         if not resume:
             chat_log.write(
-                f"[#808080]Initialized conversation {self.conversation_id}[/#808080]"
+                f"[secondary]Initialized conversation "
+                f"{self.conversation_id}[/secondary]"
             )
         else:
             chat_log.write(
-                f"[#808080]Resumed conversation {self.conversation_id}[/#808080]"
+                f"[secondary]Resumed conversation "
+                f"{self.conversation_id}[/secondary]"
             )
 
         chat_log.write("")
-        chat_log.write("[#FFD700]Let's start building![/#FFD700]")
+        chat_log.write("[primary]Let's start building![/primary]")
         chat_log.write(
-            "[#00FF00]What do you want to build? "
-            "[#808080]Type /help for help[/#808080][/#00FF00]"
+            "[success]What do you want to build? "
+            "[secondary]Type /help for help[/secondary][/success]"
         )
         chat_log.write("")
 
@@ -295,10 +300,10 @@ class OpenHandsApp(App):
         elif cmd == "/resume":
             await self.action_resume()
         else:
-            self.log_message(f"[red]Unknown command: {command}[/red]")
+            self.log_message(f"[error]Unknown command: {command}[/error]")
             self.log_message(
-                "[#FFD700]Type [#FFFFFF]/help[/#FFFFFF] to see available "
-                "commands[/#FFD700]"
+                "[warning]Type [accent]/help[/accent] to see available "
+                "commands[/warning]"
             )
 
     async def process_user_message(self, user_input: str) -> None:
@@ -334,8 +339,8 @@ class OpenHandsApp(App):
     def action_help(self) -> None:
         """Display help information."""
         self.log_message("")
-        self.log_message("[#FFD700]🤖 OpenHands CLI Help[/#FFD700]")
-        self.log_message("[#808080]Available commands:[/#808080]")
+        self.log_message("[primary]🤖 OpenHands CLI Help[/primary]")
+        self.log_message("[secondary]Available commands:[/secondary]")
         self.log_message("")
 
         commands = {
@@ -351,10 +356,10 @@ class OpenHandsApp(App):
         }
 
         for command, description in commands.items():
-            self.log_message(f"  [#FFFFFF]{command}[/#FFFFFF] - {description}")
+            self.log_message(f"  [accent]{command}[/accent] - {description}")
 
         self.log_message("")
-        self.log_message("[#808080]Tips:[/#808080]")
+        self.log_message("[secondary]Tips:[/secondary]")
         self.log_message("  • Use F1-F5 for quick access to common functions")
         self.log_message("  • Press Ctrl+C to quit, Ctrl+P to pause")
         self.log_message("")
