@@ -26,13 +26,43 @@ class MissingAgentSpec(Exception):
 
 def load_agent_specs(
     conversation_id: str | None = None,
+    mcp_servers: list | None = None,
 ) -> Agent:
+    """Load agent specifications.
+
+    Args:
+        conversation_id: Optional conversation ID for session tracking
+        mcp_servers: Optional list of MCP servers to augment agent configuration
+
+    Returns:
+        Configured Agent instance
+
+    Raises:
+        MissingAgentSpec: If agent specification is not found or invalid
+    """
     agent_store = AgentStore()
     agent = agent_store.load(session_id=conversation_id)
     if not agent:
         raise MissingAgentSpec(
             "Agent specification not found. Please configure your agent settings."
         )
+
+    # If MCP servers are provided, augment the agent's MCP configuration
+    if mcp_servers:
+        # Convert list to dict format expected by agent
+        mcp_config = agent.mcp_config or {}
+        existing_servers = mcp_config.get("mcpServers", {})
+
+        # Merge provided MCP servers with existing ones
+        # Provided servers take precedence
+        for server in mcp_servers:
+            if isinstance(server, dict) and "name" in server:
+                existing_servers[server["name"]] = server
+
+        agent = agent.model_copy(
+            update={"mcp_config": {"mcpServers": existing_servers}}
+        )
+
     return agent
 
 

@@ -100,8 +100,11 @@ class OpenHandsACPAgent(ACPAgent):
         session_id = str(uuid.uuid4())
 
         try:
-            # Load agent from CLI settings
-            agent = load_agent_specs(session_id)
+            # Load agent from CLI settings, passing MCP servers from params
+            agent = load_agent_specs(
+                conversation_id=session_id,
+                mcp_servers=[p.model_dump() for p in params.mcpServers]
+            )
             logger.info(f"Loaded agent with model: {agent.llm.model}")
 
             # Validate working directory
