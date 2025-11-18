@@ -50,48 +50,28 @@ class OpenHandsApp(App):
     """Main Textual application for OpenHands CLI."""
 
     CSS = """
-    #banner {
-        height: 8;
-        background: $primary;
-        color: $text;
-        text-align: center;
-        content-align: center middle;
+    Screen {
+        layout: vertical;
     }
     
-    #chat_log {
+    #main_display {
         height: 1fr;
         border: solid $primary;
         margin: 1;
+        overflow-y: scroll;
     }
     
-    #input_container {
+    #input_area {
         height: 3;
-        margin: 1;
+        dock: bottom;
+        background: $surface;
+        border-top: solid $primary;
     }
     
     #user_input {
-        height: 3;
-        background: #000000;
-        color: auto;
-        border: solid #0000ff;
-        padding: 1;
-    }
-    
-    #user_input:focus {
-        border: solid #00ffff;
-        background: #111111;
-        color: auto;
-        padding: 1;
-    }
-    
-    #help_text {
+        width: 1fr;
         height: 1;
-        color: $text-muted;
-        text-align: center;
-    }
-    
-    .command_button {
-        margin: 0 1;
+        margin: 1;
     }
     """
 
@@ -118,26 +98,15 @@ class OpenHandsApp(App):
 
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
-        yield Header()
+        # Main display area - takes up most of the screen
+        yield RichLog(id="main_display", highlight=True, markup=True)
         
-        # Banner with OpenHands ASCII art
-        yield Static(self._get_banner_text(), id="banner")
-        
-        # Main chat area
-        yield RichLog(id="chat_log", highlight=True, markup=True)
-        
-        # Input area
-        with Container(id="input_container"):
+        # Input area - docked to bottom
+        with Container(id="input_area"):
             yield Input(
                 placeholder="Type your message or /help for commands...",
                 id="user_input"
             )
-            yield Static(
-                "Press Enter to send • Type /help for commands • F1-F5 for quick actions",
-                id="help_text"
-            )
-        
-        yield Footer()
 
     def _get_banner_text(self) -> str:
         """Get the OpenHands banner text."""
@@ -152,6 +121,16 @@ class OpenHandsApp(App):
 
     async def on_mount(self) -> None:
         """Initialize the application when mounted."""
+        # Show welcome message
+        main_display = self.query_one("#main_display", RichLog)
+        main_display.write(self._get_banner_text())
+        main_display.write("\n[bold cyan]Welcome to OpenHands CLI![/bold cyan]")
+        main_display.write("Type your message or /help for commands...")
+        
+        # Focus the input
+        input_widget = self.query_one("#user_input", Input)
+        input_widget.focus()
+        
         # Set up conversation ID
         if self.resume_conversation_id:
             try:
@@ -185,7 +164,7 @@ class OpenHandsApp(App):
 
     def display_welcome(self, resume: bool = False) -> None:
         """Display the welcome message."""
-        chat_log = self.query_one("#chat_log", RichLog)
+        chat_log = self.query_one("#main_display", RichLog)
         chat_log.clear()
         
         if not resume:
@@ -200,7 +179,7 @@ class OpenHandsApp(App):
 
     def log_message(self, message: str) -> None:
         """Log a message to the chat area."""
-        chat_log = self.query_one("#chat_log", RichLog)
+        chat_log = self.query_one("#main_display", RichLog)
         chat_log.write(message)
 
     def setup_textual_conversation(
@@ -286,7 +265,7 @@ class OpenHandsApp(App):
             conversation_id = uuid.UUID(self.conversation_id)
             
             # Set up the visualizer to output to our chat log
-            chat_log = self.query_one("#chat_log", RichLog)
+            chat_log = self.query_one("#main_display", RichLog)
             visualizer = TextualVisualizer(chat_log)
             
             # Create conversation with our visualizer
