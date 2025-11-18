@@ -1,0 +1,31 @@
+Collecting textual
+  Downloading textual-6.6.0-py3-none-any.whl.metadata (9.1 kB)
+Collecting markdown-it-py>=2.1.0 (from markdown-it-py[linkify]>=2.1.0->textual)
+  Downloading markdown_it_py-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+Collecting mdit-py-plugins (from textual)
+  Downloading mdit_py_plugins-0.5.0-py3-none-any.whl.metadata (2.8 kB)
+Requirement already satisfied: platformdirs<5,>=3.6.0 in /openhands/micromamba/envs/openhands/lib/python3.12/site-packages (from textual) (4.5.0)
+Collecting pygments<3.0.0,>=2.19.2 (from textual)
+  Downloading pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+Collecting rich>=14.2.0 (from textual)
+  Downloading rich-14.2.0-py3-none-any.whl.metadata (18 kB)
+Requirement already satisfied: typing-extensions<5.0.0,>=4.4.0 in /openhands/micromamba/envs/openhands/lib/python3.12/site-packages (from textual) (4.15.0)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.1.0->markdown-it-py[linkify]>=2.1.0->textual)
+  Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Collecting linkify-it-py<3,>=1 (from markdown-it-py[linkify]>=2.1.0->textual)
+  Downloading linkify_it_py-2.0.3-py3-none-any.whl.metadata (8.5 kB)
+Collecting uc-micro-py (from linkify-it-py<3,>=1->markdown-it-py[linkify]>=2.1.0->textual)
+  Downloading uc_micro_py-1.0.3-py3-none-any.whl.metadata (2.0 kB)
+Downloading textual-6.6.0-py3-none-any.whl (712 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 712.6/712.6 kB 31.1 MB/s  0:00:00
+Downloading pygments-2.19.2-py3-none-any.whl (1.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 69.6 MB/s  0:00:00
+Downloading markdown_it_py-4.0.0-py3-none-any.whl (87 kB)
+Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Downloading linkify_it_py-2.0.3-py3-none-any.whl (19 kB)
+Downloading rich-14.2.0-py3-none-any.whl (243 kB)
+Downloading mdit_py_plugins-0.5.0-py3-none-any.whl (57 kB)
+Downloading uc_micro_py-1.0.3-py3-none-any.whl (6.2 kB)
+Installing collected packages: uc-micro-py, pygments, mdurl, markdown-it-py, linkify-it-py, rich, mdit-py-plugins, textual
+
+Successfully installed linkify-it-py-2.0.3 markdown-it-py-4.0.0 mdit-py-plugins-0.5.0 mdurl-0.1.2 pygments-2.19.2 rich-14.2.0 textual-6.6.0 uc-micro-py-1.0.3
