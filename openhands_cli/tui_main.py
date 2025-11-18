@@ -20,6 +20,7 @@ from prompt_toolkit.layout.containers import Window, WindowAlign
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.widgets import Frame
 from prompt_toolkit.shortcuts import print_formatted_text
+from prompt_toolkit.filters import Condition
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.conversation.state import ConversationExecutionStatus
@@ -68,6 +69,7 @@ class OpenHandsTUI:
         # UI state
         self.output_content: list[str] = []
         self.input_buffer = Buffer()
+        self.output_buffer = Buffer()  # Regular buffer for output with text selection (editing controlled by key bindings)
         self.app: Application | None = None
         
         # Initialize UI
@@ -77,22 +79,16 @@ class OpenHandsTUI:
     def _setup_ui(self) -> None:
         """Set up the TUI layout and key bindings."""
         
-        # Create output control
-        def get_output_text():
-            return "\n".join(self.output_content)
-        
-        output_control = FormattedTextControl(text=get_output_text)
-        
         # Create layout
         layout = Layout(
             HSplit([
-                # Main output area (expandable)
+                # Main output area (expandable) - now uses BufferControl for text selection
                 Frame(
                     Window(
-                        output_control,
+                        BufferControl(buffer=self.output_buffer),
                         wrap_lines=True,
                     ),
-                    title="OpenHands CLI"
+                    title="OpenHands CLI (Tab to focus, mouse/Shift+arrows to select, Ctrl+C to copy)"
                 ),
                 # Input area (fixed height)
                 Frame(
@@ -100,23 +96,59 @@ class OpenHandsTUI:
                         BufferControl(buffer=self.input_buffer),
                         height=1,
                     ),
-                    title="Input (Press Enter to send, Ctrl+C to exit)"
+                    title="Input (Press Enter to send, Tab to switch focus, Ctrl+D to exit)"
                 ),
             ])
         )
+        
+        # Set initial focus to input buffer
+        layout.focus(self.input_buffer)
         
         # Key bindings
         kb = KeyBindings()
         
         @kb.add('enter')
         def handle_enter(event):
-            """Handle Enter key - process user input."""
-            asyncio.create_task(self._handle_user_input())
+            """Handle Enter key - process user input only if in input buffer."""
+            if event.app.layout.current_buffer == self.input_buffer:
+                asyncio.create_task(self._handle_user_input())
         
         @kb.add('c-c')
         def handle_ctrl_c(event):
-            """Handle Ctrl+C - exit with confirmation."""
+            """Handle Ctrl+C - copy selected text to clipboard."""
+            self._handle_copy()
+        
+        @kb.add('c-d')
+        def handle_ctrl_d(event):
+            """Handle Ctrl+D - exit with confirmation."""
             asyncio.create_task(self._handle_exit())
+        
+        # Create condition for when output buffer is focused
+        output_focused = Condition(lambda: self.app and self.app.layout.current_buffer == self.output_buffer)
+        
+        # Prevent common editing keys in output buffer
+        editing_keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+                       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'space', 'backspace', 'delete']
+        
+        for key in editing_keys:
+            @kb.add(key, filter=output_focused)
+            def prevent_output_edit(event, key=key):
+                """Prevent editing in the output buffer - redirect focus to input."""
+                self.app.layout.focus(self.input_buffer)
+                # Re-send the key to the input buffer
+                if key == 'space':
+                    self.input_buffer.insert_text(' ')
+                elif len(key) == 1:  # Single character
+                    self.input_buffer.insert_text(key)
+        
+        # Tab to switch between buffers
+        @kb.add('tab')
+        def switch_buffer(event):
+            """Switch focus between output and input buffers."""
+            if event.app.layout.current_buffer == self.input_buffer:
+                event.app.layout.focus(self.output_buffer)
+            else:
+                event.app.layout.focus(self.input_buffer)
         
         # Create application
         self.app = Application(
@@ -145,6 +177,13 @@ class OpenHandsTUI:
             "│    /confirm  - Toggle confirmation mode                        │",
             "│    /resume   - Resume paused conversation                      │",
             "│                                                                 │",
+            "│  Controls:                                                      │",
+            "│    Enter     - Send message to agent                           │",
+            "│    Tab       - Switch focus between output and input           │",
+            "│    Ctrl+C    - Copy selected text to clipboard                 │",
+            "│    Ctrl+D    - Exit the application                            │",
+            "│    Mouse     - Select text for copying                         │",
+            "│                                                                 │",
             "│  Type your message and press Enter to send it to the agent.    │",
             "╰─────────────────────────────────────────────────────────────────╯",
             "",
@@ -154,6 +193,9 @@ class OpenHandsTUI:
         else:
             self.output_content.append("🚀 Ready to start a new conversation!")
         self.output_content.append("")
+        
+        # Update the buffer with the welcome message
+        self._update_output_buffer()
     
     def _add_output(self, text: str, style: str = "") -> None:
         """Add text to output area."""
@@ -163,14 +205,47 @@ class OpenHandsTUI:
         else:
             self.output_content.append(text)
         
+        # Update the output buffer with all content
+        self._update_output_buffer()
+        
         # Trigger UI refresh
         if self.app:
             self.app.invalidate()
+    
+    def _update_output_buffer(self) -> None:
+        """Update the output buffer with current content."""
+        content = "\n".join(self.output_content)
+        self.output_buffer.document = Document(content, cursor_position=len(content))
+    
+    def _handle_copy(self) -> None:
+        """Handle copying selected text to clipboard."""
+        try:
+            # Get selected text from the output buffer
+            selected_text = self.output_buffer.copy_selection()
+            if selected_text:
+                # Try to copy to system clipboard
+                import pyperclip
+                pyperclip.copy(selected_text)
+                # Show feedback
+                self._add_output("📋 Text copied to clipboard!")
+            else:
+                self._add_output("ℹ️  No text selected. Use mouse or Shift+arrows to select text first.")
+        except ImportError:
+            # Fallback if pyperclip is not available
+            selected_text = self.output_buffer.copy_selection()
+            if selected_text:
+                self._add_output("📋 Selected text (pyperclip not available for system clipboard):")
+                self._add_output(f"'{selected_text}'")
+            else:
+                self._add_output("ℹ️  No text selected. Use mouse or Shift+arrows to select text first.")
+        except Exception as e:
+            self._add_output(f"❌ Error copying text: {e}")
     
     def _clear_output(self) -> None:
         """Clear the output area."""
         self.output_content.clear()
         self._add_welcome_message()
+        self._update_output_buffer()
     
     async def _handle_user_input(self) -> None:
         """Handle user input from the input buffer."""

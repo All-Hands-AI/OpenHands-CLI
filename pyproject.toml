@@ -22,6 +22,7 @@ dependencies = [
   "openhands-tools==1.1",
   "prompt-toolkit>=3",
   "typer>=0.17.4",
+  "pyperclip>=1.8.0",
 ]
 
 scripts = { openhands = "openhands_cli.simple_main:main" }
