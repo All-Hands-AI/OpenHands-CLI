@@ -53,7 +53,7 @@ class OpenHandsApp(App):
     }
 
     #main_display {
-        height: 70%;
+        height: 1fr;
         margin: 1 1 0 1;
         overflow-y: scroll;
         background: $background;
@@ -105,14 +105,16 @@ class OpenHandsApp(App):
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
         # Main display area - takes up most of the screen
-        yield RichLog(id="main_display", highlight=True, markup=True)
+        main_display = RichLog(id="main_display", highlight=True, markup=True)
+        main_display.can_focus = False
+        yield main_display
+
 
         # Input area - docked to bottom
         with Container(id="input_area"):
             text_input = Input(
                 placeholder="Type your message or /help for commands...",
                 id="user_input",
-                # suggester=SuggestFromList(["/help", "/exit"], case_sensitive=True),
             )
 
             yield text_input
