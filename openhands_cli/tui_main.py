@@ -29,6 +29,7 @@ from openhands_cli.setup import (
     setup_conversation,
     verify_agent_exists_or_setup_agent,
 )
+from openhands_cli.tui_visualizer import TUIVisualizer
 from openhands_cli.tui.settings.mcp_screen import MCPScreen
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.status import display_status
@@ -277,7 +278,7 @@ class OpenHandsTUI:
         try:
             # Initialize conversation if needed
             if not self.runner or not self.conversation:
-                self.conversation = setup_conversation(self.conversation_id)
+                self.conversation = self._setup_conversation_with_tui_visualizer(self.conversation_id)
                 self.runner = ConversationRunner(
                     self.conversation,
                     output_callback=self._add_output,
@@ -317,6 +318,38 @@ class OpenHandsTUI:
         
         if self.app:
             self.app.exit()
+    
+    def _setup_conversation_with_tui_visualizer(self, conversation_id):
+        """Setup conversation with TUI-compatible visualizer."""
+        from uuid import UUID
+        from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+        from openhands.sdk.security.confirmation_policy import AlwaysConfirm
+        from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+        from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+        from openhands_cli.setup import load_agent_specs
+
+        self._add_output("🔧 Initializing agent...")
+
+        agent = load_agent_specs(str(conversation_id))
+
+        # Create TUI visualizer that sends output to our TUI
+        tui_visualizer = TUIVisualizer(output_callback=self._add_output)
+
+        # Create conversation with TUI visualizer
+        conversation: BaseConversation = Conversation(
+            agent=agent,
+            workspace=Workspace(working_dir=WORK_DIR),
+            persistence_dir=CONVERSATIONS_DIR,
+            conversation_id=conversation_id,
+            visualizer=tui_visualizer,
+        )
+
+        # Set up security analyzer
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(AlwaysConfirm())
+
+        self._add_output(f"✅ Agent initialized with model: {agent.llm.model}")
+        return conversation
     
     async def run_async(self) -> None:
         """Run the TUI application asynchronously."""
