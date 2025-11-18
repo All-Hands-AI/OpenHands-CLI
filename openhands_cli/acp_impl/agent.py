@@ -24,12 +24,12 @@ from acp.schema import (
     AuthenticateRequest,
     AuthenticateResponse,
     CancelNotification,
-    ContentBlock1,
+    TextContentBlock,
     LoadSessionRequest,
     McpCapabilities,
     PromptCapabilities,
-    SessionUpdate1,
-    SessionUpdate2,
+    AgentMessageChunk,
+    UserMessageChunk,
     SetSessionModelRequest,
     SetSessionModelResponse,
     SetSessionModeRequest,
@@ -219,9 +219,9 @@ class OpenHandsACPAgent(ACPAgent):
             await self._conn.sessionUpdate(
                 SessionNotification(
                     sessionId=session_id,
-                    update=SessionUpdate2(
+                    update=AgentMessageChunk(
                         sessionUpdate="agent_message_chunk",
-                        content=ContentBlock1(type="text", text=f"Error: {str(e)}"),
+                        content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
                     ),
                 )
             )
@@ -264,9 +264,9 @@ class OpenHandsACPAgent(ACPAgent):
                             await self._conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=session_id,
-                                    update=SessionUpdate1(
+                                    update=UserMessageChunk(
                                         sessionUpdate="user_message_chunk",
-                                        content=ContentBlock1(
+                                        content=TextContentBlock(
                                             type="text", text=text_content
                                         ),
                                     ),
@@ -284,9 +284,9 @@ class OpenHandsACPAgent(ACPAgent):
                             await self._conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=session_id,
-                                    update=SessionUpdate2(
+                                    update=AgentMessageChunk(
                                         sessionUpdate="agent_message_chunk",
-                                        content=ContentBlock1(
+                                        content=TextContentBlock(
                                             type="text", text=text_content
                                         ),
                                     ),

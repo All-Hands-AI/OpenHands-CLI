@@ -4,21 +4,26 @@ from typing import TYPE_CHECKING, Any
 
 from acp import SessionNotification
 from acp.schema import (
-    ContentBlock1,
-    ContentBlock2,
-    SessionUpdate2,
-    SessionUpdate4,
-    SessionUpdate5,
-    ToolCallContent1,
+    TextContentBlock,
+    ImageContentBlock,
+    AgentThoughtChunk,
+    AgentMessageChunk,
+    ToolCallStart,
+    ToolCallProgress,
+    ContentToolCallContent,
     ToolCallLocation,
+    TerminalToolCallContent,
+    TerminalToolCallContent,
     ToolKind,
 )
 
-from openhands.sdk import ImageContent, TextContent
+from openhands.sdk import ImageContent, TextContent, Action
 from openhands.sdk.event import (
+    Event,
     ActionEvent,
     AgentErrorEvent,
     LLMConvertibleEvent,
+    ObservationBaseEvent,
     ObservationEvent,
     UserRejectObservation,
 )
@@ -29,12 +34,12 @@ if TYPE_CHECKING:
 
 
 from openhands.sdk import get_logger
-
+from openhands.tools.file_editor.definition import FileEditorAction
 
 logger = get_logger(__name__)
 
 
-def get_tool_kind(tool_name: str) -> ToolKind:
+def get_tool_kind(tool_name: str, action: Action | None) -> ToolKind:
     """Map tool names to ACP ToolKind values.
 
     Args:
@@ -44,64 +49,47 @@ def get_tool_kind(tool_name: str) -> ToolKind:
         ACP ToolKind string ("execute", "edit", "fetch", "think", or "other")
     """
     tool_kind_mapping: dict[str, ToolKind] = {
-        "execute_bash": "execute",
         "terminal": "execute",
-        "str_replace_editor": "edit",
-        "file_editor": "edit",
         "browser_use": "fetch",
         "browser": "fetch",
-        "task_tracker": "think",
-        "bash": "execute",
     }
+    
+    # Special handling for file_editor tool
+    if tool_name == "file_editor":
+        assert isinstance(action, FileEditorAction)
+        if action.command == "view":
+            return "read"
+        return "edit"
+
     return tool_kind_mapping.get(tool_name, "other")
 
 
-def _extract_locations(event: ActionEvent) -> list[ToolCallLocation] | None:
-    """Extract file locations from an action event if available.
+def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
+    """Extract file locations from an action if available.
 
     Returns a list of ToolCallLocation objects if the action contains location
     information (e.g., file paths, directories), otherwise returns None.
 
     Supports:
-    - str_replace_editor: path, view_range, insert_line
     - file_editor: path, view_range, insert_line
     - Other tools with 'path' or 'directory' attributes
 
     Args:
-        event: ActionEvent to extract locations from
-
+        action: Action to extract locations from
+    
     Returns:
         List of ToolCallLocation objects or None
     """
-    if not event.action:
-        return None
-
     locations = []
-
-    # Check if action has a 'path' field (e.g., str_replace_editor, file_editor)
-    if hasattr(event.action, "path"):
-        path = getattr(event.action, "path", None)
-        if path:
-            location = ToolCallLocation(path=path)
-
-            # Check for line number information
-            if hasattr(event.action, "view_range"):
-                view_range = getattr(event.action, "view_range", None)
-                if view_range and isinstance(view_range, list) and len(view_range) > 0:
-                    location.line = view_range[0]
-            elif hasattr(event.action, "insert_line"):
-                insert_line = getattr(event.action, "insert_line", None)
-                if insert_line is not None:
-                    location.line = insert_line
-
+    if isinstance(action, FileEditorAction):
+        # Handle FileEditorAction specifically
+        if action.path:
+            location = ToolCallLocation(path=action.path)
+            if action.view_range and len(action.view_range) > 0:
+                location.line = action.view_range[0]
+            elif action.insert_line is not None:
+                location.line = action.insert_line
             locations.append(location)
-
-    # Check if action has a 'directory' field
-    elif hasattr(event.action, "directory"):
-        directory = getattr(event.action, "directory", None)
-        if directory:
-            locations.append(ToolCallLocation(path=directory))
-
     return locations if locations else None
 
 
@@ -137,7 +125,7 @@ class EventSubscriber:
         self.session_id = session_id
         self.conn = conn
 
-    async def __call__(self, event: Any):
+    async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
 
         Args:
@@ -163,83 +151,64 @@ class EventSubscriber:
             # First, send thoughts/reasoning as agent_message_chunk if available
             thought_text = " ".join([t.text for t in event.thought])
 
-            # Send reasoning content first if available
             if event.reasoning_content and event.reasoning_content.strip():
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         sessionId=self.session_id,
-                        update=SessionUpdate2(
-                            sessionUpdate="agent_message_chunk",
-                            content=ContentBlock1(
+                        update=AgentThoughtChunk(
+                            sessionUpdate="agent_thought_chunk",
+                            content=TextContentBlock(
                                 type="text",
-                                text=event.reasoning_content,
+                                text="**Reasoning**:\n" + event.reasoning_content.strip() + "\n",
                             ),
                         ),
                     )
                 )
 
-            # Then send thought as agent_message_chunk
             if thought_text.strip():
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         sessionId=self.session_id,
-                        update=SessionUpdate2(
-                            sessionUpdate="agent_message_chunk",
-                            content=ContentBlock1(
+                        update=AgentThoughtChunk(
+                            sessionUpdate="agent_thought_chunk",
+                            content=TextContentBlock(
                                 type="text",
-                                text=thought_text,
+                                text="\n**Thought**:\n" + thought_text.strip() + "\n",
                             ),
                         ),
                     )
                 )
 
             # Now send the tool_call with event.visualize content
-            tool_kind = get_tool_kind(event.tool_name)
+            tool_kind = get_tool_kind(event.tool_name, event.action)
 
             # Use event.visualize for comprehensive tool display
-            action_viz = _rich_text_to_plain(event.visualize)
-
-            # Use action.title for a brief summary if available
-            title = (
-                event.action.title  # type: ignore[attr-defined]
-                if event.action and hasattr(event.action, "title")
-                else event.tool_name
-            )
-
-            # Extract locations if available
-            locations = _extract_locations(event)
-
-            # Get raw input from tool call if available
-            raw_input = None
-            if (
-                event.tool_call
-                and hasattr(event.tool_call, "function")
-                and hasattr(event.tool_call.function, "arguments")  # type: ignore[attr-defined]
-            ):
-                raw_input = event.tool_call.function.arguments  # type: ignore[attr-defined]
+            action_viz = None
+            if event.action:
+                action_viz = _rich_text_to_plain(event.action.visualize)
 
             await self.conn.sessionUpdate(
                 SessionNotification(
                     sessionId=self.session_id,
-                    update=SessionUpdate4(
+                    update=ToolCallStart(
                         sessionUpdate="tool_call",
                         toolCallId=event.tool_call_id,
-                        title=title,
+                        title=action_viz if action_viz is not None else event.tool_name,
                         kind=tool_kind,
-                        status="pending",
+                        status="in_progress",
                         content=[
-                            ToolCallContent1(
+                            ContentToolCallContent(
                                 type="content",
-                                content=ContentBlock1(
+                                content=TextContentBlock(
                                     type="text",
                                     text=action_viz,
                                 ),
                             )
                         ]
-                        if action_viz.strip()
+                        if action_viz is not None and action_viz.strip()
                         else None,
-                        locations=locations,
-                        rawInput=raw_input,
+                        locations=extract_action_locations(event.action) if event.action else None,
+                        rawInput=event.action.model_dump() if event.action else None,
                     ),
                 )
             )
@@ -247,7 +216,7 @@ class EventSubscriber:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
 
     async def _handle_observation_event(
-        self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
+        self, event: ObservationBaseEvent
     ):
         """Handle observation events by sending tool_call_update notification.
 
@@ -255,46 +224,24 @@ class EventSubscriber:
             event: ObservationEvent, UserRejectObservation, or AgentErrorEvent
         """
         try:
-            # Use visualize property for rich content
             viz_text = _rich_text_to_plain(event.visualize)
 
-            # Determine status
             if isinstance(event, ObservationEvent):
                 status = "completed"
             else:  # UserRejectObservation or AgentErrorEvent
                 status = "failed"
 
-            # Extract raw output for structured data
-            raw_output = None
-            if isinstance(event, ObservationEvent):
-                # Extract content from observation for raw output
-                content_parts = []
-                for item in event.observation.to_llm_content:
-                    if isinstance(item, TextContent):
-                        content_parts.append(item.text)
-                    elif hasattr(item, "text") and not isinstance(item, ImageContent):
-                        content_parts.append(getattr(item, "text"))
-                    else:
-                        content_parts.append(str(item))
-                content_text = "".join(content_parts)
-                if content_text.strip():
-                    raw_output = {"result": content_text}
-            elif isinstance(event, UserRejectObservation):
-                raw_output = {"rejection_reason": event.rejection_reason}
-            else:  # AgentErrorEvent
-                raw_output = {"error": event.error}
-
             await self.conn.sessionUpdate(
                 SessionNotification(
                     sessionId=self.session_id,
-                    update=SessionUpdate5(
+                    update=ToolCallProgress(
                         sessionUpdate="tool_call_update",
                         toolCallId=event.tool_call_id,
                         status=status,
                         content=[
-                            ToolCallContent1(
+                            ContentToolCallContent(
                                 type="content",
-                                content=ContentBlock1(
+                                content=TextContentBlock(
                                     type="text",
                                     text=viz_text,
                                 ),
@@ -302,7 +249,7 @@ class EventSubscriber:
                         ]
                         if viz_text.strip()
                         else None,
-                        rawOutput=raw_output,
+                        rawOutput=event.model_dump(),
                     ),
                 )
             )
@@ -328,9 +275,9 @@ class EventSubscriber:
                             await self.conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=self.session_id,
-                                    update=SessionUpdate2(
+                                    update=AgentMessageChunk(
                                         sessionUpdate="agent_message_chunk",
-                                        content=ContentBlock1(
+                                        content=TextContentBlock(
                                             type="text",
                                             text=content_item.text,
                                         ),
@@ -345,9 +292,9 @@ class EventSubscriber:
                             await self.conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=self.session_id,
-                                    update=SessionUpdate2(
+                                    update=AgentMessageChunk(
                                         sessionUpdate="agent_message_chunk",
-                                        content=ContentBlock2(
+                                        content=ImageContentBlock(
                                             type="image",
                                             data=image_url,
                                             mimeType="image/png",
@@ -362,9 +309,9 @@ class EventSubscriber:
                             await self.conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=self.session_id,
-                                    update=SessionUpdate2(
+                                    update=AgentMessageChunk(
                                         sessionUpdate="agent_message_chunk",
-                                        content=ContentBlock1(
+                                        content=TextContentBlock(
                                             type="text",
                                             text=content_item,
                                         ),
