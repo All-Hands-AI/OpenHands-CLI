@@ -80,7 +80,7 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: ${{ matrix.artifact_name }}
-                  path: openhands-cli/dist/openhands*
+                  path: dist/openhands*
                   retention-days: 30
 
     create-github-release:

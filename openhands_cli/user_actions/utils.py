@@ -67,7 +67,7 @@ def build_layout(question: str, choices: list[str], selected_ref: list[int]) -> 
     content_window = Window(
         FormattedTextControl(get_choice_text),
         always_hide_cursor=True,
-        height=Dimension(max=8),
+        height=Dimension(max=16),
     )
     return Layout(HSplit([content_window]))
 
@@ -175,7 +175,6 @@ def get_session_prompter(
     session = PromptSession(
         completer=CommandCompleter(),
         key_bindings=bindings,
-        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",  # noqa: ARG005
         multiline=True,
         input=input,
         output=output,
