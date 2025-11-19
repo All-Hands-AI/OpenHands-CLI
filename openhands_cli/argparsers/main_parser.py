@@ -39,7 +39,10 @@ Examples:
     confirmation_group.add_argument(
         "--llm-approve",
         action="store_true",
-        help="Enable LLM-based security analyzer (only confirm high-risk actions)",
+        help=(
+            "Enable LLM-based security analyzer "
+            "(only confirm LLM-predicted high-risk actions)"
+        ),
     )
 
     # Only serve as subcommand

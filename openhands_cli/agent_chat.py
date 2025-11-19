@@ -30,6 +30,7 @@ from openhands_cli.tui.tui import (
     display_welcome,
 )
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
+from openhands_cli.user_actions.types import ConfirmationMode
 from openhands_cli.user_actions.utils import get_session_prompter
 
 
@@ -60,7 +61,8 @@ def _print_exit_hint(conversation_id: str) -> None:
 
 
 def run_cli_entry(
-    resume_conversation_id: str | None = None, confirmation_mode: str | None = None
+    resume_conversation_id: str | None = None,
+    confirmation_mode: ConfirmationMode | None = None,
 ) -> None:
     """Run the agent chat session using the agent SDK.
 

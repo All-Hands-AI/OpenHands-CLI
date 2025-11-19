@@ -538,10 +538,8 @@ class TestConfirmationMode:
                         # Verify that confirmation mode was disabled
                         assert result == UserConfirmation.ACCEPT
                         # Should have called setup_conversation to toggle confirmation
-                        # mode
-                        mock_setup.assert_called_once_with(
-                            mock_conversation.id, include_security_analyzer=False
-                        )
+                        # mode (without confirmation_mode parameter, default to None)
+                        mock_setup.assert_called_once_with(mock_conversation.id)
                         # Should have called set_confirmation_policy with NeverConfirm
                         # on new conversation
                         new_mock_conversation.set_confirmation_policy.assert_called_with(

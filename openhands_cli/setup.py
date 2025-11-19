@@ -18,6 +18,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.tui.visualizer import CLIVisualizer
+from openhands_cli.user_actions.types import ConfirmationMode
 
 
 class MissingAgentSpec(Exception):
@@ -55,8 +56,7 @@ def verify_agent_exists_or_setup_agent() -> Agent:
 
 def setup_conversation(
     conversation_id: UUID,
-    include_security_analyzer: bool = True,
-    confirmation_mode: str | None = None,
+    confirmation_mode: ConfirmationMode | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -64,8 +64,6 @@ def setup_conversation(
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
-        include_security_analyzer: Whether to include the security analyzer.
-            Deprecated - use confirmation_mode instead.
         confirmation_mode: Confirmation mode to use. Options: None, "always", "llm"
 
     Raises:
@@ -95,13 +93,8 @@ def setup_conversation(
         # Use LLM-based risk analysis, only confirm high-risk actions
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(ConfirmRisky(threshold=SecurityRisk.HIGH))
-    else:
-        # Legacy support for include_security_analyzer parameter
-        if not include_security_analyzer:
-            conversation.set_security_analyzer(None)
-        else:
-            conversation.set_security_analyzer(LLMSecurityAnalyzer())
-            conversation.set_confirmation_policy(AlwaysConfirm())
+    # When confirmation_mode is None, use default behavior
+    # (no security analyzer, no confirmation)
 
     print_formatted_text(
         HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")

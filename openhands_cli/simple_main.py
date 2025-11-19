@@ -12,6 +12,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.user_actions.types import ConfirmationMode
 
 
 debug_env = os.getenv("DEBUG", "false").lower()
@@ -42,7 +43,7 @@ def main() -> None:
             from openhands_cli.agent_chat import run_cli_entry
 
             # Determine confirmation mode from args
-            confirmation_mode = None
+            confirmation_mode: ConfirmationMode | None = None
             if args.always_approve:
                 confirmation_mode = "always"
             elif args.llm_approve:
