@@ -1,47 +1,35 @@
 """Utility functions for ACP implementation."""
 
-from collections.abc import Sequence
-from typing import Any
-
-from uuid import uuid4
 import base64
 import mimetypes
 from pathlib import Path
-from urllib.parse import urlparse
+from uuid import uuid4
 
 from acp.schema import (
-    HttpMcpServer,
-    SseMcpServer,
-    StdioMcpServer,
-    EnvVariable,
-    TextContentBlock as ACPTextContentBlock,
-    ImageContentBlock as ACPImageContentBlock,
-    AudioContentBlock as ACPAudioContentBlock,
-    ResourceContentBlock as ACPResourceContentBlock,
+    BlobResourceContents as ACPBlobResourceContents,
     EmbeddedResourceContentBlock as ACPEmbeddedResourceContentBlock,
+    ResourceContentBlock as ACPResourceContentBlock,
     TextResourceContents as ACPTextResourceContents,
-    BlobResourceContents as ACPBlobResourceContents
 )
 
-from openhands.sdk import (
-    ImageContent, 
-    TextContent,
-    get_logger
-)
+from openhands.sdk import ImageContent, TextContent
 from openhands.sdk.context import Skill
 
 
 RESOURCE_SKILL = Skill(
     name="user_provided_resources",
     content=(
-    "You may encounter sections labeled as user-provided additional context or resources. These blocks contain files or data that the user referenced in their message. They may include plain text, images, code snippets, or binary content saved to a temporary file. Treat these blocks as part of the user’s input. Read them carefully and use their contents when forming your reasoning or answering the query. If a block points to a saved file, assume it contains relevant binary data that could not be displayed directly." # noqa: E501,
+        "You may encounter sections labeled as user-provided additional context or resources. These blocks contain files or data that the user referenced in their message. They may include plain text, images, code snippets, or binary content saved to a temporary file. Treat these blocks as part of the user’s input. Read them carefully and use their contents when forming your reasoning or answering the query. If a block points to a saved file, assume it contains relevant binary data that could not be displayed directly."  # noqa: E501,
     ),
-    trigger=None
+    trigger=None,
 )
+
+ACP_CACHE_DIR = Path.home() / ".openhands" / "cache" / "acp"
+ACP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def _materialize_embedded_resource(
     block: ACPEmbeddedResourceContentBlock,
-    base_dir: Path = Path.home() / '.openhands' / 'cache' / 'embedded_resources'
 ) -> TextContent | ImageContent:
     """
     For:
@@ -79,7 +67,7 @@ def _materialize_embedded_resource(
             ext = mimetypes.guess_extension(mime_type) or ""
 
         filename = f"embedded_resource_{uuid4().hex}{ext}"
-        target = base_dir / filename
+        target = ACP_CACHE_DIR / filename
         target.write_bytes(data)
 
         return TextContent(
@@ -93,7 +81,7 @@ def _materialize_embedded_resource(
 
 
 def convert_resources_to_content(
-    resource: ACPResourceContentBlock | ACPEmbeddedResourceContentBlock
+    resource: ACPResourceContentBlock | ACPEmbeddedResourceContentBlock,
 ) -> TextContent | ImageContent:
     if isinstance(resource, ACPResourceContentBlock):
         return TextContent(

@@ -38,6 +38,7 @@ def main() -> None:
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         elif args.command == "acp":
             import asyncio
+
             from openhands_cli.acp_impl.main import run_acp_agent
 
             asyncio.run(run_acp_agent())

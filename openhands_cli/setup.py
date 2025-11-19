@@ -4,7 +4,7 @@ from uuid import UUID
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
-from openhands.sdk.context import Skill, AgentContext
+from openhands.sdk.context import AgentContext, Skill
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
 )
@@ -66,7 +66,11 @@ def load_agent_specs(
             existing_skills = agent.agent_context.skills
             existing_skills.extend(skills)
             agent = agent.model_copy(
-                update={"agent_context": agent.agent_context.model_copy(update={"skills": existing_skills})}
+                update={
+                    "agent_context": agent.agent_context.model_copy(
+                        update={"skills": existing_skills}
+                    )
+                }
             )
         else:
             agent = agent.model_copy(

@@ -3,25 +3,13 @@
 from collections.abc import Sequence
 from typing import Any
 
-from uuid import uuid4
-import base64
-import mimetypes
-from pathlib import Path
-from urllib.parse import urlparse
-
 from acp.schema import (
+    EnvVariable,
     HttpMcpServer,
     SseMcpServer,
     StdioMcpServer,
-    EnvVariable,
-    TextContentBlock as ACPTextContentBlock,
-    ImageContentBlock as ACPImageContentBlock,
-    AudioContentBlock as ACPAudioContentBlock,
-    ResourceContentBlock as ACPResourceContentBlock,
-    EmbeddedResourceContentBlock as ACPEmbeddedResourceContentBlock,
-    TextResourceContents as ACPTextResourceContents,
-    BlobResourceContents as ACPBlobResourceContents
 )
+
 
 ACPMCPServerType = StdioMcpServer | HttpMcpServer | SseMcpServer
 
@@ -77,4 +65,3 @@ def transform_acp_mcp_servers_to_agent_format(
         transformed_servers[server_name] = server_config
 
     return transformed_servers
-
