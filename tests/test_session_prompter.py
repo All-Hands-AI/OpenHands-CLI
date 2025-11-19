@@ -98,4 +98,3 @@ def test_get_session_prompter_default_parameters():
     assert session.multiline is True
     assert session.key_bindings is not None
     assert session.completer is not None
-
