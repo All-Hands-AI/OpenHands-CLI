@@ -45,9 +45,9 @@ def main() -> None:
             # Determine confirmation mode from args
             confirmation_mode: ConfirmationMode | None = None
             if args.always_approve:
-                confirmation_mode = "always"
+                confirmation_mode = "always-approve"
             elif args.llm_approve:
-                confirmation_mode = "llm"
+                confirmation_mode = "llm-approve"
 
             # Start agent chat
             run_cli_entry(

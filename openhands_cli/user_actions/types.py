@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 
 
-ConfirmationMode = Literal["always", "llm"]
+ConfirmationMode = Literal["always-approve", "llm-approve"]
 
 
 class UserConfirmation(Enum):

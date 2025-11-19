@@ -32,7 +32,7 @@ class ConversationRunner:
         if new_confirmation_mode_state:
             # Enable confirmation mode: recreate conversation with always mode
             self.conversation = setup_conversation(
-                self.conversation.id, confirmation_mode="always"
+                self.conversation.id, confirmation_mode="always-approve"
             )
         else:
             # Disable confirmation mode: recreate conversation without confirmation

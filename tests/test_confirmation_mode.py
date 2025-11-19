@@ -118,7 +118,7 @@ class TestConfirmationMode:
                 mock_conversation_class.return_value = mock_conversation_instance
 
                 result = setup_conversation(
-                    mock_conversation_id, confirmation_mode="always"
+                    mock_conversation_id, confirmation_mode="always-approve"
                 )
 
                 # Verify AlwaysConfirm policy was set
@@ -155,7 +155,7 @@ class TestConfirmationMode:
                 mock_conversation_class.return_value = mock_conversation_instance
 
                 result = setup_conversation(
-                    mock_conversation_id, confirmation_mode="llm"
+                    mock_conversation_id, confirmation_mode="llm-approve"
                 )
 
                 # Verify ConfirmRisky policy was set

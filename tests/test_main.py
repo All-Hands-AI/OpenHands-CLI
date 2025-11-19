@@ -108,7 +108,7 @@ class TestMainEntryPoint:
 
         # Should call run_cli_entry with always confirmation mode
         mock_run_agent_chat.assert_called_once_with(
-            resume_conversation_id=None, confirmation_mode="always"
+            resume_conversation_id=None, confirmation_mode="always-approve"
         )
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
@@ -125,7 +125,7 @@ class TestMainEntryPoint:
 
         # Should call run_cli_entry with llm confirmation mode
         mock_run_agent_chat.assert_called_once_with(
-            resume_conversation_id=None, confirmation_mode="llm"
+            resume_conversation_id=None, confirmation_mode="llm-approve"
         )
 
 
@@ -142,15 +142,18 @@ class TestMainEntryPoint:
         ),
         (
             ["openhands", "--always-approve"],
-            {"resume_conversation_id": None, "confirmation_mode": "always"},
+            {"resume_conversation_id": None, "confirmation_mode": "always-approve"},
         ),
         (
             ["openhands", "--llm-approve"],
-            {"resume_conversation_id": None, "confirmation_mode": "llm"},
+            {"resume_conversation_id": None, "confirmation_mode": "llm-approve"},
         ),
         (
             ["openhands", "--resume", "test-id", "--always-approve"],
-            {"resume_conversation_id": "test-id", "confirmation_mode": "always"},
+            {
+                "resume_conversation_id": "test-id",
+                "confirmation_mode": "always-approve",
+            },
         ),
     ],
 )

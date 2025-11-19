@@ -68,7 +68,8 @@ def run_cli_entry(
 
     Args:
         resume_conversation_id: ID of conversation to resume
-        confirmation_mode: Confirmation mode to use. Options: None, "always", "llm"
+        confirmation_mode: Confirmation mode to use.
+            Options: None, "always-approve", "llm-approve"
 
     Raises:
         AgentSetupError: If agent setup fails
@@ -111,7 +112,7 @@ def run_cli_entry(
     # Display confirmation mode status if set
     if confirmation_mode:
         mode_display = (
-            "always-approve" if confirmation_mode == "always" else "LLM-based"
+            "always-approve" if confirmation_mode == "always-approve" else "LLM-based"
         )
         print_formatted_text(
             HTML(f"<yellow>Confirmation mode: {mode_display}</yellow>")

@@ -64,7 +64,8 @@ def setup_conversation(
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
-        confirmation_mode: Confirmation mode to use. Options: None, "always", "llm"
+        confirmation_mode: Confirmation mode to use.
+            Options: None, "always-approve", "llm-approve"
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -85,11 +86,11 @@ def setup_conversation(
     )
 
     # Handle confirmation mode
-    if confirmation_mode == "always":
+    if confirmation_mode == "always-approve":
         # Always ask for confirmation
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(AlwaysConfirm())
-    elif confirmation_mode == "llm":
+    elif confirmation_mode == "llm-approve":
         # Use LLM-based risk analysis, only confirm high-risk actions
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(ConfirmRisky(threshold=SecurityRisk.HIGH))
