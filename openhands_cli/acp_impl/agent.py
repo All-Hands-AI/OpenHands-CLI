@@ -34,18 +34,15 @@ from acp.schema import (
     SetSessionModeRequest,
     SetSessionModeResponse,
     TextContentBlock,
-    UserMessageChunk,
 )
 
 from openhands.sdk import (
     BaseConversation,
     Conversation,
     Message,
-    TextContent,
     Workspace,
 )
 from openhands.sdk.event import Event
-from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
@@ -53,7 +50,7 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
     transform_acp_mcp_servers_to_agent_format,
 )
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
 
@@ -70,10 +67,126 @@ class OpenHandsACPAgent(ACPAgent):
             conn: ACP connection for sending notifications
         """
         self._conn = conn
-        # session_id -> conversation
-        self._sessions: dict[str, BaseConversation] = {}
+        # Cache of active conversations to preserve state (pause, confirmation, etc.)
+        # across multiple operations on the same session
+        self._active_sessions: dict[str, BaseConversation] = {}
 
         logger.info("OpenHands ACP Agent initialized")
+
+    def _get_or_create_conversation(
+        self,
+        session_id: str,
+        working_dir: str | None = None,
+        mcp_servers: dict[str, dict[str, Any]] | None = None,
+    ) -> BaseConversation:
+        """Get an active conversation from cache or create/load it.
+
+        This maintains conversation state (pause, confirmation, etc.) across
+        multiple operations on the same session.
+
+        Args:
+            session_id: Session/conversation ID (UUID string)
+            working_dir: Working directory for workspace (only for new sessions)
+            mcp_servers: MCP servers config (only for new sessions)
+
+        Returns:
+            Cached or newly created/loaded conversation
+        """
+        # Check if we already have this conversation active
+        if session_id in self._active_sessions:
+            logger.debug(f"Using cached conversation for session {session_id}")
+            return self._active_sessions[session_id]
+
+        # Create/load new conversation
+        logger.debug(f"Creating new conversation for session {session_id}")
+        conversation = self._setup_acp_conversation(
+            session_id=session_id,
+            working_dir=working_dir,
+            mcp_servers=mcp_servers,
+        )
+
+        # Cache it for future operations
+        self._active_sessions[session_id] = conversation
+        return conversation
+
+    def _setup_acp_conversation(
+        self,
+        session_id: str,
+        working_dir: str | None = None,
+        mcp_servers: dict[str, dict[str, Any]] | None = None,
+    ) -> BaseConversation:
+        """Set up a conversation for ACP with event streaming support.
+
+        This function reuses the resume logic from
+        openhands_cli.setup.setup_conversation but adapts it for ACP by using
+        EventSubscriber instead of CLIVisualizer.
+
+        The SDK's Conversation class automatically:
+        - Loads from disk if conversation_id exists in persistence_dir
+        - Creates a new conversation if it doesn't exist
+
+        Args:
+            session_id: Session/conversation ID (UUID string)
+            working_dir: Working directory for the workspace. Defaults to WORK_DIR.
+            mcp_servers: Optional MCP servers configuration
+
+        Returns:
+            Configured conversation that's either loaded from disk or newly created
+
+        Raises:
+            MissingAgentSpec: If agent configuration is missing
+        """
+        # Load agent specs (same as setup_conversation)
+        agent = load_agent_specs(
+            conversation_id=session_id,
+            mcp_servers=mcp_servers,
+            skills=[RESOURCE_SKILL],
+        )
+
+        # Validate and setup workspace
+        if working_dir is None:
+            working_dir = WORK_DIR
+        working_path = Path(working_dir)
+
+        if not working_path.exists():
+            logger.warning(
+                f"Working directory {working_dir} doesn't exist, creating it"
+            )
+            working_path.mkdir(parents=True, exist_ok=True)
+
+        if not working_path.is_dir():
+            raise ValueError(
+                f"Working directory path is not a directory: {working_dir}"
+            )
+
+        workspace = Workspace(working_dir=str(working_path))
+
+        # Create event subscriber for streaming updates (ACP-specific)
+        subscriber = EventSubscriber(session_id, self._conn)
+
+        # Get the current event loop for the callback
+        loop = asyncio.get_event_loop()
+
+        def sync_callback(event: Event) -> None:
+            """Synchronous wrapper that schedules async event handling."""
+            asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+
+        # Create conversation with persistence support
+        # The SDK automatically loads from disk if conversation_id exists
+        conversation = Conversation(
+            agent=agent,
+            workspace=workspace,
+            persistence_dir=CONVERSATIONS_DIR,
+            conversation_id=UUID(session_id),
+            callbacks=[sync_callback],
+        )
+
+        # # Set up security analyzer (same as setup_conversation with confirmation mode)
+        # conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        # conversation.set_confirmation_policy(AlwaysConfirm())
+        # TODO: implement later
+
+        return conversation
 
     async def initialize(self, params: InitializeRequest) -> InitializeResponse:
         """Initialize the ACP protocol."""
@@ -127,61 +240,22 @@ class OpenHandsACPAgent(ACPAgent):
                     params.mcpServers
                 )
 
-            # Load agent from CLI settings
-            agent = load_agent_specs(
-                conversation_id=session_id,
-                mcp_servers=mcp_servers_dict,
-                # Additional prompt extensions required by OpenHands CLI ACP
-                skills=[RESOURCE_SKILL],
-            )
-            logger.info(f"Loaded agent with model: {agent.llm.model}")
-
             # Validate working directory
             working_dir = params.cwd or str(Path.cwd())
-            working_path = Path(working_dir)
-
             logger.info(f"Using working directory: {working_dir}")
 
-            # Create directory if it doesn't exist
-            if not working_path.exists():
-                logger.warning(
-                    f"Working directory {working_dir} doesn't exist, creating it"
-                )
-                working_path.mkdir(parents=True, exist_ok=True)
-
-            if not working_path.is_dir():
-                raise ValueError(
-                    f"Working directory path is not a directory: {working_dir}"
-                )
-
-            workspace = Workspace(working_dir=str(working_path))
-
-            # Create event subscriber for streaming updates
-            subscriber = EventSubscriber(session_id, self._conn)
-
-            # Get the current event loop to use in the callback
-            loop = asyncio.get_event_loop()
-
-            # Create a synchronous wrapper for the async subscriber
-            def sync_callback(event: Event) -> None:
-                """Synchronous wrapper that schedules async event handling."""
-                # Schedule the coroutine on the event loop thread-safely
-                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
-
-            # Create conversation using CLI's persistence directory
-            # Pass the callback at creation time
-            conversation = Conversation(
-                agent=agent,
-                workspace=workspace,
-                persistence_dir=CONVERSATIONS_DIR,
-                conversation_id=UUID(session_id),
-                callbacks=[sync_callback],
+            # Create conversation and cache it for future operations
+            # This reuses the same pattern as openhands --resume
+            conversation = self._get_or_create_conversation(
+                session_id=session_id,
+                working_dir=working_dir,
+                mcp_servers=mcp_servers_dict,
             )
 
-            # Store conversation
-            self._sessions[session_id] = conversation
-
-            logger.info(f"Created new session {session_id}")
+            logger.info(
+                f"Created new session {session_id} with model: "
+                f"{conversation.agent.llm.model}"  # type: ignore[attr-defined]
+            )
 
             return NewSessionResponse(sessionId=session_id)
 
@@ -199,18 +273,16 @@ class OpenHandsACPAgent(ACPAgent):
         """Handle a prompt request."""
         session_id = params.sessionId
 
-        if session_id not in self._sessions:
-            raise ValueError(f"Unknown session: {session_id}")
-
-        conversation = self._sessions[session_id]
-
-        # Convert ACP prompt format to OpenHands message content
-        message_content = convert_acp_prompt_to_message_content(params.prompt)
-
-        if not message_content:
-            return PromptResponse(stopReason="end_turn")
-
         try:
+            # Get or create conversation (preserves state like pause/confirmation)
+            conversation = self._get_or_create_conversation(session_id=session_id)
+
+            # Convert ACP prompt format to OpenHands message content
+            message_content = convert_acp_prompt_to_message_content(params.prompt)
+
+            if not message_content:
+                return PromptResponse(stopReason="end_turn")
+
             # Send the message with potentially multiple content types
             # (text + images)
             message = Message(role="user", content=message_content)
@@ -241,67 +313,51 @@ class OpenHandsACPAgent(ACPAgent):
         """Cancel the current operation."""
         logger.info(f"Cancel requested for session: {params.sessionId}")
 
-        if params.sessionId in self._sessions:
-            conversation = self._sessions[params.sessionId]
-            # Pause the conversation
+        try:
+            # Get active conversation and pause it
+            conversation = self._get_or_create_conversation(session_id=params.sessionId)
+            # Pause the conversation (state is preserved in cache)
             conversation.pause()
+        except Exception as e:
+            logger.warning(f"Failed to cancel session {params.sessionId}: {e}")
 
     async def loadSession(self, params: LoadSessionRequest) -> None:
-        """Load an existing session and replay conversation history."""
+        """Load an existing session and replay conversation history.
+
+        This implements the same logic as 'openhands --resume <session_id>':
+        - Uses _setup_acp_conversation which calls the SDK's Conversation constructor
+        - The SDK automatically loads from persistence_dir if conversation_id exists
+        - Streams the loaded history back to the client
+
+        Per ACP spec (https://agentclientprotocol.com/protocol/session-setup#loading-sessions):
+        - Server should load the session state from persistent storage
+        - Replay the conversation history to the client via sessionUpdate notifications
+        """
         session_id = params.sessionId
         logger.info(f"Loading session: {session_id}")
 
         try:
-            # Check if session exists
-            if session_id not in self._sessions:
-                raise ValueError(f"Session not found: {session_id}")
+            # Get or create conversation (loads from disk if not in cache)
+            # The SDK's Conversation class automatically loads from disk if the
+            # conversation_id exists in persistence_dir
+            conversation = self._get_or_create_conversation(session_id=session_id)
 
-            conversation = self._sessions[session_id]
+            # Check if there's actually any history to load
+            if not conversation.state.events:
+                logger.warning(
+                    f"Session {session_id} has no history (new or empty session)"
+                )
+                return
 
-            # Stream conversation history to client
-            logger.info("Streaming conversation history to client")
+            # Stream conversation history to client by reusing EventSubscriber
+            # This ensures consistent event handling with live conversations
+            logger.info(
+                f"Streaming {len(conversation.state.events)} events from "
+                f"conversation history"
+            )
+            subscriber = EventSubscriber(session_id, self._conn)
             for event in conversation.state.events:
-                if isinstance(event, MessageEvent):
-                    # Convert MessageEvent to ACP session update
-                    if event.source == "user":
-                        # Stream user message
-                        text_content = ""
-                        for content in event.llm_message.content:
-                            if isinstance(content, TextContent):
-                                text_content += content.text
-
-                        if text_content.strip():
-                            await self._conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=session_id,
-                                    update=UserMessageChunk(
-                                        sessionUpdate="user_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text", text=text_content
-                                        ),
-                                    ),
-                                )
-                            )
-
-                    elif event.source == "agent":
-                        # Stream agent message
-                        text_content = ""
-                        for content in event.llm_message.content:
-                            if isinstance(content, TextContent):
-                                text_content += content.text
-
-                        if text_content.strip():
-                            await self._conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=session_id,
-                                    update=AgentMessageChunk(
-                                        sessionUpdate="agent_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text", text=text_content
-                                        ),
-                                    ),
-                                )
-                            )
+                await subscriber(event)
 
             logger.info(f"Successfully loaded session {session_id}")
 

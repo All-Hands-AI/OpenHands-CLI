@@ -18,6 +18,7 @@ from acp.schema import (
     ToolCallProgress,
     ToolCallStart,
     ToolKind,
+    UserMessageChunk,
 )
 
 from openhands.sdk import Action, ImageContent, TextContent
@@ -431,7 +432,7 @@ class EventSubscriber:
         )
 
     async def _handle_llm_convertible_event(self, event: LLMConvertibleEvent):
-        """Handle other LLMConvertibleEvent events.
+        """Handle other LLMConvertibleEvent events (including user and agent messages).
 
         Args:
             event: LLMConvertibleEvent to process
@@ -439,13 +440,60 @@ class EventSubscriber:
         try:
             llm_message = event.to_llm_message()
 
-            # Send the event as a session update
-            if llm_message.role == "assistant":
-                # Send all content items from the LLM message
+            # Handle user messages
+            if llm_message.role == "user":
                 for content_item in llm_message.content:
                     if isinstance(content_item, TextContent):
                         if content_item.text.strip():
-                            # Send text content
+                            await self.conn.sessionUpdate(
+                                SessionNotification(
+                                    sessionId=self.session_id,
+                                    update=UserMessageChunk(
+                                        sessionUpdate="user_message_chunk",
+                                        content=TextContentBlock(
+                                            type="text",
+                                            text=content_item.text,
+                                        ),
+                                    ),
+                                )
+                            )
+                    elif isinstance(content_item, ImageContent):
+                        for image_url in content_item.image_urls:
+                            is_uri = image_url.startswith(("http://", "https://"))
+                            await self.conn.sessionUpdate(
+                                SessionNotification(
+                                    sessionId=self.session_id,
+                                    update=UserMessageChunk(
+                                        sessionUpdate="user_message_chunk",
+                                        content=ImageContentBlock(
+                                            type="image",
+                                            data=image_url,
+                                            mimeType="image/png",
+                                            uri=image_url if is_uri else None,
+                                        ),
+                                    ),
+                                )
+                            )
+                    elif isinstance(content_item, str):
+                        if content_item.strip():
+                            await self.conn.sessionUpdate(
+                                SessionNotification(
+                                    sessionId=self.session_id,
+                                    update=UserMessageChunk(
+                                        sessionUpdate="user_message_chunk",
+                                        content=TextContentBlock(
+                                            type="text",
+                                            text=content_item,
+                                        ),
+                                    ),
+                                )
+                            )
+
+            # Handle assistant messages
+            elif llm_message.role == "assistant":
+                for content_item in llm_message.content:
+                    if isinstance(content_item, TextContent):
+                        if content_item.text.strip():
                             await self.conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=self.session_id,
@@ -459,9 +507,7 @@ class EventSubscriber:
                                 )
                             )
                     elif isinstance(content_item, ImageContent):
-                        # Send each image URL as separate content
                         for image_url in content_item.image_urls:
-                            # Determine if it's a URI or base64 data
                             is_uri = image_url.startswith(("http://", "https://"))
                             await self.conn.sessionUpdate(
                                 SessionNotification(
@@ -479,7 +525,6 @@ class EventSubscriber:
                             )
                     elif isinstance(content_item, str):
                         if content_item.strip():
-                            # Send string content as text
                             await self.conn.sessionUpdate(
                                 SessionNotification(
                                     sessionId=self.session_id,
