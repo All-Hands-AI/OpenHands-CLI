@@ -4,6 +4,7 @@ from uuid import UUID
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+from openhands.sdk.context import Skill, AgentContext
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
 )
@@ -28,12 +29,14 @@ class MissingAgentSpec(Exception):
 def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
+    skills: list[Skill] | None = None,
 ) -> Agent:
     """Load agent specifications.
 
     Args:
         conversation_id: Optional conversation ID for session tracking
         mcp_servers: Optional dict of MCP servers to augment agent configuration
+        skills: Optional list of skills to include in the agent configuration
 
     Returns:
         Configured Agent instance
@@ -57,6 +60,19 @@ def load_agent_specs(
         agent = agent.model_copy(
             update={"mcp_config": {"mcpServers": existing_servers}}
         )
+
+    if skills:
+        if agent.agent_context is not None:
+            existing_skills = agent.agent_context.skills
+            existing_skills.extend(skills)
+            agent = agent.model_copy(
+                update={"agent_context": agent.agent_context.model_copy(update={"skills": existing_skills})}
+            )
+        else:
+            agent = agent.model_copy(
+                update={"agent_context": AgentContext(skills=skills)}
+            )
+
     return agent
 
 

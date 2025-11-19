@@ -49,6 +49,7 @@ from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
     transform_acp_mcp_servers_to_agent_format,
+    RESOURCE_SKILL
 )
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
@@ -95,8 +96,8 @@ class OpenHandsACPAgent(ACPAgent):
                 mcpCapabilities=McpCapabilities(http=True, sse=True),
                 promptCapabilities=PromptCapabilities(
                     audio=False,
-                    embeddedContext=False,
-                    image=True,  # Enable image support
+                    embeddedContext=True,
+                    image=True,
                 ),
             ),
         )
@@ -122,7 +123,12 @@ class OpenHandsACPAgent(ACPAgent):
 
             # Load agent from CLI settings
             agent = load_agent_specs(
-                conversation_id=session_id, mcp_servers=mcp_servers_dict
+                conversation_id=session_id,
+                mcp_servers=mcp_servers_dict,
+                # Additional prompt extensions required by OpenHands CLI ACP
+                skills=[
+                    RESOURCE_SKILL
+                ]
             )
             logger.info(f"Loaded agent with model: {agent.llm.model}")
 
