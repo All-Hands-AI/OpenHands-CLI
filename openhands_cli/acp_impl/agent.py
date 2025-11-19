@@ -25,6 +25,7 @@ from acp.schema import (
     AuthenticateRequest,
     AuthenticateResponse,
     CancelNotification,
+    Implementation,
     LoadSessionRequest,
     McpCapabilities,
     PromptCapabilities,
@@ -45,6 +46,7 @@ from openhands.sdk import (
 )
 from openhands.sdk.event import Event
 from openhands.sdk.event.llm_convertible.message import MessageEvent
+from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
@@ -99,6 +101,10 @@ class OpenHandsACPAgent(ACPAgent):
                     embeddedContext=True,
                     image=True,
                 ),
+            ),
+            agentInfo=Implementation(
+                name="OpenHands CLI ACP Agent",
+                version=__version__,
             ),
         )
 
