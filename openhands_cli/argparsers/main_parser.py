@@ -19,6 +19,8 @@ Use 'serve' subcommand to launch the GUI server instead.
 Examples:
   openhands                           # Start CLI mode
   openhands --resume conversation-id  # Resume a conversation in CLI mode
+  openhands --always-approve          # Start with always-approve confirmation mode
+  openhands --llm-approve             # Start with LLM-based security analyzer
   openhands serve                     # Launch GUI server
   openhands serve --gpu               # Launch GUI server with GPU support
 """,
@@ -26,6 +28,19 @@ Examples:
 
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+
+    # Confirmation mode options (mutually exclusive)
+    confirmation_group = parser.add_mutually_exclusive_group()
+    confirmation_group.add_argument(
+        "--always-approve",
+        action="store_true",
+        help="Enable always-approve mode (always ask for user confirmation)",
+    )
+    confirmation_group.add_argument(
+        "--llm-approve",
+        action="store_true",
+        help="Enable LLM-based security analyzer (only confirm high-risk actions)",
+    )
 
     # Only serve as subcommand
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")

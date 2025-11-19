@@ -41,8 +41,17 @@ def main() -> None:
             # Import agent_chat only when needed
             from openhands_cli.agent_chat import run_cli_entry
 
+            # Determine confirmation mode from args
+            confirmation_mode = None
+            if args.always_approve:
+                confirmation_mode = "always"
+            elif args.llm_approve:
+                confirmation_mode = "llm"
+
             # Start agent chat
-            run_cli_entry(resume_conversation_id=args.resume)
+            run_cli_entry(
+                resume_conversation_id=args.resume, confirmation_mode=confirmation_mode
+            )
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except EOFError:

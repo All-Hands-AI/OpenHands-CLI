@@ -93,6 +93,81 @@ class TestConfirmationMode:
             mock_agent_store_class.assert_called_once()
             mock_agent_store_instance.load.assert_called_once()
 
+    def test_setup_conversation_with_always_approve_mode(self) -> None:
+        """Test that setup_conversation sets AlwaysConfirm policy with always mode."""
+        with patch.dict(os.environ, {"LLM_MODEL": "test-model"}):
+            with (
+                patch("openhands_cli.setup.Conversation") as mock_conversation_class,
+                patch("openhands_cli.setup.AgentStore") as mock_agent_store_class,
+                patch("openhands_cli.setup.print_formatted_text"),
+                patch("openhands_cli.setup.HTML"),
+                patch("openhands_cli.setup.CLIVisualizer"),
+            ):
+                # Mock dependencies
+                mock_conversation_id = MagicMock()
+
+                # Mock AgentStore
+                mock_agent_store_instance = MagicMock()
+                mock_agent_instance = MagicMock()
+                mock_agent_instance.llm.model = "test-model"
+                mock_agent_store_instance.load.return_value = mock_agent_instance
+                mock_agent_store_class.return_value = mock_agent_store_instance
+
+                # Mock Conversation
+                mock_conversation_instance = MagicMock()
+                mock_conversation_class.return_value = mock_conversation_instance
+
+                result = setup_conversation(
+                    mock_conversation_id, confirmation_mode="always"
+                )
+
+                # Verify AlwaysConfirm policy was set
+                assert result == mock_conversation_instance
+                mock_conversation_instance.set_security_analyzer.assert_called_once()
+                mock_conversation_instance.set_confirmation_policy.assert_called_once()
+                policy_arg = (
+                    mock_conversation_instance.set_confirmation_policy.call_args[0][0]
+                )
+                assert isinstance(policy_arg, AlwaysConfirm)
+
+    def test_setup_conversation_with_llm_approve_mode(self) -> None:
+        """Test that setup_conversation sets ConfirmRisky policy with llm mode."""
+        with patch.dict(os.environ, {"LLM_MODEL": "test-model"}):
+            with (
+                patch("openhands_cli.setup.Conversation") as mock_conversation_class,
+                patch("openhands_cli.setup.AgentStore") as mock_agent_store_class,
+                patch("openhands_cli.setup.print_formatted_text"),
+                patch("openhands_cli.setup.HTML"),
+                patch("openhands_cli.setup.CLIVisualizer"),
+            ):
+                # Mock dependencies
+                mock_conversation_id = MagicMock()
+
+                # Mock AgentStore
+                mock_agent_store_instance = MagicMock()
+                mock_agent_instance = MagicMock()
+                mock_agent_instance.llm.model = "test-model"
+                mock_agent_store_instance.load.return_value = mock_agent_instance
+                mock_agent_store_class.return_value = mock_agent_store_instance
+
+                # Mock Conversation
+                mock_conversation_instance = MagicMock()
+                mock_conversation_class.return_value = mock_conversation_instance
+
+                result = setup_conversation(
+                    mock_conversation_id, confirmation_mode="llm"
+                )
+
+                # Verify ConfirmRisky policy was set
+                assert result == mock_conversation_instance
+                mock_conversation_instance.set_security_analyzer.assert_called_once()
+                mock_conversation_instance.set_confirmation_policy.assert_called_once()
+                policy_arg = (
+                    mock_conversation_instance.set_confirmation_policy.call_args[0][0]
+                )
+                assert isinstance(policy_arg, ConfirmRisky)
+                assert policy_arg.threshold == SecurityRisk.HIGH
+
     def test_conversation_runner_set_confirmation_mode(self) -> None:
         """Test that ConversationRunner can set confirmation policy."""
 
