@@ -59,7 +59,11 @@ def _print_exit_hint(conversation_id: str) -> None:
     )
 
 
-def run_cli_entry(resume_conversation_id: str | None = None) -> None:
+def run_cli_entry(
+    resume_conversation_id: str | None = None,
+    task: str | None = None,
+    file: str | None = None,
+) -> None:
     """Run the agent chat session using the agent SDK.
 
 
@@ -91,6 +95,33 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return
 
+    # Prepare initial user message if provided and not resuming
+    initial_text: str | None = None
+    if resume_conversation_id and (task or file):
+        print_formatted_text(
+            HTML(
+                "<yellow>Warning:</yellow> Ignoring --task/--file when resuming an "
+                "existing conversation."
+            )
+        )
+    else:
+        if task:
+            initial_text = task
+        elif file:
+            try:
+                with open(file, encoding="utf-8") as f:
+                    initial_text = f.read()
+            except FileNotFoundError:
+                print_formatted_text(
+                    HTML(f"<red>Error:</red> File not found: <white>{file}</white>")
+                )
+                return
+            except OSError as e:
+                print_formatted_text(
+                    HTML(f"<red>Error reading file:</red> <white>{e}</white>")
+                )
+                return
+
     display_welcome(conversation_id, bool(resume_conversation_id))
 
     # Track session start time for uptime calculation
@@ -99,6 +130,16 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
     # Create conversation runner to handle state machine logic
     runner = None
     conversation = None
+
+    # If we have an initial message, start the conversation and process it
+    if initial_text is not None and not resume_conversation_id:
+        conversation = setup_conversation(conversation_id)
+        runner = ConversationRunner(conversation)
+        runner.process_message(
+            Message(role="user", content=[TextContent(text=initial_text)])
+        )
+        print()  # spacing after initial run
+
     session = get_session_prompter()
 
     # Main chat loop
