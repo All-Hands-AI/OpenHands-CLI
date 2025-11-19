@@ -6,18 +6,18 @@ This is a simplified version that demonstrates the TUI functionality.
 
 import logging
 import os
+import sys
 import warnings
+
+debug_env = os.getenv('DEBUG', 'false').lower()
+if debug_env != '1' and debug_env != 'true':
+    logging.disable(logging.WARNING)
+    warnings.filterwarnings('ignore')
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.argparsers.main_parser import create_main_parser
-
-
-debug_env = os.getenv("DEBUG", "false").lower()
-if debug_env != "1" and debug_env != "true":
-    logging.disable(logging.WARNING)
-    warnings.filterwarnings("ignore")
 
 
 def main() -> None:
@@ -31,7 +31,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        if args.command == "serve":
+        if args.command == 'serve':
             # Import gui_launcher only when needed
             from openhands_cli.gui_launcher import launch_gui_server
 
@@ -42,18 +42,20 @@ def main() -> None:
             from openhands_cli.agent_chat import run_cli_entry
 
             # Start agent chat
+            # Keep call signature backward-compatible for upstream tests
             run_cli_entry(resume_conversation_id=args.resume)
     except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
     except EOFError:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {e}</red>"))
+        print_formatted_text(HTML(f'<red>Error: {e}</red>'))
         import traceback
 
         traceback.print_exc()
         raise
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
+    
