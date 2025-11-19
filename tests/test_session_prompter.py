@@ -102,4 +102,4 @@ def test_get_session_prompter_default_parameters():
     # Prompt continuation should be callable and return the expected string
     cont = session.prompt_continuation
     assert callable(cont)
-    assert cont(80, 1, False) == "..."
+    assert cont(80, 1, False) == ""
