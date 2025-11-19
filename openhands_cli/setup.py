@@ -46,8 +46,7 @@ def verify_agent_exists_or_setup_agent(*, load_user_skills: bool = True) -> Agen
     """
     settings_screen = SettingsScreen()
     try:
-        # Keep backward compatibility with upstream tests by not passing kwargs here
-        agent = load_agent_specs()
+        agent = load_agent_specs(load_user_skills=load_user_skills)
         return agent
     except MissingAgentSpec:
         # For first-time users, show the full settings flow with choice between basic/advanced
@@ -55,8 +54,7 @@ def verify_agent_exists_or_setup_agent(*, load_user_skills: bool = True) -> Agen
 
 
     # Try once again after settings setup attempt
-    # Keep backward compatibility with upstream tests by not passing kwargs here
-    return load_agent_specs()
+    return load_agent_specs(load_user_skills=load_user_skills)
 
 
 def setup_conversation(
@@ -104,4 +102,3 @@ def setup_conversation(
         HTML(f'<green>✓ Agent initialized with model: {agent.llm.model}</green>')
     )
     return conversation
-    

@@ -5,7 +5,7 @@ import argparse
 
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
-    
+
     Returns:
         The configured argument parser
     """
@@ -23,7 +23,7 @@ Examples:
   openhands serve --gpu               # Launch GUI server with GPU support
 """
     )
-    
+
     # CLI arguments at top level (default mode)
     parser.add_argument(
         '--resume',
@@ -44,7 +44,7 @@ Examples:
         help='Disable loading user skills from ~/.openhands'
     )
     parser.set_defaults(user_skills=True)
-    
+
     # Only serve as subcommand
     subparsers = parser.add_subparsers(
         dest='command',
@@ -66,6 +66,5 @@ Examples:
         action='store_true',
         help='Enable GPU support in the Docker container'
     )
-    
+
     return parser
-    

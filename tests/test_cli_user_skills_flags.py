@@ -24,4 +24,4 @@ def test_user_skills_disable_then_enable_then_disable_last_wins():
     parser = create_main_parser()
     args = parser.parse_args(['--user-skills', '--no-user-skills'])
     assert args.user_skills is False
-  
+
