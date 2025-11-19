@@ -22,7 +22,6 @@ Examples:
   openhands serve                     # Launch GUI server
   openhands serve --gpu               # Launch GUI server with GPU support
   openhands acp                       # Start as ACP agent for editors like Zed
-  openhands acp --log-level DEBUG     # Start ACP agent with debug logging
 """,
     )
 
@@ -46,14 +45,8 @@ Examples:
     )
 
     # Add ACP subcommand
-    acp_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
-    )
-    acp_parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Set the logging level",
     )
 
     return parser

@@ -37,18 +37,9 @@ def main() -> None:
 
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         elif args.command == "acp":
-            # Import ACP main only when needed
             import asyncio
-            import logging
-
             from openhands_cli.acp_impl.main import run_acp_agent
 
-            # Set log level
-            numeric_level = getattr(logging, args.log_level.upper(), None)
-            if isinstance(numeric_level, int):
-                logging.getLogger().setLevel(numeric_level)
-
-            # Run ACP agent
             asyncio.run(run_acp_agent())
         else:
             # Default CLI behavior - no subcommand needed

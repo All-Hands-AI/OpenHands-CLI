@@ -54,11 +54,9 @@ def load_agent_specs(
         mcp_config: dict[str, Any] = agent.mcp_config or {}
         existing_servers: dict[str, dict[str, Any]] = mcp_config.get("mcpServers", {})
         existing_servers.update(mcp_servers)
-
         agent = agent.model_copy(
             update={"mcp_config": {"mcpServers": existing_servers}}
         )
-
     return agent
 
 
