@@ -206,8 +206,9 @@ class EventSubscriber:
                     if event.action.command == "view":
                         tool_kind = "read"
                         title = f"Reading {event.action.path}"
-                    tool_kind = "edit"
-                    title = f"Editing {event.action.path}"
+                    else:
+                        tool_kind = "edit"
+                        title = f"Editing {event.action.path}"
                 elif isinstance(event.action, ExecuteBashAction):
                     title = f"{event.action.command}"
 
