@@ -2,6 +2,8 @@
 
 import argparse
 
+from openhands_cli import __version__
+
 
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
@@ -22,6 +24,15 @@ Examples:
   openhands serve                     # Launch GUI server
   openhands serve --gpu               # Launch GUI server with GPU support
 """,
+    )
+
+    # Version argument
+    parser.add_argument(
+        "--version",
+        "-v",
+        action="version",
+        version=f"OpenHands CLI {__version__}",
+        help="Show the version number and exit",
     )
 
     # CLI arguments at top level (default mode)
