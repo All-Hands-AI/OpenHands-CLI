@@ -42,7 +42,7 @@ def _materialize_embedded_resource(
     if isinstance(res, ACPTextResourceContents):
         return TextContent(
             text=(
-                "[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
+                "\n[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
                 f"URI: {res.uri}\n"
                 f"mimeType: {res.mimeType}\n"
                 "Content:\n"
@@ -72,7 +72,7 @@ def _materialize_embedded_resource(
 
         return TextContent(
             text=(
-                "[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
+                "\n[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
                 "User provided binary context (non-image).\n"
                 f"Saved to file: {str(target)}\n"
                 "[END USER PROVIDED ADDITIONAL CONTEXT]\n"
@@ -86,7 +86,7 @@ def convert_resources_to_content(
     if isinstance(resource, ACPResourceContentBlock):
         return TextContent(
             text=(
-                "[BEGIN USER PROVIDED ADDITIONAL RESOURCE]\n"
+                "\n[BEGIN USER PROVIDED ADDITIONAL RESOURCE]\n"
                 f"Type: {resource.type}\n"
                 f"URI: {resource.uri}\n"
                 f"name: {resource.name}\n"
