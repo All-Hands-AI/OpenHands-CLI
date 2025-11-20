@@ -8,6 +8,7 @@ using PyInstaller with the custom spec file.
 
 import argparse
 import os
+import re
 import select
 import shutil
 import subprocess
@@ -233,6 +234,65 @@ def test_executable(dummy_agent) -> bool:
         return False
 
 
+def test_version() -> bool:
+    """Test the --version flag of the built executable."""
+    print("🧪 Testing binary --version flag...")
+
+    # Find the binary executable
+    exe_path = Path("dist/openhands")
+    if not exe_path.exists():
+        exe_path = Path("dist/openhands.exe")
+        if not exe_path.exists():
+            print("❌ Binary executable not found!")
+            return False
+
+    try:
+        # Make binary executable on Unix-like systems
+        if os.name != "nt":
+            os.chmod(exe_path, 0o755)
+
+        # Run --version and capture output
+        print(f"Running: {exe_path} --version")
+        result = subprocess.run(
+            [str(exe_path), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            print("❌ Failed to run binary --version command!")
+            print(f"Exit code: {result.returncode}")
+            print(f"Output: {result.stdout}")
+            print(f"Error: {result.stderr}")
+            return False
+
+        version_output = result.stdout + result.stderr
+        print(f"Version output: {version_output}")
+
+        # Check if output contains "OpenHands CLI"
+        if "OpenHands CLI" not in version_output:
+            print("❌ Version output does not contain 'OpenHands CLI'!")
+            print(f"Output: {version_output}")
+            return False
+
+        # Check if output contains a valid version number (X.Y.Z format)
+        if not re.search(r"\d+\.\d+\.\d+", version_output):
+            print("❌ Version output does not contain a valid version number!")
+            print(f"Output: {version_output}")
+            return False
+
+        print("✅ Binary --version test passed!")
+        return True
+
+    except subprocess.TimeoutExpired:
+        print("❌ Binary --version test timed out")
+        return False
+    except Exception as e:
+        print(f"❌ Error testing binary --version: {e}")
+        return False
+
+
 # =================================================
 # SECTION: Main
 # =================================================
@@ -276,6 +336,12 @@ def main() -> int:
 
     # Test the executable
     if not args.no_test:
+        # First test --version flag
+        if not test_version():
+            print("❌ Binary --version test failed, build process failed")
+            return 1
+
+        # Then test full executable with agent
         model_name = "dummy-model"
         extra_kwargs: dict[str, Any] = {}
         if should_set_litellm_extra_body(model_name):
