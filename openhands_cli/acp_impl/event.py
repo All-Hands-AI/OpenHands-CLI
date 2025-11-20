@@ -42,8 +42,8 @@ if TYPE_CHECKING:
 
 
 from openhands.sdk import get_logger
-from openhands.sdk.tool.builtins.finish import FinishAction
-from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands.sdk.tool.builtins.finish import FinishAction, FinishObservation
+from openhands.sdk.tool.builtins.think import ThinkAction, ThinkObservation
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
@@ -290,8 +290,11 @@ class EventSubscriber:
             content: ContentToolCallContent | None = None
             status: ToolCallStatus = "completed"
             if isinstance(event, ObservationEvent):
+                if isinstance(event.observation, ThinkObservation | FinishObservation):
+                    # Think and Finish observations are handled in action event
+                    return
                 # Special handling for TaskTrackerObservation
-                if isinstance(event.observation, TaskTrackerObservation):
+                elif isinstance(event.observation, TaskTrackerObservation):
                     observation = event.observation
                     # Convert TaskItems to PlanEntries
                     entries: list[PlanEntry] = []
