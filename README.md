@@ -7,10 +7,18 @@ A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [
 ## Quickstart
 
 - Prerequisites: Python 3.12+, curl
-- Install uv (package manager):
+ - Install uv (package manager):
+  
+   **macOS / Linux (bash):**
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   # Restart your shell so "uv" is on PATH, or follow the installer hint
+  ```
+
+   **Windows (PowerShell):**
+  ```powershell
+  irm https://astral.sh/uv/install.ps1 | iex
+  # Restart your terminal so "uv" is on PATH, or follow the installer hint
   ```
 
 ### Run the CLI locally
