@@ -4,12 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 from acp import SessionNotification
 from acp.schema import (
-    AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
     ContentToolCallContent,
     FileEditToolCallContent,
-    ImageContentBlock,
     PlanEntry,
     PlanEntryStatus,
     TerminalToolCallContent,
@@ -18,15 +16,13 @@ from acp.schema import (
     ToolCallProgress,
     ToolCallStart,
     ToolKind,
-    UserMessageChunk,
 )
 
-from openhands.sdk import Action, ImageContent, TextContent
+from openhands.sdk import Action
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
     Event,
-    LLMConvertibleEvent,
     ObservationBaseEvent,
     ObservationEvent,
     UserRejectObservation,
@@ -149,8 +145,6 @@ class EventSubscriber:
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
         ):
             await self._handle_observation_event(event)
-        elif isinstance(event, LLMConvertibleEvent):
-            await self._handle_llm_convertible_event(event)
 
     async def _handle_action_event(self, event: ActionEvent):
         """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
@@ -430,112 +424,3 @@ class EventSubscriber:
                 ),
             )
         )
-
-    async def _handle_llm_convertible_event(self, event: LLMConvertibleEvent):
-        """Handle other LLMConvertibleEvent events (including user and agent messages).
-
-        Args:
-            event: LLMConvertibleEvent to process
-        """
-        try:
-            llm_message = event.to_llm_message()
-
-            # Handle user messages
-            if llm_message.role == "user":
-                for content_item in llm_message.content:
-                    if isinstance(content_item, TextContent):
-                        if content_item.text.strip():
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=UserMessageChunk(
-                                        sessionUpdate="user_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text",
-                                            text=content_item.text,
-                                        ),
-                                    ),
-                                )
-                            )
-                    elif isinstance(content_item, ImageContent):
-                        for image_url in content_item.image_urls:
-                            is_uri = image_url.startswith(("http://", "https://"))
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=UserMessageChunk(
-                                        sessionUpdate="user_message_chunk",
-                                        content=ImageContentBlock(
-                                            type="image",
-                                            data=image_url,
-                                            mimeType="image/png",
-                                            uri=image_url if is_uri else None,
-                                        ),
-                                    ),
-                                )
-                            )
-                    elif isinstance(content_item, str):
-                        if content_item.strip():
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=UserMessageChunk(
-                                        sessionUpdate="user_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text",
-                                            text=content_item,
-                                        ),
-                                    ),
-                                )
-                            )
-
-            # Handle assistant messages
-            elif llm_message.role == "assistant":
-                for content_item in llm_message.content:
-                    if isinstance(content_item, TextContent):
-                        if content_item.text.strip():
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=AgentMessageChunk(
-                                        sessionUpdate="agent_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text",
-                                            text=content_item.text,
-                                        ),
-                                    ),
-                                )
-                            )
-                    elif isinstance(content_item, ImageContent):
-                        for image_url in content_item.image_urls:
-                            is_uri = image_url.startswith(("http://", "https://"))
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=AgentMessageChunk(
-                                        sessionUpdate="agent_message_chunk",
-                                        content=ImageContentBlock(
-                                            type="image",
-                                            data=image_url,
-                                            mimeType="image/png",
-                                            uri=image_url if is_uri else None,
-                                        ),
-                                    ),
-                                )
-                            )
-                    elif isinstance(content_item, str):
-                        if content_item.strip():
-                            await self.conn.sessionUpdate(
-                                SessionNotification(
-                                    sessionId=self.session_id,
-                                    update=AgentMessageChunk(
-                                        sessionUpdate="agent_message_chunk",
-                                        content=TextContentBlock(
-                                            type="text",
-                                            text=content_item,
-                                        ),
-                                    ),
-                                )
-                            )
-        except Exception as e:
-            logger.debug(f"Error processing LLMConvertibleEvent: {e}", exc_info=True)
