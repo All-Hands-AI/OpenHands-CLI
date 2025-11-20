@@ -16,6 +16,7 @@ from acp import (
     NewSessionResponse,
     PromptRequest,
     PromptResponse,
+    RequestPermissionRequest,
     SessionNotification,
     stdio_streams,
 )
@@ -28,12 +29,15 @@ from acp.schema import (
     Implementation,
     LoadSessionRequest,
     McpCapabilities,
+    PermissionOption,
     PromptCapabilities,
     SetSessionModelRequest,
     SetSessionModelResponse,
     SetSessionModeRequest,
     SetSessionModeResponse,
+    StopReason,
     TextContentBlock,
+    ToolCall,
 )
 
 from openhands.sdk import (
@@ -42,7 +46,14 @@ from openhands.sdk import (
     Message,
     Workspace,
 )
+from openhands.sdk.conversation.state import (
+    ConversationExecutionStatus,
+    ConversationState,
+)
 from openhands.sdk.event import Event
+from openhands.sdk.security.confirmation_policy import ConfirmRisky
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
@@ -70,6 +81,8 @@ class OpenHandsACPAgent(ACPAgent):
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
         self._active_sessions: dict[str, BaseConversation] = {}
+        # Track cancellation state per session
+        self._cancelled_sessions: set[str] = set()
 
         logger.info("OpenHands ACP Agent initialized")
 
@@ -117,10 +130,6 @@ class OpenHandsACPAgent(ACPAgent):
     ) -> BaseConversation:
         """Set up a conversation for ACP with event streaming support.
 
-        This function reuses the resume logic from
-        openhands_cli.setup.setup_conversation but adapts it for ACP by using
-        EventSubscriber instead of CLIVisualizer.
-
         The SDK's Conversation class automatically:
         - Loads from disk if conversation_id exists in persistence_dir
         - Creates a new conversation if it doesn't exist
@@ -136,55 +145,43 @@ class OpenHandsACPAgent(ACPAgent):
         Raises:
             MissingAgentSpec: If agent configuration is missing
         """
-        # Load agent specs (same as setup_conversation)
+        # Load agent specs
         agent = load_agent_specs(
             conversation_id=session_id,
             mcp_servers=mcp_servers,
             skills=[RESOURCE_SKILL],
         )
 
-        # Validate and setup workspace
-        if working_dir is None:
-            working_dir = WORK_DIR
-        working_path = Path(working_dir)
-
+        # Setup workspace
+        working_path = Path(working_dir) if working_dir else Path(WORK_DIR)
         if not working_path.exists():
-            logger.warning(
-                f"Working directory {working_dir} doesn't exist, creating it"
-            )
+            logger.warning(f"Working directory {working_path} doesn't exist, creating")
             working_path.mkdir(parents=True, exist_ok=True)
-
         if not working_path.is_dir():
             raise ValueError(
-                f"Working directory path is not a directory: {working_dir}"
+                f"Working directory path is not a directory: {working_path}"
             )
-
-        workspace = Workspace(working_dir=str(working_path))
 
         # Create event subscriber for streaming updates (ACP-specific)
         subscriber = EventSubscriber(session_id, self._conn)
-
-        # Get the current event loop for the callback
         loop = asyncio.get_event_loop()
 
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create conversation with persistence support
-        # The SDK automatically loads from disk if conversation_id exists
+        # Create conversation with ACP-specific configuration
         conversation = Conversation(
             agent=agent,
-            workspace=workspace,
+            workspace=Workspace(working_dir=str(working_path)),
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
         )
 
-        # # Set up security analyzer (same as setup_conversation with confirmation mode)
-        # conversation.set_security_analyzer(LLMSecurityAnalyzer())
-        # conversation.set_confirmation_policy(AlwaysConfirm())
-        # TODO: implement later
+        # Set up security analyzer and confirmation policy
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(ConfirmRisky(threshold=SecurityRisk.HIGH))
 
         return conversation
 
@@ -270,10 +267,19 @@ class OpenHandsACPAgent(ACPAgent):
             raise
 
     async def prompt(self, params: PromptRequest) -> PromptResponse:
-        """Handle a prompt request."""
+        """Handle a prompt request.
+
+        Per ACP spec: Runs the agent until completion or a stop condition is met.
+        Returns appropriate stopReason based on why the turn ended.
+
+        This method handles the confirmation loop if confirmation policy is active.
+        """
         session_id = params.sessionId
 
         try:
+            # Clear cancellation state for this session (new prompt turn)
+            self._cancelled_sessions.discard(session_id)
+
             # Get or create conversation (preserves state like pause/confirmation)
             conversation = self._get_or_create_conversation(session_id=session_id)
 
@@ -288,12 +294,9 @@ class OpenHandsACPAgent(ACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            # Run the conversation asynchronously
-            # Callbacks are already set up when conversation was created
-            await asyncio.to_thread(conversation.run)
-
-            # Return the final response
-            return PromptResponse(stopReason="end_turn")
+            # Run conversation with confirmation handling loop
+            stop_reason = await self._run_with_confirmations(session_id, conversation)
+            return PromptResponse(stopReason=stop_reason)
 
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
@@ -307,17 +310,196 @@ class OpenHandsACPAgent(ACPAgent):
                     ),
                 )
             )
+            # Check if error was due to cancellation
+            if session_id in self._cancelled_sessions:
+                return PromptResponse(stopReason="cancelled")
             return PromptResponse(stopReason="end_turn")
 
+    async def _run_with_confirmations(
+        self, session_id: str, conversation: BaseConversation
+    ) -> StopReason:
+        """Run the conversation with confirmation handling loop.
+
+        Args:
+            session_id: The session ID
+            conversation: The conversation to run
+
+        Returns:
+            Stop reason (one of: end_turn, max_tokens, max_turn_requests,
+            refusal, cancelled)
+        """
+
+        # Handle resumed conversation waiting for confirmation
+        if (
+            conversation.state.execution_status
+            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+        ):
+            should_continue = await self._handle_acp_confirmation(
+                session_id, conversation
+            )
+            if not should_continue:
+                return self._determine_stop_reason(session_id, conversation)
+
+        # Main confirmation loop
+        while True:
+            # Check cancellation before running
+            if session_id in self._cancelled_sessions:
+                return "cancelled"
+
+            # Run conversation in thread pool (blocking)
+            await asyncio.to_thread(conversation.run)
+
+            status = conversation.state.execution_status
+
+            # Check completion states
+            if status == ConversationExecutionStatus.FINISHED:
+                return "end_turn"
+            elif status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION:
+                should_continue = await self._handle_acp_confirmation(
+                    session_id, conversation
+                )
+                if not should_continue:
+                    return self._determine_stop_reason(session_id, conversation)
+            elif status in [
+                ConversationExecutionStatus.PAUSED,
+                ConversationExecutionStatus.STUCK,
+                ConversationExecutionStatus.ERROR,
+            ]:
+                return self._determine_stop_reason(session_id, conversation)
+            else:
+                return "end_turn"
+
+    async def _handle_acp_confirmation(
+        self, session_id: str, conversation: BaseConversation
+    ) -> bool:
+        """Handle ACP permission request for pending actions.
+
+        Args:
+            session_id: The session ID
+            conversation: The conversation waiting for confirmation
+
+        Returns:
+            True if permission granted, False if denied/cancelled
+        """
+        pending_actions = ConversationState.get_unmatched_actions(
+            conversation.state.events
+        )
+        if not pending_actions:
+            return True
+
+        try:
+            # Build permission request
+            title = f"Confirm {len(pending_actions)} action(s)"
+            logger.info(f"Requesting permission for {len(pending_actions)} actions")
+
+            response = await self._conn.requestPermission(
+                RequestPermissionRequest(
+                    sessionId=session_id,
+                    toolCall=ToolCall(
+                        toolCallId=f"confirm-{uuid.uuid4().hex[:8]}",
+                        title=title,
+                        kind="other",
+                        status="pending",
+                    ),
+                    options=[
+                        PermissionOption(
+                            optionId="allow_once",
+                            kind="allow_once",
+                            name="Allow Once",
+                        ),
+                        PermissionOption(
+                            optionId="reject_once",
+                            kind="reject_once",
+                            name="Reject Once",
+                        ),
+                    ],
+                )
+            )
+
+            # Handle response
+            if response.outcome.outcome == "cancelled":
+                logger.info("Permission cancelled")
+                self._cancelled_sessions.add(session_id)
+                conversation.pause()
+                return False
+            elif (
+                response.outcome.outcome == "selected"
+                and response.outcome.optionId == "allow_once"
+            ):
+                return True
+            else:
+                conversation.reject_pending_actions("User rejected the actions")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error handling confirmation: {e}", exc_info=True)
+            conversation.reject_pending_actions("Error processing permission request")
+            return False
+
+    def _determine_stop_reason(
+        self, session_id: str, conversation: BaseConversation
+    ) -> StopReason:
+        """Determine the stop reason based on conversation state.
+
+        Args:
+            session_id: The session ID
+            conversation: The conversation that just finished
+
+        Returns:
+            Stop reason (one of: end_turn, max_tokens, max_turn_requests,
+            refusal, cancelled)
+        """
+
+        # Check if session was cancelled
+        if session_id in self._cancelled_sessions:
+            self._cancelled_sessions.discard(session_id)
+            return "cancelled"
+
+        # Check execution status
+        status = conversation.state.execution_status
+
+        if status == ConversationExecutionStatus.PAUSED:
+            # If paused and in cancelled set, it was cancelled
+            if session_id in self._cancelled_sessions:
+                self._cancelled_sessions.discard(session_id)
+                return "cancelled"
+            # Otherwise it was manually paused (treat as end of turn)
+            return "end_turn"
+
+        elif status == ConversationExecutionStatus.STUCK:
+            # Stuck detection triggered - treat as max iterations
+            return "max_turn_requests"
+
+        elif status == ConversationExecutionStatus.ERROR:
+            # Error state - check if it's a refusal or other error
+            # For now, treat as end_turn (could be refined)
+            return "end_turn"
+
+        elif status == ConversationExecutionStatus.FINISHED:
+            # Normal completion
+            return "end_turn"
+
+        # Default to end_turn for any other status
+        return "end_turn"
+
     async def cancel(self, params: CancelNotification) -> None:
-        """Cancel the current operation."""
+        """Cancel the current operation.
+
+        Per ACP spec: Agent SHOULD stop all LLM requests and tool invocations
+        as soon as possible. The prompt() method will return "cancelled" stopReason.
+        """
         logger.info(f"Cancel requested for session: {params.sessionId}")
 
         try:
+            # Mark this session as cancelled
+            self._cancelled_sessions.add(params.sessionId)
+
             # Get active conversation and pause it
             conversation = self._get_or_create_conversation(session_id=params.sessionId)
-            # Pause the conversation (state is preserved in cache)
+            # Pause the conversation (stops execution immediately)
             conversation.pause()
+
+            logger.info(f"Successfully cancelled session {params.sessionId}")
         except Exception as e:
             logger.warning(f"Failed to cancel session {params.sessionId}: {e}")
 
