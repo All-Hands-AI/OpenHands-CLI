@@ -11,7 +11,7 @@ from openhands_cli.acp_impl.utils.convert import convert_acp_prompt_to_message_c
 
 def test_convert_text_content():
     """Test converting ACP text content block to SDK format."""
-    acp_prompt = [TextContentBlock(type="text", text="Hello, world!")]
+    acp_prompt: list = [TextContentBlock(type="text", text="Hello, world!")]
 
     result = convert_acp_prompt_to_message_content(acp_prompt)
 
@@ -22,7 +22,7 @@ def test_convert_text_content():
 
 def test_convert_multiple_text_blocks():
     """Test converting multiple ACP text content blocks."""
-    acp_prompt = [
+    acp_prompt: list = [
         TextContentBlock(type="text", text="First message"),
         TextContentBlock(type="text", text="Second message"),
         TextContentBlock(type="text", text="Third message"),
@@ -32,17 +32,23 @@ def test_convert_multiple_text_blocks():
 
     assert len(result) == 3
     assert all(isinstance(content, TextContent) for content in result)
+    assert isinstance(result[0], TextContent)
     assert result[0].text == "First message"
+    assert isinstance(result[1], TextContent)
     assert result[1].text == "Second message"
+    assert isinstance(result[2], TextContent)
     assert result[2].text == "Third message"
 
 
 def test_convert_image_content():
     """Test converting ACP image content block to SDK format."""
     # Base64 encoded 1x1 red pixel PNG
-    test_image_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    test_image_data = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAF"
+        "BQIAX8jx0gAAAABJRU5ErkJggg=="
+    )
 
-    acp_prompt = [
+    acp_prompt: list = [
         ImageContentBlock(
             type="image",
             data=test_image_data,
@@ -61,9 +67,12 @@ def test_convert_image_content():
 
 def test_convert_mixed_content():
     """Test converting mixed text and image content blocks."""
-    test_image_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    test_image_data = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAF"
+        "BQIAX8jx0gAAAABJRU5ErkJggg=="
+    )
 
-    acp_prompt = [
+    acp_prompt: list = [
         TextContentBlock(type="text", text="Look at this image:"),
         ImageContentBlock(
             type="image",
@@ -94,7 +103,7 @@ def test_convert_empty_prompt():
 
 def test_convert_empty_text():
     """Test converting text block with empty string."""
-    acp_prompt = [TextContentBlock(type="text", text="")]
+    acp_prompt: list = [TextContentBlock(type="text", text="")]
 
     result = convert_acp_prompt_to_message_content(acp_prompt)
 
@@ -109,7 +118,7 @@ def test_convert_image_with_different_mime_types():
     test_data = "dGVzdGRhdGE="  # base64 encoded "testdata"
 
     for mime_type in mime_types:
-        acp_prompt = [
+        acp_prompt: list = [
             ImageContentBlock(
                 type="image",
                 data=test_data,

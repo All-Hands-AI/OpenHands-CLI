@@ -108,8 +108,8 @@ async def test_new_session_success(acp_agent, tmp_path):
         assert str(session_uuid) == response.sessionId
 
         # Verify session is stored
-        assert response.sessionId in acp_agent._sessions
-        assert acp_agent._sessions[response.sessionId] == mock_conversation
+        assert response.sessionId in acp_agent._active_sessions
+        assert acp_agent._active_sessions[response.sessionId] == mock_conversation
 
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ async def test_prompt_empty_text(acp_agent):
 
     # Create mock conversation
     mock_conversation = MagicMock()
-    acp_agent._sessions[session_id] = mock_conversation
+    acp_agent._active_sessions[session_id] = mock_conversation
 
     # Test with empty prompt
     request = PromptRequest(
@@ -261,7 +261,7 @@ async def test_cancel(acp_agent):
 
     # Create mock conversation
     mock_conversation = MagicMock()
-    acp_agent._sessions[session_id] = mock_conversation
+    acp_agent._active_sessions[session_id] = mock_conversation
 
     await acp_agent.cancel(notification)
 
@@ -314,7 +314,7 @@ async def test_load_session_success(acp_agent, mock_connection):
         MessageEvent(source="agent", llm_message=agent_message),
     ]
 
-    acp_agent._sessions[session_id] = mock_conversation
+    acp_agent._active_sessions[session_id] = mock_conversation
 
     await acp_agent.loadSession(request)
 
