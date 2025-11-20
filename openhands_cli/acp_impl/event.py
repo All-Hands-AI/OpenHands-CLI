@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from acp import SessionNotification
 from acp.schema import (
+    AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
     ContentToolCallContent,
@@ -22,9 +23,15 @@ from openhands.sdk import Action
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
+    Condensation,
+    CondensationRequest,
+    ConversationStateUpdateEvent,
     Event,
+    MessageEvent,
     ObservationBaseEvent,
     ObservationEvent,
+    PauseEvent,
+    SystemPromptEvent,
     UserRejectObservation,
 )
 
@@ -138,6 +145,10 @@ class EventSubscriber:
         Args:
             event: Event to process (ActionEvent, ObservationEvent, etc.)
         """
+        # Skip ConversationStateUpdateEvent (internal state management)
+        if isinstance(event, ConversationStateUpdateEvent):
+            return
+
         # Handle different event types
         if isinstance(event, ActionEvent):
             await self._handle_action_event(event)
@@ -145,6 +156,16 @@ class EventSubscriber:
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
         ):
             await self._handle_observation_event(event)
+        elif isinstance(event, MessageEvent):
+            await self._handle_message_event(event)
+        elif isinstance(event, SystemPromptEvent):
+            await self._handle_system_prompt_event(event)
+        # elif isinstance(event, PauseEvent):
+        #     await self._handle_pause_event(event)
+        elif isinstance(event, Condensation):
+            await self._handle_condensation_event(event)
+        elif isinstance(event, CondensationRequest):
+            await self._handle_condensation_request_event(event)
 
     async def _handle_action_event(self, event: ActionEvent):
         """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
@@ -424,3 +445,158 @@ class EventSubscriber:
                 ),
             )
         )
+
+    async def _handle_message_event(self, event: MessageEvent):
+        """Handle MessageEvent by sending AgentMessageChunk or UserMessageChunk.
+
+        Args:
+            event: MessageEvent from agent or user
+        """
+        try:
+            # Get visualization text
+            viz_text = _rich_text_to_plain(event.visualize)
+            if not viz_text.strip():
+                return
+
+            # Determine which type of message chunk to send based on role
+            if event.llm_message.role == "user":
+                # NOTE: Zed UI will render user messages when it is sent
+                # if we update it again, they will be duplicated
+                # await self.conn.sessionUpdate(
+                #     SessionNotification(
+                #         sessionId=self.session_id,
+                #         update=UserMessageChunk(
+                #             sessionUpdate="user_message_chunk",
+                #             content=TextContentBlock(
+                #                 type="text",
+                #                 text=viz_text,
+                #             ),
+                #         ),
+                #     )
+                # )
+                pass
+            else:  # assistant or other roles
+                await self.conn.sessionUpdate(
+                    SessionNotification(
+                        sessionId=self.session_id,
+                        update=AgentMessageChunk(
+                            sessionUpdate="agent_message_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        ),
+                    )
+                )
+        except Exception as e:
+            logger.debug(f"Error processing MessageEvent: {e}", exc_info=True)
+
+    async def _handle_system_prompt_event(self, event: SystemPromptEvent):
+        """Handle SystemPromptEvent by sending as AgentThoughtChunk.
+
+        System prompts are internal setup, so we send them as thought chunks
+        to indicate they're part of the agent's internal state.
+
+        Args:
+            event: SystemPromptEvent
+        """
+        try:
+            viz_text = _rich_text_to_plain(event.visualize)
+            if not viz_text.strip():
+                return
+
+            await self.conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=self.session_id,
+                    update=AgentThoughtChunk(
+                        sessionUpdate="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                    ),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Error processing SystemPromptEvent: {e}", exc_info=True)
+
+    async def _handle_pause_event(self, event: PauseEvent):
+        """Handle PauseEvent by sending as AgentThoughtChunk.
+
+        Args:
+            event: PauseEvent
+        """
+        try:
+            viz_text = _rich_text_to_plain(event.visualize)
+            if not viz_text.strip():
+                return
+
+            await self.conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=self.session_id,
+                    update=AgentThoughtChunk(
+                        sessionUpdate="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                    ),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Error processing PauseEvent: {e}", exc_info=True)
+
+    async def _handle_condensation_event(self, event: Condensation):
+        """Handle Condensation by sending as AgentThoughtChunk.
+
+        Condensation events indicate memory management is happening, which is
+        useful for the user to know but doesn't require special UI treatment.
+
+        Args:
+            event: Condensation event
+        """
+        try:
+            viz_text = _rich_text_to_plain(event.visualize)
+            if not viz_text.strip():
+                return
+
+            await self.conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=self.session_id,
+                    update=AgentThoughtChunk(
+                        sessionUpdate="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                    ),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Error processing Condensation: {e}", exc_info=True)
+
+    async def _handle_condensation_request_event(self, event: CondensationRequest):
+        """Handle CondensationRequest by sending as AgentThoughtChunk.
+
+        Args:
+            event: CondensationRequest event
+        """
+        try:
+            viz_text = _rich_text_to_plain(event.visualize)
+            if not viz_text.strip():
+                return
+
+            await self.conn.sessionUpdate(
+                SessionNotification(
+                    sessionId=self.session_id,
+                    update=AgentThoughtChunk(
+                        sessionUpdate="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                    ),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Error processing CondensationRequest: {e}", exc_info=True)

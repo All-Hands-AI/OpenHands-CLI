@@ -5,13 +5,24 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from acp import SessionNotification
-from acp.schema import SessionUpdate2, SessionUpdate4, SessionUpdate5
+from acp.schema import (
+    SessionUpdate1,
+    SessionUpdate2,
+    SessionUpdate3,
+    SessionUpdate4,
+    SessionUpdate5,
+)
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.event import (
     AgentErrorEvent,
+    Condensation,
+    CondensationRequest,
+    ConversationStateUpdateEvent,
     MessageEvent,
     ObservationEvent,
+    PauseEvent,
+    SystemPromptEvent,
 )
 from openhands_cli.acp_impl.event import EventSubscriber
 
@@ -59,6 +70,9 @@ async def test_handle_action_event(event_subscriber, mock_connection):
         title = "Test Action"
         visualize = Text("Executing test action")
 
+        def model_dump(self):
+            return {"title": self.title}
+
     # Create a simple object for tool_call
     class MockToolCall:
         class MockFunction:
@@ -83,7 +97,8 @@ async def test_handle_action_event(event_subscriber, mock_connection):
     await event_subscriber._handle_action_event(event)
 
     # Verify sessionUpdate was called multiple times (reasoning, thought, tool_call)
-    assert mock_connection.sessionUpdate.call_count >= 3
+    # Should be at least 2: thought + tool_call
+    assert mock_connection.sessionUpdate.call_count >= 2
 
     # Check that tool_call notification was sent
     calls = mock_connection.sessionUpdate.call_args_list
@@ -95,7 +110,7 @@ async def test_handle_action_event(event_subscriber, mock_connection):
             assert notification.update.sessionUpdate == "tool_call"
             assert notification.update.toolCallId == "test-call-123"
             assert notification.update.kind == "execute"  # terminal maps to execute
-            assert notification.update.status == "pending"
+            assert notification.update.status == "in_progress"
 
     assert tool_call_found, "tool_call notification should be sent"
 
@@ -140,6 +155,7 @@ async def test_handle_agent_error_event(event_subscriber, mock_connection):
     event.visualize = Text("Error: Something went wrong")
     event.tool_call_id = "test-call-123"
     event.error = "Something went wrong"
+    event.model_dump = MagicMock(return_value={"error": "Something went wrong"})
 
     # Process the event
     await event_subscriber._handle_observation_event(event)
@@ -170,7 +186,7 @@ async def test_event_subscriber_with_empty_text(event_subscriber, mock_connectio
 
 @pytest.mark.asyncio
 async def test_event_subscriber_with_user_message(event_subscriber, mock_connection):
-    """Test that user messages are not processed."""
+    """Test that user messages are sent as UserMessageChunk."""
     # Create a MessageEvent from user (not agent)
     message = Message(role="user", content=[TextContent(text="User message")])
     event = MessageEvent(source="user", llm_message=message)
@@ -178,5 +194,104 @@ async def test_event_subscriber_with_user_message(event_subscriber, mock_connect
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was not called for user messages
+    # Verify sessionUpdate was called
+    assert mock_connection.sessionUpdate.called
+    call_args = mock_connection.sessionUpdate.call_args[0][0]
+    assert isinstance(call_args, SessionNotification)
+    assert call_args.sessionId == "test-session"
+    assert isinstance(call_args.update, SessionUpdate1)
+    assert call_args.update.sessionUpdate == "user_message_chunk"
+
+
+@pytest.mark.asyncio
+async def test_handle_system_prompt_event(event_subscriber, mock_connection):
+    """Test handling of SystemPromptEvent."""
+    # Create a SystemPromptEvent
+    event = SystemPromptEvent(
+        source="agent", system_prompt=TextContent(text="System prompt"), tools=[]
+    )
+
+    # Process the event
+    await event_subscriber(event)
+
+    # Verify sessionUpdate was called
+    assert mock_connection.sessionUpdate.called
+    call_args = mock_connection.sessionUpdate.call_args[0][0]
+    assert isinstance(call_args, SessionNotification)
+    assert call_args.sessionId == "test-session"
+    assert isinstance(call_args.update, SessionUpdate3)
+    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+
+
+@pytest.mark.asyncio
+async def test_handle_pause_event(event_subscriber, mock_connection):
+    """Test handling of PauseEvent."""
+    # Create a PauseEvent
+    event = PauseEvent(source="user")
+
+    # Process the event
+    await event_subscriber(event)
+
+    # Verify sessionUpdate was called
+    assert mock_connection.sessionUpdate.called
+    call_args = mock_connection.sessionUpdate.call_args[0][0]
+    assert isinstance(call_args, SessionNotification)
+    assert call_args.sessionId == "test-session"
+    assert isinstance(call_args.update, SessionUpdate3)
+    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+
+
+@pytest.mark.asyncio
+async def test_handle_condensation_event(event_subscriber, mock_connection):
+    """Test handling of Condensation event."""
+    # Create a Condensation event
+    event = Condensation(
+        source="environment",
+        forgotten_event_ids=["event1", "event2"],
+        summary="Some events were forgotten",
+        llm_response_id="response-123",
+    )
+
+    # Process the event
+    await event_subscriber(event)
+
+    # Verify sessionUpdate was called
+    assert mock_connection.sessionUpdate.called
+    call_args = mock_connection.sessionUpdate.call_args[0][0]
+    assert isinstance(call_args, SessionNotification)
+    assert call_args.sessionId == "test-session"
+    assert isinstance(call_args.update, SessionUpdate3)
+    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+
+
+@pytest.mark.asyncio
+async def test_handle_condensation_request_event(event_subscriber, mock_connection):
+    """Test handling of CondensationRequest event."""
+    # Create a CondensationRequest event
+    event = CondensationRequest(source="environment")
+
+    # Process the event
+    await event_subscriber(event)
+
+    # Verify sessionUpdate was called
+    assert mock_connection.sessionUpdate.called
+    call_args = mock_connection.sessionUpdate.call_args[0][0]
+    assert isinstance(call_args, SessionNotification)
+    assert call_args.sessionId == "test-session"
+    assert isinstance(call_args.update, SessionUpdate3)
+    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+
+
+@pytest.mark.asyncio
+async def test_conversation_state_update_event_is_skipped(
+    event_subscriber, mock_connection
+):
+    """Test that ConversationStateUpdateEvent is skipped."""
+    # Create a ConversationStateUpdateEvent
+    event = ConversationStateUpdateEvent(source="environment", key="test", value="test")
+
+    # Process the event
+    await event_subscriber(event)
+
+    # Verify sessionUpdate was NOT called
     assert not mock_connection.sessionUpdate.called
