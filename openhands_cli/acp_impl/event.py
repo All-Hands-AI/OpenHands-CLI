@@ -53,31 +53,6 @@ from openhands.tools.task_tracker.definition import (
 logger = get_logger(__name__)
 
 
-def get_tool_kind(tool_name: str, action: Action | None) -> ToolKind:
-    """Map tool names to ACP ToolKind values.
-
-    Args:
-        tool_name: Name of the tool
-
-    Returns:
-        ACP ToolKind string ("execute", "edit", "fetch", "think", or "other")
-    """
-    tool_kind_mapping: dict[str, ToolKind] = {
-        "terminal": "execute",
-        "browser_use": "fetch",
-        "browser": "fetch",
-    }
-
-    # Special handling for file_editor tool
-    if tool_name == "file_editor":
-        assert isinstance(action, FileEditorAction)
-        if action.command == "view":
-            return "read"
-        return "edit"
-
-    return tool_kind_mapping.get(tool_name, "other")
-
-
 def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
     """Extract file locations from an action if available.
 
@@ -160,8 +135,8 @@ class EventSubscriber:
             await self._handle_message_event(event)
         elif isinstance(event, SystemPromptEvent):
             await self._handle_system_prompt_event(event)
-        # elif isinstance(event, PauseEvent):
-        #     await self._handle_pause_event(event)
+        elif isinstance(event, PauseEvent):
+            await self._handle_pause_event(event)
         elif isinstance(event, Condensation):
             await self._handle_condensation_event(event)
         elif isinstance(event, CondensationRequest):
@@ -207,9 +182,6 @@ class EventSubscriber:
                     )
                 )
 
-            # Now send the tool_call with appropriate content
-            tool_kind = get_tool_kind(event.tool_name, event.action)
-
             # Generate content for the tool call
             content: (
                 list[
@@ -219,7 +191,19 @@ class EventSubscriber:
                 ]
                 | None
             ) = None
+            tool_kind_mapping: dict[str, ToolKind] = {
+                "terminal": "execute",
+                "browser_use": "fetch",
+                "browser": "fetch",
+            }
+            tool_kind = tool_kind_mapping.get(event.tool_name, "other")
+            title = event.tool_name
             if event.action:
+                if isinstance(event.action, FileEditorAction):
+                    if event.action.command == "view":
+                        tool_kind = "read"
+                    tool_kind = "edit"
+
                 action_viz = _rich_text_to_plain(event.action.visualize)
                 if action_viz.strip():
                     content = [
@@ -238,7 +222,7 @@ class EventSubscriber:
                     update=ToolCallStart(
                         sessionUpdate="tool_call",
                         toolCallId=event.tool_call_id,
-                        title=event.tool_name,
+                        title=title,
                         kind=tool_kind,
                         status="in_progress",
                         content=content,
