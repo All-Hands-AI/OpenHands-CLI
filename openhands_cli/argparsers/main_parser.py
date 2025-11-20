@@ -32,12 +32,6 @@ Examples:
     )
     # Control loading of user skills from ~/.openhands
     parser.add_argument(
-        '--user-skills',
-        dest='user_skills',
-        action='store_true',
-        help='Enable loading user skills from ~/.openhands (default)'
-    )
-    parser.add_argument(
         '--no-user-skills',
         dest='user_skills',
         action='store_false',
