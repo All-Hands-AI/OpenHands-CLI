@@ -42,10 +42,13 @@ if TYPE_CHECKING:
 
 
 from openhands.sdk import get_logger
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
 from openhands.tools.task_tracker.definition import (
+    TaskTrackerAction,
     TaskTrackerObservation,
 )
 from openhands.tools.terminal.definition import ExecuteBashAction
@@ -202,16 +205,6 @@ class EventSubscriber:
             tool_kind = tool_kind_mapping.get(event.tool_name, "other")
             title = event.tool_name
             if event.action:
-                if isinstance(event.action, FileEditorAction):
-                    if event.action.command == "view":
-                        tool_kind = "read"
-                        title = f"Reading {event.action.path}"
-                    else:
-                        tool_kind = "edit"
-                        title = f"Editing {event.action.path}"
-                elif isinstance(event.action, ExecuteBashAction):
-                    title = f"{event.action.command}"
-
                 action_viz = _event_visualize_to_plain(event)
                 if action_viz.strip():
                     content = [
@@ -223,6 +216,46 @@ class EventSubscriber:
                             ),
                         )
                     ]
+
+                if isinstance(event.action, FileEditorAction):
+                    if event.action.command == "view":
+                        tool_kind = "read"
+                        title = f"Reading {event.action.path}"
+                    else:
+                        tool_kind = "edit"
+                        title = f"Editing {event.action.path}"
+                elif isinstance(event.action, ExecuteBashAction):
+                    title = f"{event.action.command}"
+                elif isinstance(event.action, TaskTrackerAction):
+                    title = "Plan updated"
+                elif isinstance(event.action, ThinkAction):
+                    await self.conn.sessionUpdate(
+                        SessionNotification(
+                            sessionId=self.session_id,
+                            update=AgentThoughtChunk(
+                                sessionUpdate="agent_thought_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text=action_viz,
+                                ),
+                            ),
+                        )
+                    )
+                    return
+                elif isinstance(event.action, FinishAction):
+                    await self.conn.sessionUpdate(
+                        SessionNotification(
+                            sessionId=self.session_id,
+                            update=AgentMessageChunk(
+                                sessionUpdate="agent_message_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text=action_viz,
+                                ),
+                            ),
+                        )
+                    )
+                    return
 
             await self.conn.sessionUpdate(
                 SessionNotification(
