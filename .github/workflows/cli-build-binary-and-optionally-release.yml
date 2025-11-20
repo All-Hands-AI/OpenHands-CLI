@@ -79,7 +79,7 @@ jobs:
             - name: Test binary --version flag
               run: |
                   echo "🧪 Testing binary --version flag..."
-                  
+
                   # Find the binary executable
                   if [ -f dist/openhands ]; then
                     BINARY="dist/openhands"
@@ -89,12 +89,12 @@ jobs:
                     echo "❌ Binary executable not found!"
                     exit 1
                   fi
-                  
+
                   # Make binary executable on Unix-like systems
                   if [ "${{ matrix.platform }}" != "windows" ]; then
                     chmod +x "$BINARY"
                   fi
-                  
+
                   # Run --version and capture output
                   echo "Running: $BINARY --version"
                   if ! VERSION_OUTPUT=$("$BINARY" --version 2>&1); then
@@ -102,22 +102,22 @@ jobs:
                     echo "Output: $VERSION_OUTPUT"
                     exit 1
                   fi
-                  
+
                   echo "Version output: $VERSION_OUTPUT"
-                  
+
                   # Check if output contains "OpenHands CLI" and a version number
                   if ! echo "$VERSION_OUTPUT" | grep -q "OpenHands CLI"; then
                     echo "❌ Version output does not contain 'OpenHands CLI'!"
                     echo "Output: $VERSION_OUTPUT"
                     exit 1
                   fi
-                  
+
                   if ! echo "$VERSION_OUTPUT" | grep -qE "[0-9]+\.[0-9]+\.[0-9]+"; then
                     echo "❌ Version output does not contain a valid version number (X.Y.Z format)!"
                     echo "Output: $VERSION_OUTPUT"
                     exit 1
                   fi
-                  
+
                   echo "✅ Binary --version test passed!"
 
             - name: Upload binary artifact
