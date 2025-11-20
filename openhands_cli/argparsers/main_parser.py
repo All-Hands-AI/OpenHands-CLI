@@ -37,7 +37,6 @@ Examples:
         action='store_false',
         help='Disable loading user skills from ~/.openhands'
     )
-    parser.set_defaults(user_skills=True)
 
     # Only serve as subcommand
     subparsers = parser.add_subparsers(
