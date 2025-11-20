@@ -48,6 +48,7 @@ from openhands.tools.file_editor.definition import (
 from openhands.tools.task_tracker.definition import (
     TaskTrackerObservation,
 )
+from openhands.tools.terminal.definition import ExecuteBashAction
 
 
 logger = get_logger(__name__)
@@ -203,6 +204,8 @@ class EventSubscriber:
                     if event.action.command == "view":
                         tool_kind = "read"
                     tool_kind = "edit"
+                elif isinstance(event.action, ExecuteBashAction):
+                    title = f"{event.action.command}"
 
                 action_viz = _rich_text_to_plain(event.action.visualize)
                 if action_viz.strip():
