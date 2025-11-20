@@ -277,11 +277,15 @@ class OpenHandsACPAgent(ACPAgent):
         session_id = params.sessionId
 
         try:
+            # Validate session ID
+            if session_id not in self._active_sessions:
+                raise ValueError(f"Unknown session: {session_id}")
+
             # Clear cancellation state for this session (new prompt turn)
             self._cancelled_sessions.discard(session_id)
 
-            # Get or create conversation (preserves state like pause/confirmation)
-            conversation = self._get_or_create_conversation(session_id=session_id)
+            # Get conversation from active sessions
+            conversation = self._active_sessions[session_id]
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(params.prompt)
@@ -298,6 +302,10 @@ class OpenHandsACPAgent(ACPAgent):
             stop_reason = await self._run_with_confirmations(session_id, conversation)
             return PromptResponse(stopReason=stop_reason)
 
+        except ValueError as e:
+            # Re-raise ValueError for invalid session IDs
+            logger.error(f"Error processing prompt: {e}", exc_info=True)
+            raise
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
             # Send error notification
@@ -519,6 +527,12 @@ class OpenHandsACPAgent(ACPAgent):
         logger.info(f"Loading session: {session_id}")
 
         try:
+            # Validate session ID format
+            try:
+                UUID(session_id)
+            except ValueError:
+                raise ValueError(f"Session not found: {session_id}")
+
             # Get or create conversation (loads from disk if not in cache)
             # The SDK's Conversation class automatically loads from disk if the
             # conversation_id exists in persistence_dir

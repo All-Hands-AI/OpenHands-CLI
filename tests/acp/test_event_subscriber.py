@@ -94,6 +94,7 @@ async def test_handle_action_event(event_subscriber, mock_connection):
         tool_call_id = "test-call-123"
         action = MockAction()
         tool_call = MockToolCall()
+        visualize = Text("Executing test action")
 
     event = MockEvent()
 
@@ -340,9 +341,9 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
             assert len(notification.update.entries) == 3
 
             # Verify first entry (done -> completed)
+            # Note: notes are intentionally omitted for conciseness
             entry1 = notification.update.entries[0]
-            assert "Task 1" in entry1.content
-            assert "Details for task 1" in entry1.content
+            assert entry1.content == "Task 1"
             assert entry1.status == "completed"
             assert entry1.priority == "medium"
 
@@ -354,8 +355,7 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
 
             # Verify third entry (todo -> pending)
             entry3 = notification.update.entries[2]
-            assert "Task 3" in entry3.content
-            assert "Details for task 3" in entry3.content
+            assert entry3.content == "Task 3"
             assert entry3.status == "pending"
             assert entry3.priority == "medium"
 

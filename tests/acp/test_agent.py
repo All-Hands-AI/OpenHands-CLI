@@ -296,12 +296,14 @@ async def test_load_session_not_found(acp_agent):
 @pytest.mark.asyncio
 async def test_load_session_success(acp_agent, mock_connection):
     """Test loading an existing session."""
+    from uuid import uuid4
+
     from acp import LoadSessionRequest
 
     from openhands.sdk import Message, TextContent
     from openhands.sdk.event.llm_convertible.message import MessageEvent
 
-    session_id = "existing-session"
+    session_id = str(uuid4())
     request = LoadSessionRequest(sessionId=session_id, cwd="/test/path", mcpServers=[])
 
     # Create mock conversation with history
@@ -318,8 +320,9 @@ async def test_load_session_success(acp_agent, mock_connection):
 
     await acp_agent.loadSession(request)
 
-    # Verify sessionUpdate was called for both messages
-    assert mock_connection.sessionUpdate.call_count == 2
+    # Verify sessionUpdate was called for agent message only
+    # (user messages are skipped to avoid duplication in Zed UI)
+    assert mock_connection.sessionUpdate.call_count == 1
 
 
 @pytest.mark.asyncio
