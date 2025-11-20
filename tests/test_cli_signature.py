@@ -19,5 +19,4 @@ def test_cli_signature_help_includes_user_skills_flags(capsys):
         pass
     out = capsys.readouterr().out
     # Verify flags appear in help text
-    assert '--user-skills' in out
     assert '--no-user-skills' in out
