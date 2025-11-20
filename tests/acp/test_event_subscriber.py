@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from acp import SessionNotification
 from acp.schema import (
-    SessionUpdate1,
     SessionUpdate2,
     SessionUpdate3,
     SessionUpdate4,
     SessionUpdate5,
+    SessionUpdate6,
 )
 
 from openhands.sdk import Message, TextContent
@@ -23,6 +23,10 @@ from openhands.sdk.event import (
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
+)
+from openhands.tools.task_tracker.definition import (
+    TaskItem,
+    TaskTrackerObservation,
 )
 from openhands_cli.acp_impl.event import EventSubscriber
 
@@ -186,7 +190,7 @@ async def test_event_subscriber_with_empty_text(event_subscriber, mock_connectio
 
 @pytest.mark.asyncio
 async def test_event_subscriber_with_user_message(event_subscriber, mock_connection):
-    """Test that user messages are sent as UserMessageChunk."""
+    """Test that user messages are NOT sent (to avoid duplication in Zed UI)."""
     # Create a MessageEvent from user (not agent)
     message = Message(role="user", content=[TextContent(text="User message")])
     event = MessageEvent(source="user", llm_message=message)
@@ -194,13 +198,10 @@ async def test_event_subscriber_with_user_message(event_subscriber, mock_connect
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
-    assert isinstance(call_args.update, SessionUpdate1)
-    assert call_args.update.sessionUpdate == "user_message_chunk"
+    # Verify sessionUpdate was NOT called (user messages are skipped)
+    # NOTE: Zed UI renders user messages when they're sent, so we don't
+    # want to duplicate them by sending them again as UserMessageChunk
+    assert not mock_connection.sessionUpdate.called
 
 
 @pytest.mark.asyncio
@@ -295,3 +296,106 @@ async def test_conversation_state_update_event_is_skipped(
 
     # Verify sessionUpdate was NOT called
     assert not mock_connection.sessionUpdate.called
+
+
+@pytest.mark.asyncio
+async def test_handle_task_tracker_observation(event_subscriber, mock_connection):
+    """Test handling of TaskTrackerObservation with plan updates."""
+    # Create a TaskTrackerObservation with multiple tasks
+    task_list = [
+        TaskItem(title="Task 1", notes="Details for task 1", status="done"),
+        TaskItem(title="Task 2", notes="", status="in_progress"),
+        TaskItem(title="Task 3", notes="Details for task 3", status="todo"),
+    ]
+
+    observation = TaskTrackerObservation.from_text(
+        text="Task list updated",
+        command="plan",
+        task_list=task_list,
+    )
+
+    # Create an ObservationEvent wrapping the TaskTrackerObservation
+    event = MagicMock(spec=ObservationEvent)
+    event.observation = observation
+    event.tool_call_id = "task-call-123"
+    event.model_dump = MagicMock(return_value={"command": "plan"})
+
+    # Process the event
+    await event_subscriber._handle_observation_event(event)
+
+    # Verify sessionUpdate was called twice (plan + tool_call_update)
+    assert mock_connection.sessionUpdate.call_count == 2
+
+    # Verify the plan update was sent
+    calls = mock_connection.sessionUpdate.call_args_list
+    plan_update_found = False
+    tool_call_update_found = False
+
+    for call in calls:
+        notification = call[0][0]
+        if isinstance(notification.update, SessionUpdate6):
+            plan_update_found = True
+            # Verify plan structure
+            assert notification.update.sessionUpdate == "plan"
+            assert len(notification.update.entries) == 3
+
+            # Verify first entry (done -> completed)
+            entry1 = notification.update.entries[0]
+            assert "Task 1" in entry1.content
+            assert "Details for task 1" in entry1.content
+            assert entry1.status == "completed"
+            assert entry1.priority == "medium"
+
+            # Verify second entry (in_progress -> in_progress)
+            entry2 = notification.update.entries[1]
+            assert entry2.content == "Task 2"
+            assert entry2.status == "in_progress"
+            assert entry2.priority == "medium"
+
+            # Verify third entry (todo -> pending)
+            entry3 = notification.update.entries[2]
+            assert "Task 3" in entry3.content
+            assert "Details for task 3" in entry3.content
+            assert entry3.status == "pending"
+            assert entry3.priority == "medium"
+
+        elif isinstance(notification.update, SessionUpdate5):
+            tool_call_update_found = True
+            assert notification.update.sessionUpdate == "tool_call_update"
+            assert notification.update.toolCallId == "task-call-123"
+            assert notification.update.status == "completed"
+
+    assert plan_update_found, "AgentPlanUpdate notification should be sent"
+    assert tool_call_update_found, "ToolCallProgress notification should be sent"
+
+
+@pytest.mark.asyncio
+async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connection):
+    """Test handling of TaskTrackerObservation with empty task list."""
+    observation = TaskTrackerObservation.from_text(
+        text="No tasks",
+        command="view",
+        task_list=[],
+    )
+
+    event = MagicMock(spec=ObservationEvent)
+    event.observation = observation
+    event.tool_call_id = "task-call-456"
+    event.model_dump = MagicMock(return_value={"command": "view"})
+
+    # Process the event
+    await event_subscriber._handle_observation_event(event)
+
+    # Verify sessionUpdate was called twice (plan with empty list + tool_call_update)
+    assert mock_connection.sessionUpdate.call_count == 2
+
+    # Verify empty plan was sent
+    calls = mock_connection.sessionUpdate.call_args_list
+    plan_found = False
+    for call in calls:
+        notification = call[0][0]
+        if isinstance(notification.update, SessionUpdate6):
+            plan_found = True
+            assert notification.update.entries == []
+
+    assert plan_found, "AgentPlanUpdate with empty entries should be sent"

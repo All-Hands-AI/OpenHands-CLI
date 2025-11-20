@@ -1,6 +1,6 @@
 """Utility functions for ACP implementation."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from acp import SessionNotification
 from acp.schema import (
@@ -16,6 +16,7 @@ from acp.schema import (
     ToolCallLocation,
     ToolCallProgress,
     ToolCallStart,
+    ToolCallStatus,
     ToolKind,
 )
 
@@ -43,7 +44,6 @@ if TYPE_CHECKING:
 from openhands.sdk import get_logger
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
-    FileEditorObservation,
 )
 from openhands.tools.task_tracker.definition import (
     TaskTrackerObservation,
@@ -83,7 +83,7 @@ def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
     return locations if locations else None
 
 
-def _rich_text_to_plain(text: Any) -> str:
+def _event_visualize_to_plain(event: Event) -> str:
     """Convert Rich Text object to plain string.
 
     Args:
@@ -92,8 +92,10 @@ def _rich_text_to_plain(text: Any) -> str:
     Returns:
         Plain text string
     """
-    if hasattr(text, "plain"):
-        return text.plain
+    text = event.visualize
+    text = text.plain
+    # Double newlines for ACP formatting
+    text = text.replace("\n", "\n\n")
     return str(text)
 
 
@@ -203,11 +205,13 @@ class EventSubscriber:
                 if isinstance(event.action, FileEditorAction):
                     if event.action.command == "view":
                         tool_kind = "read"
+                        title = f"Reading {event.action.path}"
                     tool_kind = "edit"
+                    title = f"Editing {event.action.path}"
                 elif isinstance(event.action, ExecuteBashAction):
                     title = f"{event.action.command}"
 
-                action_viz = _rich_text_to_plain(event.action.visualize)
+                action_viz = _event_visualize_to_plain(event)
                 if action_viz.strip():
                     content = [
                         ContentToolCallContent(
@@ -242,196 +246,91 @@ class EventSubscriber:
     async def _handle_observation_event(self, event: ObservationBaseEvent):
         """Handle observation events by sending tool_call_update notification.
 
-        Routes special observation types to dedicated handlers, otherwise uses
-        generic handling with visualization text.
+        Handles special observation types (FileEditor, TaskTracker) with custom logic,
+        and generic observations with visualization text.
 
         Args:
             event: ObservationEvent, UserRejectObservation, or AgentErrorEvent
         """
         try:
-            # Route special observation types to dedicated handlers
+            content: ContentToolCallContent | None = None
+            status: ToolCallStatus = "completed"
             if isinstance(event, ObservationEvent):
-                if isinstance(event.observation, FileEditorObservation):
-                    await self._handle_file_editor_observation(event)
-                    return
-
+                # Special handling for TaskTrackerObservation
                 if isinstance(event.observation, TaskTrackerObservation):
-                    await self._handle_task_tracker_observation(event)
-                    return
+                    observation = event.observation
+                    # Convert TaskItems to PlanEntries
+                    entries: list[PlanEntry] = []
+                    for task in observation.task_list:
+                        # Map status: todo→pending, in_progress→in_progress,
+                        # done→completed
+                        status_map: dict[str, PlanEntryStatus] = {
+                            "todo": "pending",
+                            "in_progress": "in_progress",
+                            "done": "completed",
+                        }
+                        task_status = status_map.get(task.status, "pending")
+                        task_content = task.title
+                        # NOTE: we ignore notes for now to keep it concise
+                        # if task.notes:
+                        #     task_content += f"\n{task.notes}"
+                        entries.append(
+                            PlanEntry(
+                                content=task_content,
+                                status=task_status,
+                                priority="medium",  # TaskItem doesn't have priority
+                            )
+                        )
 
-            # Generic handling for all other observations
-            await self._handle_generic_observation(event)
-        except Exception as e:
-            logger.debug(f"Error processing observation event: {e}", exc_info=True)
-
-    async def _handle_file_editor_observation(self, event: ObservationEvent):
-        """Handle FileEditorObservation with structured diff content.
-
-        Args:
-            event: ObservationEvent containing FileEditorObservation
-        """
-        observation = event.observation
-        assert isinstance(observation, FileEditorObservation)
-
-        content: (
-            list[
-                ContentToolCallContent
-                | FileEditToolCallContent
-                | TerminalToolCallContent
-            ]
-            | None
-        ) = None
-
-        # Use FileEditToolCallContent for file edits with meaningful diffs
-        if (
-            observation._has_meaningful_diff
-            and observation.path is not None
-            and observation.new_content is not None
-        ):
-            content = [
-                FileEditToolCallContent(
-                    type="diff",
-                    path=observation.path,
-                    oldText=observation.old_content,
-                    newText=observation.new_content,
-                )
-            ]
-        else:
-            # Use ContentToolCallContent for view commands and other operations
-            viz_text = _rich_text_to_plain(event.visualize)
-            if viz_text.strip():
-                content = [
-                    ContentToolCallContent(
+                    # Send AgentPlanUpdate
+                    await self.conn.sessionUpdate(
+                        SessionNotification(
+                            sessionId=self.session_id,
+                            update=AgentPlanUpdate(
+                                sessionUpdate="plan",
+                                entries=entries,
+                            ),
+                        )
+                    )
+                else:
+                    observation = event.observation
+                    # Use ContentToolCallContent for view commands and other operations
+                    viz_text = _event_visualize_to_plain(event)
+                    if viz_text.strip():
+                        content = ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        )
+            else:
+                # For UserRejectObservation or AgentErrorEvent
+                status = "failed"
+                viz_text = _event_visualize_to_plain(event)
+                if viz_text.strip():
+                    content = ContentToolCallContent(
                         type="content",
                         content=TextContentBlock(
                             type="text",
                             text=viz_text,
                         ),
                     )
-                ]
-
-        await self.conn.sessionUpdate(
-            SessionNotification(
-                sessionId=self.session_id,
-                update=ToolCallProgress(
-                    sessionUpdate="tool_call_update",
-                    toolCallId=event.tool_call_id,
-                    status="completed",
-                    content=content,
-                    rawOutput=event.model_dump(),
-                ),
-            )
-        )
-
-    async def _handle_task_tracker_observation(self, event: ObservationEvent):
-        """Handle TaskTrackerObservation by converting to AgentPlanUpdate.
-
-        Args:
-            event: ObservationEvent containing TaskTrackerObservation
-        """
-        try:
-            observation = event.observation
-            assert isinstance(observation, TaskTrackerObservation)
-
-            # Convert TaskItems to PlanEntries
-            entries: list[PlanEntry] = []
-            for task in observation.task_list:
-                # Map status: todo->pending, in_progress->in_progress, done->completed
-                status_map: dict[str, PlanEntryStatus] = {
-                    "todo": "pending",
-                    "in_progress": "in_progress",
-                    "done": "completed",
-                }
-                status = status_map.get(task.status, "pending")
-
-                # Combine title and notes into content
-                content = task.title
-                if task.notes:
-                    content += f"\n{task.notes}"
-
-                entries.append(
-                    PlanEntry(
-                        content=content,
-                        status=status,
-                        priority="medium",  # TaskItem doesn't have priority
-                    )
-                )
-
-            # Send AgentPlanUpdate
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    sessionId=self.session_id,
-                    update=AgentPlanUpdate(
-                        sessionUpdate="plan",
-                        entries=entries,
-                    ),
-                )
-            )
-
-            # Also send tool_call_update to mark the task_tracker tool as completed
+            # Send tool_call_update for all observation types
             await self.conn.sessionUpdate(
                 SessionNotification(
                     sessionId=self.session_id,
                     update=ToolCallProgress(
                         sessionUpdate="tool_call_update",
                         toolCallId=event.tool_call_id,
-                        status="completed",
-                        content=None,  # Plan is in AgentPlanUpdate
+                        status=status,
+                        content=[content] if content else None,
                         rawOutput=event.model_dump(),
                     ),
                 )
             )
         except Exception as e:
-            logger.debug(f"Error processing TaskTrackerObservation: {e}", exc_info=True)
-
-    async def _handle_generic_observation(self, event: ObservationBaseEvent):
-        """Handle generic observations with visualization text.
-
-        Used for terminal commands, other tool observations, errors, and rejections.
-
-        Args:
-            event: Any observation event without special handling
-        """
-        # Determine status based on event type
-        if isinstance(event, ObservationEvent):
-            status = "completed"
-        else:  # UserRejectObservation or AgentErrorEvent
-            status = "failed"
-
-        # Generate content from visualization text
-        content: (
-            list[
-                ContentToolCallContent
-                | FileEditToolCallContent
-                | TerminalToolCallContent
-            ]
-            | None
-        ) = None
-
-        viz_text = _rich_text_to_plain(event.visualize)
-        if viz_text.strip():
-            content = [
-                ContentToolCallContent(
-                    type="content",
-                    content=TextContentBlock(
-                        type="text",
-                        text=viz_text,
-                    ),
-                )
-            ]
-
-        await self.conn.sessionUpdate(
-            SessionNotification(
-                sessionId=self.session_id,
-                update=ToolCallProgress(
-                    sessionUpdate="tool_call_update",
-                    toolCallId=event.tool_call_id,
-                    status=status,
-                    content=content,
-                    rawOutput=event.model_dump(),
-                ),
-            )
-        )
+            logger.debug(f"Error processing observation event: {e}", exc_info=True)
 
     async def _handle_message_event(self, event: MessageEvent):
         """Handle MessageEvent by sending AgentMessageChunk or UserMessageChunk.
@@ -441,7 +340,7 @@ class EventSubscriber:
         """
         try:
             # Get visualization text
-            viz_text = _rich_text_to_plain(event.visualize)
+            viz_text = _event_visualize_to_plain(event)
             if not viz_text.strip():
                 return
 
@@ -488,7 +387,7 @@ class EventSubscriber:
             event: SystemPromptEvent
         """
         try:
-            viz_text = _rich_text_to_plain(event.visualize)
+            viz_text = _event_visualize_to_plain(event)
             if not viz_text.strip():
                 return
 
@@ -514,7 +413,7 @@ class EventSubscriber:
             event: PauseEvent
         """
         try:
-            viz_text = _rich_text_to_plain(event.visualize)
+            viz_text = _event_visualize_to_plain(event)
             if not viz_text.strip():
                 return
 
@@ -543,7 +442,7 @@ class EventSubscriber:
             event: Condensation event
         """
         try:
-            viz_text = _rich_text_to_plain(event.visualize)
+            viz_text = _event_visualize_to_plain(event)
             if not viz_text.strip():
                 return
 
@@ -569,7 +468,7 @@ class EventSubscriber:
             event: CondensationRequest event
         """
         try:
-            viz_text = _rich_text_to_plain(event.visualize)
+            viz_text = _event_visualize_to_plain(event)
             if not viz_text.strip():
                 return
 
