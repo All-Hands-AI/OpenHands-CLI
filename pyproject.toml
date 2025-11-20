@@ -15,8 +15,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
-# Using Git URLs for dependencies so installs from PyPI pull from GitHub
-# TODO: pin package versions once agent-sdk has published PyPI packages
+# Using pinned PyPI dependencies for the agent SDK and tools
 dependencies = [
   "openhands-sdk==1.2",
   "openhands-tools==1.2",
