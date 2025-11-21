@@ -16,13 +16,14 @@ def create_main_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 By default, OpenHands runs in CLI mode (terminal interface).
-Use 'serve' subcommand to launch the GUI server instead.
+Use subcommands for additional functionality.
 
 Examples:
   openhands                           # Start CLI mode
   openhands --resume conversation-id  # Resume a conversation in CLI mode
   openhands serve                     # Launch GUI server
   openhands serve --gpu               # Launch GUI server with GPU support
+  openhands acp                       # Start as ACP agent for editors like Zed
 """,
     )
 
@@ -38,7 +39,7 @@ Examples:
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
 
-    # Only serve as subcommand
+    # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
     # Add serve subcommand
@@ -52,6 +53,11 @@ Examples:
     )
     serve_parser.add_argument(
         "--gpu", action="store_true", help="Enable GPU support in the Docker container"
+    )
+
+    # Add ACP subcommand
+    subparsers.add_parser(
+        "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
     )
 
     return parser
