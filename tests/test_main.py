@@ -25,8 +25,8 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with no resume conversation ID
-        mock_run_agent_chat.assert_called_once_with(resume_conversation_id=None)
+        # Should call run_cli_entry with no resume conversation ID and default user_skills=True
+        mock_run_agent_chat.assert_called_once_with(resume_conversation_id=None, user_skills=True)
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -86,17 +86,19 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with the provided resume conversation ID
+        # Should call run_cli_entry with the provided resume conversation ID and default user_skills=True
         mock_run_agent_chat.assert_called_once_with(
-            resume_conversation_id="test-conversation-id"
+            resume_conversation_id="test-conversation-id", user_skills=True
         )
 
 
 @pytest.mark.parametrize(
     "argv,expected_kwargs",
     [
-        (["openhands"], {"resume_conversation_id": None}),
-        (["openhands", "--resume", "test-id"], {"resume_conversation_id": "test-id"}),
+        (["openhands"], {"resume_conversation_id": None, "user_skills": True}),
+        (["openhands", "--resume", "test-id"], {"resume_conversation_id": "test-id", "user_skills": True}),
+        (["openhands", "--no-user-skills"], {"resume_conversation_id": None, "user_skills": False}),
+        (["openhands", "--resume", "test-id", "--no-user-skills"], {"resume_conversation_id": "test-id", "user_skills": False}),
     ],
 )
 def test_main_cli_calls_run_cli_entry(monkeypatch, argv, expected_kwargs):
