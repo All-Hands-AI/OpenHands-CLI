@@ -16,6 +16,7 @@ from acp import (
     NewSessionResponse,
     PromptRequest,
     PromptResponse,
+    RequestError,
     SessionNotification,
     stdio_streams,
 )
@@ -27,6 +28,7 @@ from acp.schema import (
     CancelNotification,
     Implementation,
     LoadSessionRequest,
+    LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
     SetSessionModelRequest,
@@ -155,8 +157,8 @@ class OpenHandsACPAgent(ACPAgent):
             working_path.mkdir(parents=True, exist_ok=True)
 
         if not working_path.is_dir():
-            raise ValueError(
-                f"Working directory path is not a directory: {working_dir}"
+            raise RequestError.invalid_params(
+                {"reason": f"Working directory path is not a directory: {working_dir}"}
             )
 
         workspace = Workspace(working_dir=str(working_path))
@@ -261,13 +263,20 @@ class OpenHandsACPAgent(ACPAgent):
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
-            raise ValueError(
-                "Agent not configured. Please run 'openhands' to configure "
-                "the agent first."
+            raise RequestError.internal_error(
+                {
+                    "reason": "Agent not configured",
+                    "details": "Please run 'openhands' to configure the agent first.",
+                }
             )
+        except RequestError:
+            # Re-raise RequestError as-is
+            raise
         except Exception as e:
             logger.error(f"Failed to create new session: {e}", exc_info=True)
-            raise
+            raise RequestError.internal_error(
+                {"reason": "Failed to create new session", "details": str(e)}
+            )
 
     async def prompt(self, params: PromptRequest) -> PromptResponse:
         """Handle a prompt request."""
@@ -295,13 +304,12 @@ class OpenHandsACPAgent(ACPAgent):
             # Return the final response
             return PromptResponse(stopReason="end_turn")
 
-        except ValueError as e:
-            # Re-raise ValueError for invalid session IDs
-            logger.error(f"Error processing prompt: {e}", exc_info=True)
+        except RequestError:
+            # Re-raise RequestError as-is
             raise
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
-            # Send error notification
+            # Send error notification to client
             await self._conn.sessionUpdate(
                 SessionNotification(
                     sessionId=session_id,
@@ -311,7 +319,9 @@ class OpenHandsACPAgent(ACPAgent):
                     ),
                 )
             )
-            return PromptResponse(stopReason="end_turn")
+            raise RequestError.internal_error(
+                {"reason": "Failed to process prompt", "details": str(e)}
+            )
 
     async def cancel(self, params: CancelNotification) -> None:
         """Cancel the current operation."""
@@ -322,10 +332,18 @@ class OpenHandsACPAgent(ACPAgent):
             conversation = self._get_or_create_conversation(session_id=params.sessionId)
             # Pause the conversation (state is preserved in cache)
             conversation.pause()
+        except RequestError:
+            # Re-raise RequestError as-is
+            raise
         except Exception as e:
-            logger.warning(f"Failed to cancel session {params.sessionId}: {e}")
+            logger.error(f"Failed to cancel session {params.sessionId}: {e}")
+            raise RequestError.internal_error(
+                {"reason": "Failed to cancel session", "details": str(e)}
+            )
 
-    async def loadSession(self, params: LoadSessionRequest) -> None:
+    async def loadSession(
+        self, params: LoadSessionRequest
+    ) -> LoadSessionResponse | None:
         """Load an existing session and replay conversation history.
 
         This implements the same logic as 'openhands --resume <session_id>':
@@ -345,7 +363,9 @@ class OpenHandsACPAgent(ACPAgent):
             try:
                 UUID(session_id)
             except ValueError:
-                raise ValueError(f"Session not found: {session_id}")
+                raise RequestError.invalid_params(
+                    {"reason": "Invalid session ID format", "sessionId": session_id}
+                )
 
             # Get or create conversation (loads from disk if not in cache)
             # The SDK's Conversation class automatically loads from disk if the
@@ -357,7 +377,7 @@ class OpenHandsACPAgent(ACPAgent):
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                return
+                return LoadSessionResponse()
 
             # Stream conversation history to client by reusing EventSubscriber
             # This ensures consistent event handling with live conversations
@@ -370,10 +390,16 @@ class OpenHandsACPAgent(ACPAgent):
                 await subscriber(event)
 
             logger.info(f"Successfully loaded session {session_id}")
+            return LoadSessionResponse()
 
+        except RequestError:
+            # Re-raise RequestError as-is
+            raise
         except Exception as e:
             logger.error(f"Failed to load session {session_id}: {e}", exc_info=True)
-            raise
+            raise RequestError.internal_error(
+                {"reason": "Failed to load session", "details": str(e)}
+            )
 
     async def setSessionMode(
         self, params: SetSessionModeRequest
