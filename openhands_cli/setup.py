@@ -5,8 +5,10 @@ from prompt_toolkit import HTML, print_formatted_text
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
+    ConfirmRisky,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands.sdk.security.risk import SecurityRisk
 
 # Register tools on import
 from openhands.tools.file_editor import FileEditorTool  # noqa: F401
@@ -16,6 +18,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.tui.visualizer import CLIVisualizer
+from openhands_cli.user_actions.types import ConfirmationMode
 
 
 class MissingAgentSpec(Exception):
@@ -52,7 +55,8 @@ def verify_agent_exists_or_setup_agent() -> Agent:
 
 
 def setup_conversation(
-    conversation_id: UUID, include_security_analyzer: bool = True
+    conversation_id: UUID,
+    confirmation_mode: ConfirmationMode | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -60,6 +64,8 @@ def setup_conversation(
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
+        confirmation_mode: Confirmation mode to use.
+            Options: None, "always-approve", "llm-approve"
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -79,12 +85,17 @@ def setup_conversation(
         visualizer=CLIVisualizer,
     )
 
-    # Security analyzer is set though conversation API now
-    if not include_security_analyzer:
-        conversation.set_security_analyzer(None)
-    else:
+    # Handle confirmation mode
+    if confirmation_mode == "always-approve":
+        # Always ask for confirmation
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(AlwaysConfirm())
+    elif confirmation_mode == "llm-approve":
+        # Use LLM-based risk analysis, only confirm high-risk actions
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(ConfirmRisky(threshold=SecurityRisk.HIGH))
+    # When confirmation_mode is None, use default behavior
+    # (no security analyzer, no confirmation)
 
     print_formatted_text(
         HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")

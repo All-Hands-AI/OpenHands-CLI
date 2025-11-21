@@ -26,7 +26,10 @@ class TestMainEntryPoint:
         simple_main.main()
 
         # Should call run_cli_entry with no resume conversation ID
-        mock_run_agent_chat.assert_called_once_with(resume_conversation_id=None)
+        # and no confirmation mode
+        mock_run_agent_chat.assert_called_once_with(
+            resume_conversation_id=None, confirmation_mode=None
+        )
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -88,15 +91,70 @@ class TestMainEntryPoint:
 
         # Should call run_cli_entry with the provided resume conversation ID
         mock_run_agent_chat.assert_called_once_with(
-            resume_conversation_id="test-conversation-id"
+            resume_conversation_id="test-conversation-id", confirmation_mode=None
+        )
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--always-approve"])
+    def test_main_with_always_approve_argument(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() passes always-approve confirmation mode when provided."""
+        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call run_cli_entry with always confirmation mode
+        mock_run_agent_chat.assert_called_once_with(
+            resume_conversation_id=None, confirmation_mode="always-approve"
+        )
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--llm-approve"])
+    def test_main_with_llm_approve_argument(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() passes llm-approve confirmation mode when provided."""
+        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call run_cli_entry with llm confirmation mode
+        mock_run_agent_chat.assert_called_once_with(
+            resume_conversation_id=None, confirmation_mode="llm-approve"
         )
 
 
 @pytest.mark.parametrize(
     "argv,expected_kwargs",
     [
-        (["openhands"], {"resume_conversation_id": None}),
-        (["openhands", "--resume", "test-id"], {"resume_conversation_id": "test-id"}),
+        (
+            ["openhands"],
+            {"resume_conversation_id": None, "confirmation_mode": None},
+        ),
+        (
+            ["openhands", "--resume", "test-id"],
+            {"resume_conversation_id": "test-id", "confirmation_mode": None},
+        ),
+        (
+            ["openhands", "--always-approve"],
+            {"resume_conversation_id": None, "confirmation_mode": "always-approve"},
+        ),
+        (
+            ["openhands", "--llm-approve"],
+            {"resume_conversation_id": None, "confirmation_mode": "llm-approve"},
+        ),
+        (
+            ["openhands", "--resume", "test-id", "--always-approve"],
+            {
+                "resume_conversation_id": "test-id",
+                "confirmation_mode": "always-approve",
+            },
+        ),
     ],
 )
 def test_main_cli_calls_run_cli_entry(monkeypatch, argv, expected_kwargs):
@@ -146,6 +204,10 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
         (["openhands", "invalid-command"], 2),  # argparse error
         (["openhands", "--help"], 0),  # top-level help
         (["openhands", "serve", "--help"], 0),  # subcommand help
+        (
+            ["openhands", "--always-approve", "--llm-approve"],
+            2,
+        ),  # mutually exclusive
     ],
 )
 def test_help_and_invalid(monkeypatch, argv, expected_exit_code):
