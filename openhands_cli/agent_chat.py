@@ -60,7 +60,11 @@ def _print_exit_hint(conversation_id: str) -> None:
 
 
 
-def run_cli_entry(resume_conversation_id: str | None = None, user_skills: bool = True) -> None:
+def run_cli_entry(
+    resume_conversation_id: str | None = None,
+    user_skills: bool = True,
+    project_skills: bool = True,
+) -> None:
     """Run the agent chat session using the agent SDK.
 
 
@@ -83,7 +87,10 @@ def run_cli_entry(resume_conversation_id: str | None = None, user_skills: bool =
             return
 
     try:
-        initialized_agent = verify_agent_exists_or_setup_agent(load_user_skills=user_skills)
+        initialized_agent = verify_agent_exists_or_setup_agent(
+            load_user_skills=user_skills,
+            load_project_skills=project_skills,
+        )
     except MissingAgentSpec:
         print_formatted_text(HTML('\n<yellow>Setup is required to use OpenHands CLI.</yellow>'))
         print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
@@ -197,7 +204,11 @@ def run_cli_entry(resume_conversation_id: str | None = None, user_skills: bool =
                 message = None
 
             if not runner or not conversation:
-                conversation = setup_conversation(conversation_id, load_user_skills=user_skills)
+                conversation = setup_conversation(
+                    conversation_id,
+                    load_user_skills=user_skills,
+                    load_project_skills=project_skills,
+                )
                 runner = ConversationRunner(conversation)
             runner.process_message(message)
 

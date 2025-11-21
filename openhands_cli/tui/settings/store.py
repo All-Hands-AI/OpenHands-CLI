@@ -33,7 +33,12 @@ class AgentStore:
         except Exception:
             return {}
 
-    def load(self, session_id: str | None = None, load_user_skills: bool = True) -> Agent | None:
+    def load(
+        self,
+        session_id: str | None = None,
+        load_user_skills: bool = True,
+        load_project_skills: bool = True,
+    ) -> Agent | None:
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
             agent = Agent.model_validate_json(str_spec)
@@ -50,6 +55,10 @@ class AgentStore:
 
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
+
+            # Load skills from user directories and project-specific directories
+            if load_project_skills:
+                skills = self.load_project_skills()
 
             # Prefer newer SDK supporting load_user_skills; fall back if unsupported
             try:

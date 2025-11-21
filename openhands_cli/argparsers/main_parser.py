@@ -37,6 +37,16 @@ Examples:
         action='store_false',
         help='Disable loading user skills from ~/.openhands'
     )
+    # Control loading of project-specific skills
+    parser.add_argument(
+        '--no-project-skills',
+        dest='project_skills',
+        action='store_false',
+        help='Disable loading project-specific skills from the current project'
+    )
+
+    # Set defaults explicitly for clarity
+    parser.set_defaults(user_skills=True, project_skills=True)
 
     # Only serve as subcommand
     subparsers = parser.add_subparsers(

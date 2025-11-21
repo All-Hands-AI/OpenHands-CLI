@@ -43,7 +43,11 @@ def main() -> None:
 
             # Start agent chat
             # Keep call signature backward-compatible for upstream tests
-            run_cli_entry(resume_conversation_id=args.resume, user_skills=args.user_skills)
+            run_cli_entry(
+                resume_conversation_id=args.resume,
+                user_skills=args.user_skills,
+                project_skills=getattr(args, 'project_skills', True),
+            )
     except KeyboardInterrupt:
         print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
     except EOFError:
