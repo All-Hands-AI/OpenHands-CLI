@@ -30,7 +30,9 @@ from acp.schema import (
     LoadSessionRequest,
     LoadSessionResponse,
     McpCapabilities,
+    ModelInfo,
     PromptCapabilities,
+    SessionModelState,
     SetSessionModelRequest,
     SetSessionModelResponse,
     SetSessionModeRequest,
@@ -45,6 +47,7 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.event import Event
+from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
@@ -57,6 +60,140 @@ from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
 
 logger = logging.getLogger(__name__)
+
+
+def _determine_provider(model: str, base_url: str | None) -> str | None:
+    """Determine the provider from the model string and base URL.
+
+    Args:
+        model: The model identifier (e.g., "litellm_proxy/claude-sonnet-4-5-20250929")
+        base_url: The base URL if using a custom endpoint
+
+    Returns:
+        Provider name (e.g., "openhands", "anthropic", "openai") or None if unknown
+    """
+    # Check if using OpenHands proxy
+    if base_url and "all-hands.dev" in base_url:
+        return "openhands"
+
+    # Check if model has a provider prefix
+    if "/" in model:
+        provider_prefix = model.split("/")[0]
+        # litellm_proxy is a special case - need to check the actual model
+        if provider_prefix == "litellm_proxy":
+            # Extract the actual model name after the prefix
+            actual_model = model.split("/", 1)[1] if "/" in model else model
+            # Try to match against known providers by checking if the model exists
+            for provider, models in {
+                **VERIFIED_MODELS,
+                **UNVERIFIED_MODELS_EXCLUDING_BEDROCK,
+            }.items():
+                if actual_model in models:
+                    return provider
+            return None
+        else:
+            # Direct provider prefix like "anthropic/", "openai/"
+            return provider_prefix
+
+    # Try to match model name against provider model lists
+    for provider, models in {
+        **VERIFIED_MODELS,
+        **UNVERIFIED_MODELS_EXCLUDING_BEDROCK,
+    }.items():
+        if model in models:
+            return provider
+
+    return None
+
+
+def _get_available_models(conversation: BaseConversation) -> list[ModelInfo]:
+    """Get list of available models for the current provider using CLI's model registry.
+
+    This reuses the same logic as the CLI settings screen, which uses VERIFIED_MODELS
+    and UNVERIFIED_MODELS_EXCLUDING_BEDROCK to determine available models.
+
+    Args:
+        conversation: The conversation instance with LLM configuration
+
+    Returns:
+        List of ModelInfo objects representing available models from the same provider
+    """
+    try:
+        llm = conversation.agent.llm  # type: ignore[attr-defined]
+        current_model = llm.model
+        base_url = llm.base_url
+
+        # Determine the provider
+        provider = _determine_provider(current_model, base_url)
+
+        if not provider:
+            logger.debug(
+                "Could not determine provider for model %s, "
+                "returning current model only",
+                current_model,
+            )
+            return [
+                ModelInfo(
+                    modelId=current_model,
+                    name=current_model,
+                    description=f"Current model: {current_model}",
+                )
+            ]
+
+        # Get available models for this provider from the CLI's model registry
+        available_model_ids = VERIFIED_MODELS.get(
+            provider, []
+        ) + UNVERIFIED_MODELS_EXCLUDING_BEDROCK.get(provider, [])
+
+        if not available_model_ids:
+            logger.debug(
+                "No models found for provider %s, returning current model only",
+                provider,
+            )
+            return [
+                ModelInfo(
+                    modelId=current_model,
+                    name=current_model,
+                    description=f"Current model: {current_model}",
+                )
+            ]
+
+        # Convert to ModelInfo objects
+        # Need to format the model ID based on current configuration
+        available_models = []
+        for model_id in available_model_ids:
+            # Format the full model ID to match the current configuration
+            if current_model.startswith("litellm_proxy/"):
+                full_model_id = f"litellm_proxy/{model_id}"
+            elif "/" in current_model and not current_model.startswith(
+                "litellm_proxy/"
+            ):
+                # Has a provider prefix like "anthropic/"
+                prefix = current_model.split("/")[0]
+                full_model_id = f"{prefix}/{model_id}"
+            else:
+                # No prefix
+                full_model_id = model_id
+
+            available_models.append(
+                ModelInfo(
+                    modelId=full_model_id,
+                    name=model_id,
+                    description=f"{provider.capitalize()} model",
+                )
+            )
+
+        logger.debug(
+            "Found %d models for provider %s",
+            len(available_models),
+            provider,
+        )
+        return available_models
+
+    except Exception as e:
+        logger.error("Error getting available models: %s", e, exc_info=True)
+        # Return empty list on error
+        return []
 
 
 class OpenHandsACPAgent(ACPAgent):
@@ -254,12 +391,24 @@ class OpenHandsACPAgent(ACPAgent):
                 mcp_servers=mcp_servers_dict,
             )
 
-            logger.info(
-                f"Created new session {session_id} with model: "
-                f"{conversation.agent.llm.model}"  # type: ignore[attr-defined]
-            )
+            # Get current model and available models
+            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
+            available_models = _get_available_models(conversation)
 
-            return NewSessionResponse(sessionId=session_id)
+            # Build SessionModelState
+            model_state = None
+            if available_models:
+                model_state = SessionModelState(
+                    availableModels=available_models,
+                    currentModelId=current_model,
+                )
+                logger.debug(
+                    f"Loaded {len(available_models)} available models for new session"
+                )
+
+            logger.info(f"Created new session {session_id} with model: {current_model}")
+
+            return NewSessionResponse(sessionId=session_id, models=model_state)
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -372,12 +521,27 @@ class OpenHandsACPAgent(ACPAgent):
             # conversation_id exists in persistence_dir
             conversation = self._get_or_create_conversation(session_id=session_id)
 
+            # Get current model and available models
+            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
+            available_models = _get_available_models(conversation)
+
+            # Build SessionModelState
+            model_state = None
+            if available_models:
+                model_state = SessionModelState(
+                    availableModels=available_models,
+                    currentModelId=current_model,
+                )
+                logger.debug(
+                    f"Loaded {len(available_models)} available models for session"
+                )
+
             # Check if there's actually any history to load
             if not conversation.state.events:
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                return LoadSessionResponse()
+                return LoadSessionResponse(models=model_state)
 
             # Stream conversation history to client by reusing EventSubscriber
             # This ensures consistent event handling with live conversations
@@ -390,7 +554,7 @@ class OpenHandsACPAgent(ACPAgent):
                 await subscriber(event)
 
             logger.info(f"Successfully loaded session {session_id}")
-            return LoadSessionResponse()
+            return LoadSessionResponse(models=model_state)
 
         except RequestError:
             # Re-raise RequestError as-is
