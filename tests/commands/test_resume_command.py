@@ -5,14 +5,16 @@ from uuid import UUID
 
 import pytest
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.base import DummyOutput
+from prompt_toolkit.output.defaults import DummyOutput
 
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands_cli.user_actions import UserConfirmation
 
 
-# ---------- Fixtures & helpers ----------
+pytestmark = pytest.mark.usefixtures('skip_terminal_check_env')
 
+
+# ---------- Fixtures & helpers ----------
 
 @pytest.fixture
 def mock_agent():
@@ -24,7 +26,7 @@ def mock_agent():
 def mock_conversation():
     """Mock conversation with default settings."""
     conv = MagicMock()
-    conv.id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    conv.id = UUID('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
     return conv
 
 
@@ -36,19 +38,12 @@ def mock_runner():
 
 def run_resume_command_test(commands, agent_status=None, expect_runner_created=True):
     """Helper function to run resume command tests with common setup."""
-    with (
-        patch(
-            "openhands_cli.agent_chat.exit_session_confirmation"
-        ) as mock_exit_confirm,
-        patch(
-            "openhands_cli.agent_chat.get_session_prompter"
-        ) as mock_get_session_prompter,
-        patch("openhands_cli.agent_chat.setup_conversation") as mock_setup_conversation,
-        patch(
-            "openhands_cli.agent_chat.verify_agent_exists_or_setup_agent"
-        ) as mock_verify_agent,
-        patch("openhands_cli.agent_chat.ConversationRunner") as mock_runner_cls,
-    ):
+    with patch('openhands_cli.agent_chat.exit_session_confirmation') as mock_exit_confirm, \
+         patch('openhands_cli.agent_chat.get_session_prompter') as mock_get_session_prompter, \
+         patch('openhands_cli.agent_chat.setup_conversation') as mock_setup_conversation, \
+         patch('openhands_cli.agent_chat.verify_agent_exists_or_setup_agent') as mock_verify_agent, \
+         patch('openhands_cli.agent_chat.ConversationRunner') as mock_runner_cls:
+
         # Auto-accept the exit prompt to avoid interactive UI
         mock_exit_confirm.return_value = UserConfirmation.ACCEPT
 
@@ -58,7 +53,7 @@ def run_resume_command_test(commands, agent_status=None, expect_runner_created=T
 
         # Mock conversation setup
         conv = MagicMock()
-        conv.id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        conv.id = UUID('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
         if agent_status:
             conv.state.execution_status = agent_status
         mock_setup_conversation.return_value = conv
@@ -69,10 +64,7 @@ def run_resume_command_test(commands, agent_status=None, expect_runner_created=T
         mock_runner_cls.return_value = runner
 
         # Real session fed by a pipe
-        from openhands_cli.user_actions.utils import (
-            get_session_prompter as real_get_session_prompter,
-        )
-
+        from openhands_cli.user_actions.utils import get_session_prompter as real_get_session_prompter
         with create_pipe_input() as pipe:
             output = DummyOutput()
             session = real_get_session_prompter(input=pipe, output=output)
@@ -85,14 +77,13 @@ def run_resume_command_test(commands, agent_status=None, expect_runner_created=T
                 pipe.send_text(ch)
 
             # Capture printed output
-            with patch("openhands_cli.agent_chat.print_formatted_text") as mock_print:
+            with patch('openhands_cli.agent_chat.print_formatted_text') as mock_print:
                 run_cli_entry(None)
 
             return mock_runner_cls, runner, mock_print
 
 
 # ---------- Warning tests (parametrized) ----------
-
 
 @pytest.mark.parametrize(
     "commands,expected_warning,expect_runner_created",
@@ -106,18 +97,15 @@ def run_resume_command_test(commands, agent_status=None, expect_runner_created=T
 def test_resume_command_warnings(commands, expected_warning, expect_runner_created):
     """Test /resume command shows appropriate warnings."""
     # Set agent status to FINISHED for the "conversation exists but not paused" test
-    agent_status = (
-        ConversationExecutionStatus.FINISHED if expect_runner_created else None
-    )
+    agent_status = ConversationExecutionStatus.FINISHED if expect_runner_created else None
 
     mock_runner_cls, runner, mock_print = run_resume_command_test(
         commands, agent_status=agent_status, expect_runner_created=expect_runner_created
     )
 
     # Verify warning message was printed
-    warning_calls = [
-        call for call in mock_print.call_args_list if expected_warning in str(call)
-    ]
+    warning_calls = [call for call in mock_print.call_args_list
+                    if expected_warning in str(call)]
     assert len(warning_calls) > 0, f"Expected warning about {expected_warning}"
 
     # Verify runner creation expectation
@@ -129,7 +117,6 @@ def test_resume_command_warnings(commands, expected_warning, expect_runner_creat
 
 
 # ---------- Successful resume tests (parametrized) ----------
-
 
 @pytest.mark.parametrize(
     "agent_status",
@@ -149,8 +136,7 @@ def test_resume_command_successful_resume(agent_status):
     # Verify runner was created and process_message was called
     assert mock_runner_cls.call_count == 1
 
-    # Verify process_message was called twice: once with the initial message,
-    # once with None for resume
+    # Verify process_message was called twice: once with the initial message, once with None for resume
     assert runner.process_message.call_count == 2
 
     # Check the calls to process_message
@@ -162,6 +148,4 @@ def test_resume_command_successful_resume(agent_status):
 
     # Second call should have None (the /resume command)
     second_call_args = calls[1][0]
-    assert second_call_args[0] is None, (
-        "Second call should have None message for resume"
-    )
+    assert second_call_args[0] is None, "Second call should have None message for resume"
