@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from typing import Any
 
 from acp.schema import (
-    EnvVariable,
     HttpMcpServer,
     SseMcpServer,
     StdioMcpServer,
@@ -14,7 +13,7 @@ from acp.schema import (
 ACPMCPServerType = StdioMcpServer | HttpMcpServer | SseMcpServer
 
 
-def _transform_env_to_dict(env: Sequence[EnvVariable]) -> dict[str, str]:
+def _transform_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
     """
     Transform environment variables from serialized EnvVariable format to a dictionary.
 
@@ -29,7 +28,7 @@ def _transform_env_to_dict(env: Sequence[EnvVariable]) -> dict[str, str]:
     """
     env_dict: dict[str, str] = {}
     for env_var in env:
-        env_dict[env_var.name] = env_var.value
+        env_dict[env_var["name"]] = env_var["value"]
     return env_dict
 
 
